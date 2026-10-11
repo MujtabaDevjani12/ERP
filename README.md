@@ -1,7 +1,6 @@
-<<<<<<< HEAD
 # Multiple POS
 
-Ek Django-based POS system jo Gold/Diamond, Mart, Restaurant aur Clothing — sab business types ko ek hi system se handle karta hai. Multi-store, multi-warehouse, role-based permissions, POS billing screen, register (till) sessions, purchases/suppliers, inventory + barcode scanning, invoices (PDF/email/WhatsApp), reports/charts, aur CSV import/export.
+A Django-based POS system that handles Gold/Diamond, Mart, Restaurant and Clothing businesses, all from a single system. It includes multi-store and multi-warehouse support, role-based permissions, a POS billing screen, register (till) sessions, purchases/suppliers, inventory with barcode scanning, invoices (PDF/email/WhatsApp), reports/charts, and CSV import/export.
 
 ## 1. Setup (Windows / PowerShell)
 
@@ -14,9 +13,9 @@ pip install -r requirements.txt
 copy .env.example .env
 ```
 
-`.env` file kholein aur kam az kam `SECRET_KEY` change kar dein. Baqi (email/WhatsApp) baad mein bhar sakte hain — un ke bina bhi system pura chalega, sirf woh do delivery channels off rahenge.
+Open the `.env` file and change at least `SECRET_KEY`. You can fill in the rest (email/WhatsApp) later. The system works fully without them; only those two delivery channels will stay off.
 
-> **Invoice PDF:** ab ReportLab se banta hai (pure Python, `pip install -r requirements.txt` kaafi hai) — Windows par GTK/Pango/Cairo ya WeasyPrint install karne ki zaroorat nahi.
+> **Invoice PDF:** It is now generated with ReportLab (pure Python, so `pip install -r requirements.txt` is enough). There is no need to install GTK/Pango/Cairo or WeasyPrint on Windows.
 
 ```powershell
 python manage.py makemigrations
@@ -25,28 +24,28 @@ python manage.py seed_demo
 python manage.py runserver
 ```
 
-(`makemigrations` zaroori hai — is checkout mein migration files shamil nahi hain kyunke jahan yeh code likha gaya wahan Django chalane ki sahulat nahi thi. Ek dafa `makemigrations` chala kar commit kar dein, phir aage sirf `migrate` hi chalega.)
+(`makemigrations` is required because this checkout does not include migration files. The environment where this code was written had no way to run Django. Run `makemigrations` once and commit the result; after that, only `migrate` is needed.)
 
-Browser mein `http://127.0.0.1:8000/` kholein — login page aayega.
+Open `http://127.0.0.1:8000/` in your browser and the login page will appear.
 
-## 2. Demo logins (seed_demo command banata hai)
+## 2. Demo logins (created by the `seed_demo` command)
 
-| Username  | Password      | Role                          |
-|-----------|---------------|--------------------------------|
-| `admin`   | `admin12345`  | Superuser / owner (sab kuch)  |
-| `manager` | `manager12345`| Manager (Django admin bhi)    |
-| `cashier` | `cashier12345`| Cashier / biller (sirf POS)   |
+| Username  | Password       | Role                              |
+|-----------|----------------|-----------------------------------|
+| `admin`   | `admin12345`   | Superuser / owner (full access)   |
+| `manager` | `manager12345` | Manager (also has Django admin)   |
+| `cashier` | `cashier12345` | Cashier / biller (POS only)       |
 
-Pehli baar login karne ke baad **sidebar → Registers → Open register** karein — POS screen tabhi khulti hai jab ek register session open ho (jaan-boojh kar esa design hai, taake har sale kisi na kisi register/shift se linked rahe).
+After logging in for the first time, go to **sidebar → Registers → Open register**. The POS screen only opens when a register session is open. This is deliberate, so that every sale is always linked to some register/shift.
 
-Production mein `seed_demo` mat chalayen (ya demo users ka password turant badal dein) — yeh sirf testing ke liye hai.
+Do not run `seed_demo` in production (or change the demo users' passwords immediately). It is for testing only.
 
-## 3. Project ka structure (ek app = ek zimmedari)
+## 3. Project structure (one app = one responsibility)
 
 ```
 config/          settings, root urls.py, wsgi/asgi
 core/            shared base models (TimeStampedModel, CreatedByModel) + helpers
-tenants/         Store, Warehouse — har cheez isi se link hoti hai
+tenants/         Store, Warehouse — everything links back to these
 accounts/        custom User (store, is_biller, pos_pin)
 configuration/   POS Configuration (per-store) + System Configuration (site-wide) + number prefixes
 pricing/         Tax, Discount, CustomerGroup
@@ -64,49 +63,48 @@ dashboard/       Server-rendered UI: home dashboard + the POS billing screen
 reports/         Sales/stock reports, charts, CSV import/export — no models of its own
 ```
 
-Roles/permissions Django ke built-in Group/Permission system se chalte hain — koi alag "Role" model nahi (`/admin/auth/group/` se naye roles bana kar checkbox se permissions de sakte hain, phir Users ko wahi group assign kar dein).
+Roles and permissions run on Django's built-in Group/Permission system. There is no separate "Role" model. You can create new roles at `/admin/auth/group/`, assign permissions with checkboxes, and then assign that group to Users.
 
-## 4. Kya pura working hai vs kya abhi stub/manual setup maangta hai
+## 4. What is fully working vs. what is a stub or needs manual setup
 
-**Pura working (is checkout ke saath hi chal jayega):**
+**Fully working (runs out of the box with this checkout):**
 - Login, multi-store/warehouse, custom User + Django Group-based roles
-- POS billing screen — cart, barcode scan/search, split payments, quick cash, held sales, hotkeys (F4/F7/F8/Ctrl+F3/Ctrl+Shift+A)
-- Register open/close (apni alag pages), expected-cash vs counted-cash variance
-- Product add/edit with variants (Size/Color/Karat/Weight — sab ek hi attribute system se), auto barcode
-- Quantity Adjustment — scan-based, same barcode UX jaise POS mein
-- Purchases: Supplier → Purchase Order → (received hote hi) stock automatically andar, payments partial/due/paid
-- Sales: list/detail, add payment, payment status (due/partial/paid), PDF invoice, sale returns model (UI abhi list-level tak)
-- Customers (CNIC field), Gift cards, Loyalty points (auto-award on sale)
+- POS billing screen: cart, barcode scan/search, split payments, quick cash, held sales, hotkeys (F4/F7/F8/Ctrl+F3/Ctrl+Shift+A)
+- Register open/close (separate pages), expected-cash vs. counted-cash variance
+- Product add/edit with variants (Size/Color/Karat/Weight, all in one attribute system), auto barcode
+- Quantity Adjustment: scan-based, with the same barcode UX as the POS
+- Purchases: Supplier → Purchase Order → (once received) stock is added automatically; payments can be partial/due/paid
+- Sales: list/detail, add payment, payment status (due/partial/paid), PDF invoice, sale returns model (UI only at list level for now)
+- Customers (CNIC field), Gift cards, Loyalty points (auto-awarded on sale)
 - Expenses + categories, register-linked cash-out tracking
-- Settings: **POS Configuration** aur **System Configuration** do alag pages, + document number prefixes (SALE/SR/IPAY/POP/DO/PO/PR/TR/EXP/QA)
+- Settings: separate **POS Configuration** and **System Configuration** pages, plus document number prefixes (SALE/SR/IPAY/POP/DO/PO/PR/TR/EXP/QA)
 - Reports dashboard: revenue/due/purchases/expenses/profit cards, sales trend chart, top products, low-stock alert, payment-method breakdown
-- CSV export (sales, products) aur CSV import (products) — sidebar → Reports
+- CSV export (sales, products) and CSV import (products): sidebar → Reports
 
-**Kaam karta hai lekin real credentials chahiye (.env mein):**
-- Email invoice sending — abhi console backend use ho raha hai (terminal mein print hota hai), real bhejne ke liye `EMAIL_HOST` wagera .env mein bharein
-- WhatsApp invoice sending — Meta WhatsApp Cloud API stub hai, `WHATSAPP_ACCESS_TOKEN` + `WHATSAPP_PHONE_NUMBER_ID` chahiye, warna Document Log mein "not configured" error show hoga (silently fail nahi hota)
+**Works, but needs real credentials (in `.env`):**
+- Email invoice sending: currently uses the console backend (output is printed in the terminal). To send real emails, fill in `EMAIL_HOST` etc. in `.env`.
+- WhatsApp invoice sending: the Meta WhatsApp Cloud API integration is a stub. It needs `WHATSAPP_ACCESS_TOKEN` + `WHATSAPP_PHONE_NUMBER_ID`; otherwise the Document Log will show a "not configured" error (it does not fail silently).
 
-**Abhi tak nahi bana (aage add ho sakta hai):**
-- Online payment gateways (PayPal/Stripe/Authorize.net) — sirf settings mein placeholder fields hain, actual API integration nahi
-- Media library ka apna browsing UI (model maujood hai, list/upload screen nahi)
+**Not built yet (can be added later):**
+- Online payment gateways (PayPal/Stripe/Authorize.net): only placeholder fields exist in settings, with no actual API integration
+- A browsing UI for the media library (the model exists, but there is no list/upload screen)
 - Product image ZIP bulk-upload
-- Stock transfer aur sale-return ke apne dedicated forms (models + basic list maujood hain)
+- Dedicated forms for stock transfer and sale return (models + basic lists exist)
 
 ## 5. Development notes
 
-- Frontend: server-rendered Django templates + Tailwind (CDN) + Alpine.js — koi alag frontend build step nahi
-- Sabhi document numbers (`SALE-000001` waghera) `configuration.NumberingPrefix.next_reference()` se atomically milte hain — race-safe hai (select_for_update)
-- Har `Product` ka kam az kam 1 `ProductVariant` hamesha hota hai (signal se auto-create) — Sales/Purchases/Stock hamesha variant ko point karte hain, kabhi Product ko seedha nahi
-- Ye code is is sandbox mein likha gaya hai jahan `pip install`/`manage.py` chalane ki sahulat nahi thi (no PyPI access) — is liye apni machine par upar wale migrate/runserver steps zaroor chalayen aur agar koi chhoti typo/error mile to bata dein, foran fix ho jayegi.
+- Frontend: server-rendered Django templates + Tailwind (CDN) + Alpine.js, with no separate frontend build step
+- All document numbers (`SALE-000001`, etc.) are obtained atomically from `configuration.NumberingPrefix.next_reference()`, which is race-safe (`select_for_update`)
+- Every `Product` always has at least 1 `ProductVariant` (auto-created via a signal). Sales/Purchases/Stock always point to the variant, never directly to the Product
+- This code was written in a sandbox where `pip install` and `manage.py` could not be run (no PyPI access). So please run the migrate/runserver steps above on your own machine, and if you find any small typo or error, report it and it will be fixed right away.
 
 ---
 
 ## ERP modules (Manufacturing + Retail + Wholesale)
 
-Upar wala POS bilkul pehle ki tarah chalta hai. Us ke upar ERP ke modules additive tareeqe se add kiye gaye hain
-(naye apps, naye tables — purane tables/screens nahi tode gaye):
+The POS above works exactly as before. The ERP modules have been added on top of it in an additive way (new apps, new tables; the old tables and screens were not broken).
 
-| Module | Kaam |
+| Module | Purpose |
 |---|---|
 | `company`, `numbering`, `audit`, `attachments` | Company/branch, document numbers (PO-2026-00001), audit trail, files |
 | `rbac`, `approvals` | 21 roles, approval workflows (levels, amount limits, delegation) |
@@ -120,13 +118,9 @@ Upar wala POS bilkul pehle ki tarah chalta hai. Us ke upar ERP ke modules additi
 | `hr`, `payroll` | Employees, attendance, leave, loans, payroll, payslips, bank file |
 | `reports_erp`, `notifications`, `api` | `/erp/` dashboard + reports (Excel/PDF), alerts inbox, read-only REST API |
 
-* **Pehle yeh padhein:** `ERP_RUN_GUIDE.md` (exact commands, backup ke saath).
-* Design aur rules: `docs/ERP_ARCHITECTURE.md`, `docs/ACCOUNTING_RULES.md`, `docs/PRODUCTION_FLOW.md`,
+* **Read this first:** `ERP_RUN_GUIDE.md` (exact commands, including backup).
+* Design and rules: `docs/ERP_ARCHITECTURE.md`, `docs/ACCOUNTING_RULES.md`, `docs/PRODUCTION_FLOW.md`,
   `docs/DATABASE_ARCHITECTURE.md`, `docs/API_DOCUMENTATION.md`, `docs/DEPLOYMENT.md`; audit/roadmap: `ERP_AUDIT.md`, `ERP_ROADMAP.md`.
-* ERP documents ki zyada tar screens **Django admin** (`/admin/`) mein hain; `/erp/` dashboard aur reports ke liye.
-* **Demo data sirf development ke liye:** `python manage.py seed_demo_erp` (DEBUG=False par chalta hi nahi).
-  Production par kabhi `seed_demo` / `seed_demo_erp` na chalayen; `seed_demo` ke weak passwords (`admin12345` ...) turant badal dein.
-=======
-# ERP
-ERP POS
->>>>>>> d8ca3bace3622db87cf33c4b69dcc3d1d5f3f452
+* Most ERP document screens are in the **Django admin** (`/admin/`); the `/erp/` dashboard is for reports.
+* **Demo data is for development only:** `python manage.py seed_demo_erp` (it will not run when DEBUG=False).
+  Never run `seed_demo` / `seed_demo_erp` in production; change the weak `seed_demo` passwords (`admin12345`, etc.) immediately.
