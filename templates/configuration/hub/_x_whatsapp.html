@@ -1,0 +1,11 @@
+{% load ui %}
+<div class="st-body">
+  <h3 class="st-subtitle">Connection</h3>
+  {% if wa.token and wa.phone_id %}
+    <div class="ui-alert ui-alert-success" role="status">{% icon "success" "w-4 h-4" %}<div>The WhatsApp Cloud API credentials are set on the server.</div></div>
+  {% else %}
+    <div class="ui-alert ui-alert-warning" role="status">{% icon "warning" "w-4 h-4" %}<div>WhatsApp is not connected yet. Add <code>WHATSAPP_ACCESS_TOKEN</code> and <code>WHATSAPP_PHONE_NUMBER_ID</code> (from your Meta WhatsApp Business account) to the <code>.env</code> file and restart the server. Until then, “Send on WhatsApp” fails with a clear message in the document log.</div></div>
+  {% endif %}
+  <div class="st-hint" style="margin-top:12px"><b>Placeholders</b>
+    <div class="st-chips"><code>{customer_name}</code><code>{store_name}</code><code>{reference}</code><code>{total}</code></div></div>
+</div>

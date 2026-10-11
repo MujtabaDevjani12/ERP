@@ -1,0 +1,23 @@
+{% load ui %}
+<form id="st-main-form" method="post" novalidate class="st-form">
+  {% csrf_token %}
+  <div class="st-body">
+    <div class="st-table-wrap">
+      <table class="st-table">
+        <thead><tr><th>Document</th><th>Prefix</th><th>Digits</th><th>Next number</th></tr></thead>
+        <tbody>
+          {% for r in rows %}
+            <tr>
+              <td data-label="Document"><b>{{ r.get_document_type_display }}</b></td>
+              <td data-label="Prefix"><input type="text" name="prefix_{{ r.pk }}" value="{{ r.prefix }}" maxlength="15" aria-label="Prefix for {{ r.get_document_type_display }}" style="text-transform:uppercase"{% if r.error %} aria-invalid="true"{% endif %}>{% if r.error %}<p class="ui-error">{{ r.error }}</p>{% endif %}</td>
+              <td data-label="Digits"><input type="number" name="padding_{{ r.pk }}" value="{{ r.padding }}" min="1" max="12" aria-label="Digits for {{ r.get_document_type_display }}"></td>
+              <td data-label="Next number"><span class="st-mono">{{ r.prefix }}-{{ r.next_number }}</span></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="ui-help" style="margin-top:12px">Changing a prefix only affects documents created from now on. The running number itself is never reset.</p>
+  </div>
+  <div class="st-foot"><span></span><button type="submit" class="ui-btn ui-btn-primary">{% icon "check-mark" "w-4 h-4" %}<span>Save changes</span></button></div>
+</form>

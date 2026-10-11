@@ -1,0 +1,134 @@
+{% extends "base.html" %}{% load ui static %}
+{% block title %}Quantity adjustment{% endblock %}
+{% block content %}
+<div class="ui-form-wrap space-y-4" x-data="qtyAdjustApp()" x-init="init()" @keydown.window.f2.prevent="$refs.scan && $refs.scan.focus()">
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{% url 'inventory:adjustment_list' %}">Adjustment history</a><span class="sep">/</span><span>New</span></nav>
+      <h1 class="page-title">Quantity adjustment</h1>
+      <p class="page-subtitle">Scan or search to add an item, enter the quantity change, then save them all together.</p>
+    </div>
+    <div class="page-actions"><a class="ui-btn ui-btn-secondary" href="{% url 'inventory:adjustment_list' %}">{% icon "clock" "w-4 h-4" %}<span>History</span></a></div>
+  </div>
+
+  <form method="post" @submit="beforeSubmit($event)" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="rows_json" x-ref="rowsJson">
+
+    <section class="ui-form-section">
+      <header><h2>Adjustment details</h2><p>Where the stock is and why it is changing.</p></header>
+      <div class="body ui-grid ui-grid-2">
+        <div class="ui-field"><label class="ui-label" for="qa-wh">Warehouse <span style="color:var(--ui-danger)">*</span></label>
+          <select id="qa-wh" name="warehouse" x-model="warehouse" @change="refresh()">{% for w in warehouses %}<option value="{{ w.id }}">{{ w.name }}</option>{% endfor %}</select></div>
+        <div class="ui-field"><label class="ui-label" for="qa-reason">Reason</label>
+          <select id="qa-reason" name="reason" x-model="reason">{% for value, label in reasons %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></div>
+        <div class="ui-field ui-span-2"><label class="ui-label" for="qa-note">Note</label>
+          <input type="text" id="qa-note" name="note" x-model="note" maxlength="500" placeholder="Optional - e.g. shelf count on Friday"></div>
+      </div>
+    </section>
+
+    <section class="ui-form-section" style="overflow:visible">
+      <header><h2>Products</h2><p>Scan a barcode (Enter adds it) or type a name / SKU. <kbd class="ui-kbd">F2</kbd> jumps to the scan box.</p></header>
+      <div class="body space-y-3">
+        <div class="lp-box">
+          <div class="ui-search" style="max-width:none">
+            {% icon "scan" "w-4 h-4" %}
+            <input type="search" x-ref="scan" x-model="query" @input.debounce.180ms="search()"
+                   @keydown.enter.prevent="enter()" @keydown.arrow-down.prevent="move(1)" @keydown.arrow-up.prevent="move(-1)" @keydown.escape="clear()"
+                   placeholder="Scan a barcode or type a product name, SKU…" autocomplete="off" aria-label="Scan or search products to adjust" role="combobox" :aria-expanded="results.length > 0">
+            <span class="lp-spin" x-show="busy" x-cloak aria-hidden="true"></span>
+          </div>
+          <div class="lp-list" x-show="results.length" x-cloak role="listbox">
+            <template x-for="(r, i) in results" :key="r.id">
+              <button type="button" class="lp-item" :class="{ 'is-hi': i === hi }" role="option" :aria-selected="i === hi" @mouseenter="hi = i" @click="pick(r)">
+                <span class="lp-thumb"><img x-show="r.image" :src="r.image" alt="" loading="lazy"><span x-show="!r.image" x-text="(r.product || '?').slice(0, 1).toUpperCase()"></span></span>
+                <span class="min-w-0 lp-main"><span class="ui-cell-title" x-text="r.name"></span><span class="ui-cell-sub" x-text="[r.sku, r.barcode].filter(Boolean).join(' · ')"></span></span>
+                <span class="lp-side"><span class="ui-muted lp-stock" x-text="'on hand ' + r.stock + (r.unit ? ' ' + r.unit : '')"></span></span>
+                <span class="lp-in" x-show="has(r.id)" x-cloak>Added</span>
+              </button>
+            </template>
+          </div>
+          <p class="ui-error" x-show="miss" x-cloak style="margin-top:6px">No product found for “<span x-text="miss"></span>”. Check the code and try again.</p>
+          <p class="ui-error" x-show="failed" x-cloak style="margin-top:6px">Could not reach the server to search. Check your connection and try again.</p>
+        </div>
+
+        <div class="ui-table-wrap" x-show="rows.length" x-cloak>
+          <table class="ui-table ui-table-cards">
+            <thead><tr><th>Product</th><th class="num">Current</th><th class="num" style="width:11rem">Change (+ / −)</th><th class="num">New quantity</th><th class="col-actions"><span class="sr-only">Remove</span></th></tr></thead>
+            <tbody>
+              <template x-for="(row, idx) in rows" :key="row.variant_id">
+                <tr>
+                  <td data-label="Product"><div class="ui-cell-title" x-text="row.name"></div><div class="ui-cell-sub" x-text="row.sku"></div></td>
+                  <td data-label="Current" class="num tabular ui-muted" x-text="fmt(row.current)"></td>
+                  <td data-label="Change" class="num">
+                    <div class="lp-qty">
+                      <button type="button" class="icon-btn" @click="step(row, -1)" aria-label="One less">{% icon "minus" "w-3.5 h-3.5" %}</button>
+                      <input type="number" step="any" inputmode="decimal" x-model="row.change" style="text-align:center" :aria-label="'Change for ' + row.name">
+                      <button type="button" class="icon-btn" @click="step(row, 1)" aria-label="One more">{% icon "plus" "w-3.5 h-3.5" %}</button>
+                    </div>
+                  </td>
+                  <td data-label="New quantity" class="num tabular"><strong :class="{ 'ui-neg': after(row) < 0 }" x-text="fmt(after(row))"></strong></td>
+                  <td class="col-actions"><button type="button" class="icon-btn" @click="rows.splice(idx, 1)" aria-label="Remove this product" style="color:var(--ui-danger)">{% icon "trash" "w-4 h-4" %}</button></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+        <div class="ui-empty" x-show="!rows.length" style="padding:28px 0"><div class="ui-empty-icon">{% icon "cube" "w-6 h-6" %}</div><h3>No products yet</h3><p>Scan or search above to add the items you are counting.</p></div>
+        <p class="ui-error" x-show="problem" x-cloak x-text="problem" role="alert"></p>
+      </div>
+    </section>
+
+    <div class="ui-sticky-actions">
+      <span class="ui-muted" style="margin-right:auto"><strong x-text="rows.length"></strong> product<span x-show="rows.length !== 1">s</span> · <strong x-text="changed()"></strong> with a change</span>
+      <a href="{% url 'inventory:adjustment_list' %}" class="ui-btn ui-btn-secondary">Cancel</a>
+      <button type="submit" class="ui-btn ui-btn-primary" :disabled="!rows.length || submitting">
+        <span x-show="!submitting" class="inline-flex items-center gap-2">{% icon "check-mark" "w-4 h-4" %}<span>Save adjustment</span></span>
+        <span x-show="submitting" x-cloak>Saving…</span>
+      </button>
+    </div>
+  </form>
+</div>
+<script src="{% static 'js/line-picker.js' %}?v=20261010j"></script>
+<script>
+function qtyAdjustApp() {
+  const num = v => { const x = parseFloat(v); return isNaN(x) ? 0 : x; };
+  const rnd = v => Math.round(v * 1000) / 1000;
+  return {
+    ...lpSearch({
+      url: () => '{% url "catalog:api_variant_lookup" %}?warehouse=' + encodeURIComponent(document.getElementById('qa-wh').value),
+      onPick(v) { this.addRow(v); },
+    }),
+    rows: [], warehouse: '{{ warehouses.0.id|default:"" }}', reason: 'recount', note: '', problem: '', submitting: false,
+    init() { this.$nextTick(() => this.$refs.scan && this.$refs.scan.focus()); },
+    fmt(v) { return String(rnd(num(v))); },
+    after(r) { return rnd(num(r.current) + num(r.change)); },
+    changed() { return this.rows.filter(r => num(r.change) !== 0).length; },
+    has(id) { return this.rows.some(r => r.variant_id === id); },
+    addRow(r) {
+      const existing = this.rows.find(x => x.variant_id === r.id);
+      if (!existing) this.rows.push({ variant_id: r.id, name: r.name, sku: r.sku || '', current: num(r.stock), change: '' });
+      this.problem = '';
+      this.$nextTick(() => this.$refs.scan && this.$refs.scan.focus());
+    },
+    step(r, d) { r.change = String(rnd(num(r.change) + d)); },
+    async refresh() {            // another warehouse: the "current" figures must follow it
+      for (const r of this.rows) {
+        try {
+          const res = await fetch('{% url "catalog:api_variant_lookup" %}?warehouse=' + encodeURIComponent(this.warehouse) + '&q=' + encodeURIComponent(r.sku || r.name), { credentials: 'same-origin' });
+          const hit = ((await res.json()).results || []).find(x => x.id === r.variant_id);
+          r.current = hit ? num(hit.stock) : 0;
+        } catch (e) { /* keep the old figure */ }
+      }
+    },
+    beforeSubmit(e) {
+      this.problem = '';
+      const rows = this.rows.filter(r => num(r.change) !== 0);
+      if (!rows.length) { e.preventDefault(); this.problem = this.rows.length ? 'Every change is zero - enter how many to add (+) or remove (−).' : 'Add at least one product.'; return; }
+      this.$refs.rowsJson.value = JSON.stringify(rows.map(r => ({ variant_id: r.variant_id, change: num(r.change) })));
+      this.submitting = true;
+    },
+  };
+}
+</script>
+{% endblock %}

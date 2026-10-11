@@ -1,0 +1,441 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Print barcodes{% endblock %}
+{% block content %}
+{{ config|json_script:"bp-config" }}
+<div x-data="barcodeSheet" x-init="init()" class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{% url 'catalog:product_list' %}">Products</a><span class="sep">/</span><span>Print barcodes</span></nav>
+      <h1 class="page-title">Print barcodes</h1>
+      <p class="page-subtitle">Pick products, choose a label sheet or roll, decide what goes on each label, then print.</p>
+    </div>
+    <div class="page-actions">
+      <span class="ui-result-note" x-text="summary"></span>
+      <button type="button" class="ui-btn ui-btn-primary" :disabled="!flat.length || !libReady" @click="print()">{% icon "printer" "w-4 h-4" %}<span>Print labels</span></button>
+    </div>
+  </div>
+
+  <div class="ui-alert ui-alert-warning" x-show="libFailed" x-cloak role="alert">{% icon "warning" "w-4 h-4" %}<span>The barcode drawing library could not be loaded (check the internet connection), so labels cannot be previewed or printed yet. Reload the page to try again.</span></div>
+
+  <div class="bp-layout">
+    <div class="pf-stack">
+      <!-- 1. products -->
+      <section class="ui-form-section">
+        <header><h2>1. Choose products</h2><p>Search by name, SKU or barcode. Each variant has its own barcode.</p></header>
+        <div class="body space-y-3">
+          <div class="flex flex-wrap gap-2 items-end">
+            <div class="ui-search" style="min-width:12rem">
+              <label class="ui-label" for="bp-q">Search</label>
+              {% icon "search" "w-4 h-4" %}
+              <input type="search" id="bp-q" x-model="query" @input="search()" @keydown.enter.prevent="runSearch()" placeholder="Name, SKU or scan a barcode" autocomplete="off" autofocus>
+            </div>
+            <div style="min-width:10rem">
+              <label class="ui-label" for="bp-cat">Category</label>
+              <select id="bp-cat" x-model="category" @change="runSearch()">
+                <option value="">All categories</option>
+                {% for c in categories %}<option value="{{ c.pk }}">{{ c.name }}</option>{% endfor %}
+              </select>
+            </div>
+            <button type="button" class="ui-btn ui-btn-secondary" :disabled="!results.length" @click="addAll(results)">{% icon "plus" "w-4 h-4" %}<span x-text="results.length ? 'Add all ' + results.length : 'Add all'"></span></button>
+          </div>
+
+          <div class="bp-results" x-show="query.trim() || category" x-cloak>
+            <p class="pf-note" x-show="searching">Searching…</p>
+            <p class="pf-note" x-show="!searching && !results.length">No products match.</p>
+            <template x-for="r in results" :key="r.id">
+              <button type="button" class="bp-result" @click="add(r)">
+                <span class="min-w-0"><span class="ui-cell-title" x-text="r.product + (r.variant ? ' · ' + r.variant : '')"></span><span class="ui-cell-sub" style="display:block" x-text="r.sku + ' · ' + r.barcode"></span></span>
+                <span class="ui-cell-sub" x-text="money(r.price)"></span>
+                <span class="ui-btn ui-btn-ghost ui-btn-sm">{% icon "plus" "w-4 h-4" %}</span>
+              </button>
+            </template>
+            <p class="pf-note" x-show="truncated">Showing the first results only. Narrow the search to see more.</p>
+          </div>
+
+          <div x-show="items.length" x-cloak>
+            <div class="flex flex-wrap items-center justify-between gap-2" style="margin-bottom:8px">
+              <span class="ui-section-title" x-text="'Selected · ' + items.length + (items.length === 1 ? ' item' : ' items')"></span>
+              <div class="flex flex-wrap items-center gap-2">
+                <label class="pf-note" for="bp-all">Copies for all</label>
+                <input type="number" id="bp-all" min="1" max="999" x-model.number="allCopies" style="width:5rem" @change="setAllCopies()">
+                <button type="button" class="ui-btn ui-btn-ghost ui-btn-sm" @click="copiesFromStock()">Copies = stock</button>
+                <button type="button" class="ui-btn ui-btn-ghost ui-btn-sm" style="color:var(--ui-danger)" @click="items = []">Clear</button>
+              </div>
+            </div>
+            <div class="ui-table-wrap" style="max-height:340px">
+              <table class="ui-table">
+                <thead><tr><th>Product</th><th class="num">Price</th><th class="num" style="width:7rem">Copies</th><th class="col-actions"><span class="sr-only">Remove</span></th></tr></thead>
+                <tbody>
+                  <template x-for="(it, i) in items" :key="it.id">
+                    <tr>
+                      <td><div class="ui-cell-title" x-text="it.product + (it.variant ? ' · ' + it.variant : '')"></div><div class="ui-cell-sub" x-text="it.barcode + (it.stock ? ' · stock ' + it.stock : '')"></div></td>
+                      <td class="num ui-nowrap" x-text="money(it.price)"></td>
+                      <td class="num"><input type="number" min="1" max="999" x-model.number="it.copies" style="width:5.5rem;text-align:right" @focus="$event.target.select()"></td>
+                      <td class="col-actions"><button type="button" class="icon-btn" @click="items.splice(i, 1)" aria-label="Remove" style="color:var(--ui-danger)">{% icon "x" "w-4 h-4" %}</button></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <p class="pf-note" x-show="!items.length">Nothing selected yet. Search above and click a product to add it. Open a product and use “Print barcodes” to arrive here with it already selected.</p>
+        </div>
+      </section>
+
+      <!-- 2. sheet -->
+      <section class="ui-form-section">
+        <header><h2>2. Label sheet or roll</h2><p>Pick the paper your labels come on. Everything can be fine-tuned for any printer.</p></header>
+        <div class="body space-y-3">
+          <div class="ui-field">
+            <label class="ui-label" for="bp-preset">Layout</label>
+            <select id="bp-preset" x-model="s.preset" @change="applyPreset()" x-effect="void presets.length; $nextTick(() => { $el.value = s.preset })">
+              <optgroup label="A4 label sheets">
+                <template x-for="p in presets.filter(p => p.group === 'sheet')" :key="p.id"><option :value="p.id" x-text="p.name"></option></template>
+              </optgroup>
+              <optgroup label="Label rolls (thermal / direct)">
+                <template x-for="p in presets.filter(p => p.group === 'roll')" :key="p.id"><option :value="p.id" x-text="p.name"></option></template>
+              </optgroup>
+              <option value="custom">Custom size…</option>
+            </select>
+          </div>
+          <p class="pf-note" x-text="layoutNote"></p>
+          <div class="ui-field" x-show="sheetMode">
+            <label class="ui-label" for="bp-start">Start at label number</label>
+            <input type="number" id="bp-start" min="1" :max="perPage" x-model.number="s.startAt">
+            <p class="ui-help">Re-using a partly used sheet? Enter the first free label. Earlier positions stay empty.</p>
+          </div>
+          <details>
+            <summary class="pf-note" style="cursor:pointer">Custom sizes and fine tuning (millimetres)</summary>
+            <div class="ui-grid ui-grid-4" style="margin-top:var(--sp-3)">
+              <div class="ui-field"><label class="ui-label">Page width</label><input type="number" step="0.1" min="10" x-model.number="s.paperW" @input="s.preset = 'custom'"></div>
+              <div class="ui-field"><label class="ui-label">Page height</label><input type="number" step="0.1" min="10" x-model.number="s.paperH" @input="s.preset = 'custom'"></div>
+              <div class="ui-field"><label class="ui-label">Label width</label><input type="number" step="0.1" min="10" x-model.number="s.labelW" @input="s.preset = 'custom'"></div>
+              <div class="ui-field"><label class="ui-label">Label height</label><input type="number" step="0.1" min="8" x-model.number="s.labelH" @input="s.preset = 'custom'"></div>
+              <div class="ui-field"><label class="ui-label">Columns</label><input type="number" min="1" max="12" x-model.number="s.cols" @input="s.preset = 'custom'"></div>
+              <div class="ui-field"><label class="ui-label">Rows</label><input type="number" min="1" max="40" x-model.number="s.rows" @input="s.preset = 'custom'"></div>
+              <div class="ui-field"><label class="ui-label">Top margin</label><input type="number" step="0.1" min="0" x-model.number="s.mt" @input="s.preset = 'custom'"></div>
+              <div class="ui-field"><label class="ui-label">Left margin</label><input type="number" step="0.1" min="0" x-model.number="s.ml" @input="s.preset = 'custom'"></div>
+              <div class="ui-field"><label class="ui-label">Gap between columns</label><input type="number" step="0.1" min="0" x-model.number="s.gx" @input="s.preset = 'custom'"></div>
+              <div class="ui-field"><label class="ui-label">Gap between rows</label><input type="number" step="0.1" min="0" x-model.number="s.gy" @input="s.preset = 'custom'"></div>
+            </div>
+            <p class="ui-help">If printed labels drift from the sticker edges, print one test page and adjust the margins by a millimetre or two. Print with “Scale 100%” / “Actual size” in the print window.</p>
+          </details>
+        </div>
+      </section>
+
+      <!-- 3. content -->
+      <section class="ui-form-section">
+        <header><h2>3. What to print on each label</h2></header>
+        <div class="body space-y-4">
+          <div class="bp-checks">
+            <label><input type="checkbox" x-model="s.show.company"> Company name</label>
+            <label><input type="checkbox" x-model="s.show.name"> Product name</label>
+            <label><input type="checkbox" x-model="s.show.variant"> Variant (size, colour…)</label>
+            <label><input type="checkbox" x-model="s.show.sku"> SKU</label>
+            <label><input type="checkbox" x-model="s.show.category"> Category</label>
+            <label><input type="checkbox" x-model="s.show.brand"> Brand</label>
+            <label><input type="checkbox" x-model="s.show.barcode"> Barcode bars</label>
+            <label><input type="checkbox" x-model="s.show.code"> Barcode number</label>
+            <label><input type="checkbox" x-model="s.show.price"> Price</label>
+          </div>
+          <div class="ui-grid ui-grid-2">
+            <div class="ui-field" x-show="s.show.company"><label class="ui-label" for="bp-company">Company name on label</label><input type="text" id="bp-company" x-model="s.company" maxlength="60"></div>
+            <div class="ui-field" x-show="s.show.price"><label class="ui-label" for="bp-cur">Price in</label>
+              <select id="bp-cur" x-model="s.cur" x-effect="$nextTick(() => { $el.value = s.cur })">
+                <template x-for="c in cfg.currencies" :key="c.code"><option :value="c.code" x-text="c.code + ' (' + c.symbol + ')' + (c.base ? ' · main currency' : ' · 1 ' + c.code + ' = ' + rateText(c) + ' ' + cfg.currencies[0].code)"></option></template>
+              </select></div>
+            <div class="ui-field" x-show="s.show.price"><label class="ui-label" for="bp-cur2">Also show price in</label>
+              <select id="bp-cur2" x-model="s.cur2" x-effect="void s.cur; $nextTick(() => { $el.value = s.cur2 })">
+                <option value="">— No second price —</option>
+                <template x-for="c in cfg.currencies.filter(c => c.code !== s.cur)" :key="c.code"><option :value="c.code" x-text="c.code + ' (' + c.symbol + ')'"></option></template>
+              </select>
+              <p class="ui-help" x-show="cfg.currencies.length < 2">Only one currency is set up. <a class="erp-link" :href="cfg.currenciesUrl" target="_blank" rel="noopener">Add another currency</a> in Settings to print prices in it.</p></div>
+            <div class="ui-field" x-show="s.show.price"><label class="ui-label" for="bp-cst">Currency shown as</label>
+              <select id="bp-cst" x-model="s.curStyle"><option value="symbol">Symbol (Rs 1,200)</option><option value="code">Code (PKR 1,200)</option><option value="none">Number only (1,200)</option></select></div>
+            <div class="ui-field" x-show="s.show.price"><label class="ui-label" for="bp-dec">Price decimals</label>
+              <select id="bp-dec" x-model.number="s.decimals"><option :value="-1">Automatic</option><option :value="0">None (1,200)</option><option :value="2">Two (1,200.00)</option></select></div>
+            <div class="ui-field"><label class="ui-label" for="bp-align">Text alignment</label>
+              <select id="bp-align" x-model="s.align"><option value="center">Centre</option><option value="left">Left</option></select></div>
+          </div>
+          <div class="ui-grid ui-grid-2">
+            <div class="ui-field"><label class="ui-label" for="bp-font">Text size · <span x-text="s.font + '%'"></span></label><input type="range" id="bp-font" min="60" max="160" step="5" x-model.number="s.font"></div>
+            <div class="ui-field"><label class="ui-label" for="bp-bh">Barcode height · <span x-text="s.barcodeH + '%'"></span></label><input type="range" id="bp-bh" min="25" max="90" step="5" x-model.number="s.barcodeH"></div>
+            <div class="ui-field"><label class="ui-label" for="bp-pad">Inner padding (mm)</label><input type="number" id="bp-pad" step="0.1" min="0" max="10" x-model.number="s.pad"></div>
+            <label class="flex items-center gap-2" style="align-self:end;padding-bottom:9px"><input type="checkbox" x-model="s.border"> Print a border around each label</label>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- preview -->
+    <aside class="bp-preview">
+      <section class="ui-form-section">
+        <header class="flex items-center justify-between" style="gap:var(--sp-3)">
+          <div><h2>Preview</h2><p x-text="previewNote"></p></div>
+          <button type="button" class="ui-btn ui-btn-primary ui-btn-sm" :disabled="!flat.length || !libReady" @click="print()">{% icon "printer" "w-4 h-4" %}<span>Print</span></button>
+        </header>
+        <div class="body" style="background:var(--ui-surface-hover)">
+          <div x-ref="stage" class="bp-stage">
+            <div class="bp-empty" x-show="!flat.length" x-cloak>{% icon "tag" "w-6 h-6" %}<p>Add products to see the labels here.</p></div>
+            <div :style="'height:' + stageHeight + 'px'" x-show="flat.length" x-cloak>
+              <div class="bp-scale" :style="'transform:scale(' + scale + ')'" x-html="previewHtml"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<style>
+.bp-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 440px); gap: var(--sp-4); align-items: start; }
+@media (max-width: 1180px) { .bp-layout { grid-template-columns: minmax(0, 1fr); } }
+.bp-preview { position: sticky; top: calc(var(--topbar-h) + 12px); }
+@media (max-width: 1180px) { .bp-preview { position: static; } }
+.bp-results { border: 1px solid var(--ui-border); border-radius: var(--r-md); max-height: 260px; overflow-y: auto; background: var(--ui-surface); }
+.bp-results > p { padding: 10px 12px; margin: 0; }
+.bp-result { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 8px 12px; border: 0; border-bottom: 1px solid var(--ui-border); background: transparent; text-align: left; cursor: pointer; }
+.bp-result:last-of-type { border-bottom: 0; }
+.bp-result:hover { background: var(--ui-surface-hover); }
+.bp-checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 16px; }
+.bp-checks label { display: flex; align-items: center; gap: 8px; font-size: 13.5px; cursor: pointer; }
+.bp-stage { overflow: auto; max-height: 72vh; }
+.bp-scale { transform-origin: top left; }
+.bp-empty { text-align: center; padding: 48px 12px; color: var(--ui-text-3); font-size: 13px; }
+.bp-empty svg { margin: 0 auto 8px; display: block; }
+.bp-page-cap { font-size: 11px; color: var(--ui-text-3); margin: 14px 0 4px; }
+.bp-sheet-wrap { margin-bottom: 4px; }
+.bp-scale .sheet { box-shadow: 0 1px 6px rgba(15, 23, 42, .25); margin-bottom: 0; }
+.bp-scale .lb { outline: 1px dashed #cbd5e1; outline-offset: -1px; }
+.bp-scale .lb.has-border { outline: none; }
+.bp-scale .blank { position: absolute; background: repeating-linear-gradient(45deg, #f1f5f9, #f1f5f9 4px, #fff 4px, #fff 8px); outline: 1px dashed #e2e8f0; outline-offset: -1px; }
+</style>
+
+<script>
+document.addEventListener('alpine:init', function () {
+  var CFG = JSON.parse(document.getElementById('bp-config').textContent || '{}');
+  var SHEET_CSS = '.sheet{position:relative;overflow:hidden;background:#fff;page-break-after:always;break-after:page}' +
+    '.sheet:last-child{page-break-after:auto;break-after:auto}' +
+    '.lb{position:absolute;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;overflow:hidden;font-family:Arial,Helvetica,sans-serif;line-height:1.12;color:#000}' +
+    '.lb .t{width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}' +
+    '.lb .n{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;word-break:break-word}' +
+    '.lb .bc{width:100%;flex:1 1 0;min-height:3mm;margin:.4mm 0}' +
+    '.lb .bc svg{display:block;width:100%;height:100%}' +
+    '.lb .k{letter-spacing:.06em}.lb .p{font-weight:700}.lb .p2{font-weight:600;opacity:.85}.lb .bad{color:#b91c1c;font-size:7pt}';
+
+  var PRESETS = [
+    { id: 'a4-65', group: 'sheet', name: '65 labels · 38.1 × 21.2 mm', paperW: 210, paperH: 297, labelW: 38.1, labelH: 21.2, cols: 5, rows: 13, mt: 10.7, ml: 4.7, gx: 2.5, gy: 0 },
+    { id: 'a4-40', group: 'sheet', name: '40 labels · 45.7 × 25.4 mm', paperW: 210, paperH: 297, labelW: 45.7, labelH: 25.4, cols: 4, rows: 10, mt: 21.5, ml: 9.8, gx: 2.5, gy: 0 },
+    { id: 'a4-30', group: 'sheet', name: '30 labels · 70 × 29.7 mm', paperW: 210, paperH: 297, labelW: 70, labelH: 29.7, cols: 3, rows: 10, mt: 0, ml: 0, gx: 0, gy: 0 },
+    { id: 'a4-24', group: 'sheet', name: '24 labels · 63.5 × 33.9 mm', paperW: 210, paperH: 297, labelW: 63.5, labelH: 33.9, cols: 3, rows: 8, mt: 12.9, ml: 7.2, gx: 2.5, gy: 0 },
+    { id: 'a4-21', group: 'sheet', name: '21 labels · 63.5 × 38.1 mm', paperW: 210, paperH: 297, labelW: 63.5, labelH: 38.1, cols: 3, rows: 7, mt: 15.1, ml: 7.2, gx: 2.5, gy: 0 },
+    { id: 'a4-14', group: 'sheet', name: '14 labels · 99.1 × 38.1 mm', paperW: 210, paperH: 297, labelW: 99.1, labelH: 38.1, cols: 2, rows: 7, mt: 15.1, ml: 4.7, gx: 2.5, gy: 0 },
+    { id: 'a4-12', group: 'sheet', name: '12 labels · 99.1 × 42.3 mm', paperW: 210, paperH: 297, labelW: 99.1, labelH: 42.3, cols: 2, rows: 6, mt: 21.6, ml: 4.7, gx: 2.5, gy: 0 },
+    { id: 'a4-10', group: 'sheet', name: '10 labels · 99.1 × 57 mm', paperW: 210, paperH: 297, labelW: 99.1, labelH: 57, cols: 2, rows: 5, mt: 6, ml: 4.7, gx: 2.5, gy: 0 },
+    { id: 'roll-50x25', group: 'roll', name: '50 × 25 mm · one across', paperW: 50, paperH: 25, labelW: 50, labelH: 25, cols: 1, rows: 1, mt: 0, ml: 0, gx: 0, gy: 0 },
+    { id: 'roll-40x30', group: 'roll', name: '40 × 30 mm · one across', paperW: 40, paperH: 30, labelW: 40, labelH: 30, cols: 1, rows: 1, mt: 0, ml: 0, gx: 0, gy: 0 },
+    { id: 'roll-38x25', group: 'roll', name: '38 × 25 mm · one across', paperW: 38, paperH: 25, labelW: 38, labelH: 25, cols: 1, rows: 1, mt: 0, ml: 0, gx: 0, gy: 0 },
+    { id: 'roll-58x40', group: 'roll', name: '58 × 40 mm · one across', paperW: 58, paperH: 40, labelW: 58, labelH: 40, cols: 1, rows: 1, mt: 0, ml: 0, gx: 0, gy: 0 },
+    { id: 'roll-100x50', group: 'roll', name: '100 × 50 mm · one across', paperW: 100, paperH: 50, labelW: 100, labelH: 50, cols: 1, rows: 1, mt: 0, ml: 0, gx: 0, gy: 0 },
+    { id: 'roll-2up-38x25', group: 'roll', name: '2 across · 38 × 25 mm (80 mm roll)', paperW: 80, paperH: 25, labelW: 38, labelH: 25, cols: 2, rows: 1, mt: 0, ml: 1, gx: 2, gy: 0 },
+    { id: 'roll-3up-33x22', group: 'roll', name: '3 across · 33 × 22 mm (105 mm roll)', paperW: 105, paperH: 22, labelW: 33, labelH: 22, cols: 3, rows: 1, mt: 0, ml: 1.5, gx: 1.5, gy: 0 }
+  ];
+
+  function defaults() {
+    var p = PRESETS[0];
+    return {
+      preset: p.id, paperW: p.paperW, paperH: p.paperH, labelW: p.labelW, labelH: p.labelH, cols: p.cols, rows: p.rows, mt: p.mt, ml: p.ml, gx: p.gx, gy: p.gy,
+      show: { company: true, name: true, variant: true, sku: false, category: false, brand: false, barcode: true, code: true, price: true },
+      company: CFG.company || '', cur: (CFG.currencies && CFG.currencies[0] ? CFG.currencies[0].code : ''), cur2: '', curStyle: 'symbol', decimals: -1, align: 'center', font: 100, barcodeH: 60, pad: 1.2, border: false, startAt: 1
+    };
+  }
+  function num(v, d, min) { v = Number(v); if (!isFinite(v)) v = d; return min !== undefined ? Math.max(min, v) : v; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+  var svgCache = {};
+  var JSB_FORMAT = { code128: 'CODE128', code39: 'CODE39', ean13: 'EAN13', ean8: 'EAN8', upca: 'UPC' };   // the product's own barcode type
+  function barcodeSvg(code, symbology) {
+    var format = JSB_FORMAT[symbology] || 'CODE128', cacheKey = format + '|' + code;
+    if (svgCache[cacheKey]) return svgCache[cacheKey];
+    if (!window.JsBarcode) return '';
+    var out;
+    try {
+      var el = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      window.JsBarcode(el, String(code), { format: format, displayValue: false, margin: 0, height: 100, width: 2 });
+      var vb = el.getAttribute('viewBox');
+      if (!vb) vb = '0 0 ' + (parseFloat(el.getAttribute('width')) || 200) + ' ' + (parseFloat(el.getAttribute('height')) || 100);
+      el.setAttribute('viewBox', vb); el.setAttribute('width', '100%'); el.setAttribute('height', '100%');
+      el.setAttribute('preserveAspectRatio', 'none'); el.removeAttribute('style');
+      out = el.outerHTML;
+    } catch (e) { out = '<span class="bad">Cannot make a barcode from this value</span>'; }
+    svgCache[cacheKey] = out;
+    return out;
+  }
+
+  Alpine.data('barcodeSheet', function () {
+    return {
+      cfg: CFG, presets: PRESETS, s: defaults(),
+      query: '', category: '', results: [], truncated: false, searching: false, items: [], allCopies: 1,
+      libReady: false, libFailed: false, scale: 1, stageWidth: 400,
+
+      init: function () {
+        var self = this;
+        try { var saved = JSON.parse(localStorage.getItem('barcodeSettings.v2') || 'null'); if (saved) this.s = Object.assign(defaults(), saved, { show: Object.assign(defaults().show, saved.show || {}) }); } catch (e) {}
+        if (!this.s.company) this.s.company = CFG.company || '';
+        var codes = (CFG.currencies || []).map(function (c) { return c.code; });
+        if (codes.indexOf(this.s.cur) < 0) this.s.cur = codes[0] || '';
+        if (this.s.cur2 && (codes.indexOf(this.s.cur2) < 0 || this.s.cur2 === this.s.cur)) this.s.cur2 = '';
+        (CFG.initial || []).forEach(function (it) { self.items.push(Object.assign({}, it, { copies: 1 })); });
+        this.$watch('s', function () { try { localStorage.setItem('barcodeSettings.v2', JSON.stringify(self.s)); } catch (e) {} }, { deep: true });
+        this.loadLib();
+        var stage = this.$refs.stage;
+        var measure = function () { self.stageWidth = Math.max(240, stage.clientWidth - 4); };
+        measure();
+        if (window.ResizeObserver) new ResizeObserver(measure).observe(stage); else window.addEventListener('resize', measure);
+      },
+      loadLib: function () {
+        var self = this;
+        if (window.JsBarcode) { this.libReady = true; return; }
+        var sc = document.createElement('script');
+        sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js';
+        sc.onload = function () { self.libReady = !!window.JsBarcode; self.libFailed = !self.libReady; };
+        sc.onerror = function () { self.libFailed = true; };
+        document.head.appendChild(sc);
+      },
+
+      // ---------------------------------------------------------------- picking
+      money: function (v) { return CFG.currencySymbol + ' ' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
+      search: function () { var self = this; clearTimeout(this._t); this._t = setTimeout(function () { self.runSearch(); }, 250); },
+      runSearch: function () {
+        var self = this, q = this.query.trim();
+        if (!q && !this.category) { this.results = []; return Promise.resolve(); }
+        this.searching = true;
+        var url = CFG.itemsUrl + '?q=' + encodeURIComponent(q) + '&category=' + encodeURIComponent(this.category);
+        return fetch(url, { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
+          self.results = d.results || []; self.truncated = !!d.truncated;
+          // a scanner types the whole code then presses Enter: one exact barcode hit is added straight away
+          if (q && self.results.length === 1 && self.results[0].barcode === q) { self.add(self.results[0]); self.query = ''; self.results = []; }
+        }).catch(function () { self.results = []; }).then(function () { self.searching = false; });
+      },
+      add: function (r) {
+        var have = this.items.find(function (x) { return x.id === r.id; });
+        if (have) have.copies = num(have.copies, 1, 1) + 1; else this.items.push(Object.assign({}, r, { copies: num(this.allCopies, 1, 1) }));
+      },
+      addAll: function (list) { var self = this; list.forEach(function (r) { if (!self.items.some(function (x) { return x.id === r.id; })) self.items.push(Object.assign({}, r, { copies: num(self.allCopies, 1, 1) })); }); },
+      setAllCopies: function () { var n = Math.min(999, num(this.allCopies, 1, 1)); this.allCopies = n; this.items.forEach(function (i) { i.copies = n; }); },
+      copiesFromStock: function () { this.items.forEach(function (i) { i.copies = Math.min(999, Math.max(1, Math.round(Number(i.stock) || 1))); }); },
+
+      // ---------------------------------------------------------------- layout
+      applyPreset: function () {
+        var p = PRESETS.find(function (x) { return x.id === this.s.preset; }.bind(this));
+        if (!p) return;
+        var s = this.s;
+        ['paperW', 'paperH', 'labelW', 'labelH', 'cols', 'rows', 'mt', 'ml', 'gx', 'gy'].forEach(function (k) { s[k] = p[k]; });
+        s.startAt = 1;
+      },
+      get sheetMode() { return this.perPage > 1; },
+      get perPage() { return Math.max(1, num(this.s.cols, 1, 1) * num(this.s.rows, 1, 1)); },
+      get layoutNote() {
+        var s = this.s;
+        return s.paperW + ' × ' + s.paperH + ' mm page · ' + s.cols + ' × ' + s.rows + ' = ' + this.perPage + ' label' + (this.perPage > 1 ? 's' : '') + ' per page · each label ' + s.labelW + ' × ' + s.labelH + ' mm.';
+      },
+      get flat() {
+        var out = [], total = 0;
+        this.items.forEach(function (it) {
+          var n = Math.min(999, Math.floor(num(it.copies, 1, 1)));
+          for (var i = 0; i < n && total < 5000; i++, total++) out.push(it);
+        });
+        return out;
+      },
+      get slots() {
+        var blanks = this.sheetMode ? Math.min(this.perPage - 1, Math.max(0, Math.floor(num(this.s.startAt, 1, 1)) - 1)) : 0;
+        var out = []; for (var i = 0; i < blanks; i++) out.push(null);
+        return out.concat(this.flat);
+      },
+      get pageCount() { return this.slots.length ? Math.ceil(this.slots.length / this.perPage) : 0; },
+      get summary() { return this.flat.length ? this.flat.length + ' label' + (this.flat.length === 1 ? '' : 's') + ' · ' + this.pageCount + ' page' + (this.pageCount === 1 ? '' : 's') : ''; },
+      get previewNote() { return this.flat.length ? 'Dashed lines are label edges and are not printed.' + (this.pageCount > 3 ? ' First 3 of ' + this.pageCount + ' pages shown; printing includes all.' : '') : 'Nothing to preview yet.'; },
+      get stageHeight() {
+        var pages = Math.min(3, this.pageCount), s = this.s, mm = 3.7795;
+        return Math.ceil(pages * (num(s.paperH, 297, 10) * mm + 38) * this.scale) + 8;
+      },
+
+      // ---------------------------------------------------------------- label drawing
+      currencyOf: function (code) { return (CFG.currencies || []).find(function (c) { return c.code === code; }) || (CFG.currencies || [])[0] || { code: '', symbol: '', rate: '1', decimals: 2 }; },
+      rateText: function (c) { return Number(c.rate).toLocaleString('en-US', { maximumFractionDigits: 4 }); },
+      // prices are stored in the main currency; a second currency is converted with the rate typed in Settings
+      priceText: function (v, code) {
+        var s = this.s, c = this.currencyOf(code || s.cur), rate = Number(c.rate) || 1;
+        var d = s.decimals < 0 ? (c.base ? 2 : c.decimals) : s.decimals;
+        var n = (Number(v) / rate).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+        var cur = s.curStyle === 'symbol' ? c.symbol : (s.curStyle === 'code' ? c.code : '');
+        return cur ? cur + ' ' + n : n;
+      },
+      labelHtml: function (it, x, y) {
+        var s = this.s, lw = num(s.labelW, 38, 5), lh = num(s.labelH, 21, 5), show = s.show, pad = num(s.pad, 1, 0);
+        var base = Math.max(4.5, Math.min(12, lh * 0.24)) * num(s.font, 100, 20) / 100;
+        var f = function (k) { return (base * k).toFixed(2) + 'pt'; };
+        var html = '';
+        if (show.company && s.company) html += '<div class="t" style="font-size:' + f(0.85) + ';font-weight:700">' + esc(s.company) + '</div>';
+        if (show.name) html += '<div class="t n" style="font-size:' + f(1) + ';font-weight:600;-webkit-line-clamp:' + (lh >= 30 ? 2 : 1) + '">' + esc(it.product) + '</div>';
+        if (show.variant && it.variant) html += '<div class="t" style="font-size:' + f(0.85) + '">' + esc(it.variant) + '</div>';
+        var meta = [];
+        if (show.sku) meta.push('SKU ' + it.sku);
+        if (show.category && it.category) meta.push(it.category);
+        if (show.brand && it.brand) meta.push(it.brand);
+        if (meta.length) html += '<div class="t" style="font-size:' + f(0.78) + '">' + esc(meta.join(' · ')) + '</div>';
+        if (show.barcode) html += '<div class="bc" style="max-height:' + (lh * num(s.barcodeH, 60, 10) / 100).toFixed(2) + 'mm">' + barcodeSvg(it.barcode, it.symbology) + '</div>';
+        if (show.code) html += '<div class="t k" style="font-size:' + f(0.8) + '">' + esc(it.barcode) + '</div>';
+        if (show.price) {
+          html += '<div class="t p" style="font-size:' + f(1.25) + '">' + esc(this.priceText(it.price)) + '</div>';
+          if (s.cur2) html += '<div class="t p2" style="font-size:' + f(0.9) + '">' + esc(this.priceText(it.price, s.cur2)) + '</div>';
+        }
+        var align = s.align === 'left' ? 'left' : 'center';
+        return '<div class="lb' + (s.border ? ' has-border' : '') + '" style="left:' + x.toFixed(2) + 'mm;top:' + y.toFixed(2) + 'mm;width:' + lw + 'mm;height:' + lh + 'mm;padding:' + pad + 'mm;' +
+          'text-align:' + align + ';align-items:' + (align === 'left' ? 'flex-start' : 'center') + ';' + (s.border ? 'border:0.2mm solid #000;' : '') + '">' + html + '</div>';
+      },
+      pagesHtml: function (maxPages, preview) {
+        var s = this.s, slots = this.slots, per = this.perPage, cols = Math.max(1, Math.floor(num(s.cols, 1, 1))), pages = Math.min(this.pageCount, maxPages), out = '';
+        var lw = num(s.labelW, 38, 5), lh = num(s.labelH, 21, 5);
+        for (var p = 0; p < pages; p++) {
+          var sheet = '';
+          for (var i = 0; i < per; i++) {
+            var it = slots[p * per + i], c = i % cols, r = Math.floor(i / cols);
+            var x = num(s.ml, 0, 0) + c * (lw + num(s.gx, 0, 0)), y = num(s.mt, 0, 0) + r * (lh + num(s.gy, 0, 0));
+            if (it === undefined) break;
+            if (it === null) { if (preview) sheet += '<div class="blank" style="left:' + x.toFixed(2) + 'mm;top:' + y.toFixed(2) + 'mm;width:' + lw + 'mm;height:' + lh + 'mm"></div>'; continue; }
+            sheet += this.labelHtml(it, x, y);
+          }
+          out += (preview ? '<div class="bp-page-cap">Page ' + (p + 1) + ' of ' + this.pageCount + '</div>' : '') +
+            '<div class="sheet" style="width:' + num(s.paperW, 210, 10) + 'mm;height:' + num(s.paperH, 297, 10) + 'mm">' + sheet + '</div>';
+        }
+        return out;
+      },
+      get previewHtml() {
+        void this.libReady;
+        var s = this.s, mm = 3.7795, pageW = num(s.paperW, 210, 10) * mm;
+        this.scale = Math.min(1.6, Math.max(0.25, this.stageWidth / pageW));
+        return this.flat.length ? this.pagesHtml(3, true) : '';
+      },
+
+      // ---------------------------------------------------------------- printing
+      print: function () {
+        if (!this.flat.length || !window.JsBarcode) return;
+        var s = this.s, html = this.pagesHtml(Infinity, false);
+        var old = document.getElementById('bp-frame'); if (old) old.remove();
+        var fr = document.createElement('iframe');
+        fr.id = 'bp-frame'; fr.setAttribute('aria-hidden', 'true');
+        fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+        document.body.appendChild(fr);
+        var d = fr.contentWindow.document;
+        d.open();
+        d.write('<!doctype html><html><head><meta charset="utf-8"><title>Barcode labels</title><style>@page{size:' + num(s.paperW, 210, 10) + 'mm ' + num(s.paperH, 297, 10) + 'mm;margin:0}' +
+                'html,body{margin:0;padding:0;background:#fff}' + SHEET_CSS + '</style></head><body>' + html + '</body></html>');
+        d.close();
+        setTimeout(function () { fr.contentWindow.focus(); fr.contentWindow.print(); }, 300);
+      }
+    };
+  });
+});
+</script>
+{% endblock %}

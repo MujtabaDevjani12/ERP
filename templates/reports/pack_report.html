@@ -1,0 +1,90 @@
+{% extends "base.html" %}{% load static ui %}
+{% block title %}{{ title }} report{% endblock %}
+{% block extra_head %}{% if chart_json %}<script src="{% static 'vendor/chart.umd.js' %}"></script>{% endif %}{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{% url 'reports:pack_index' %}">Reports</a><span class="sep">/</span><span>{{ title }}</span></nav>
+      <h1 class="page-title">{{ title }}</h1>
+      <p class="page-subtitle">{% if data.no_dates %}As of today{% else %}{{ date_from|date:"d M Y" }} to {{ date_to|date:"d M Y" }}{% endif %} · {{ page_obj.paginator.count }} row{{ page_obj.paginator.count|pluralize }}</p>
+    </div>
+    <div class="page-actions">
+      <a class="ui-btn ui-btn-secondary" href="{% url 'reports:pack_report_export' slug 'xlsx' %}?{{ csv_query }}">{% icon "table" "w-4 h-4" %}<span>Excel</span></a>
+      <a class="ui-btn ui-btn-secondary" href="{% url 'reports:pack_report_export' slug 'pdf' %}?{{ csv_query }}">{% icon "doc" "w-4 h-4" %}<span>PDF</span></a>
+      <a class="ui-btn ui-btn-secondary" href="{% url 'reports:pack_report_csv' slug %}?{{ csv_query }}">{% icon "download" "w-4 h-4" %}<span>CSV</span></a>
+      <button type="button" class="ui-btn ui-btn-secondary" onclick="window.print()" aria-label="Print">{% icon "printer" "w-4 h-4" %}<span>Print</span></button>
+    </div>
+  </div>
+
+  <nav class="ui-tabs" aria-label="Report groups" style="overflow-x:auto">
+    {% for g, items in groups %}<a href="{% url 'reports:pack_report' items.0.slug %}" class="ui-tab {% if g == group %}is-active{% endif %}" {% if g == group %}aria-current="true"{% endif %}>{{ g }}</a>{% endfor %}
+  </nav>
+  <nav class="ui-tabs" aria-label="Reports in this group" style="overflow-x:auto">
+    {% for g, items in groups %}{% if g == group %}{% for o in items %}<a href="{% url 'reports:pack_report' o.slug %}" class="ui-tab {% if o.slug == slug %}is-active{% endif %}" {% if o.slug == slug %}aria-current="page"{% endif %}>{{ o.title }}</a>{% endfor %}{% endif %}{% endfor %}
+  </nav>
+
+  <form method="get" class="ui-toolbar">
+    {% if not data.no_dates %}
+    <div><label class="ui-label" for="r-from">From</label><input type="date" id="r-from" name="from" value="{{ date_from|date:'Y-m-d' }}"></div>
+    <div><label class="ui-label" for="r-to">To</label><input type="date" id="r-to" name="to" value="{{ date_to|date:'Y-m-d' }}"></div>
+    {% endif %}
+    {% for f in data.extra_filters %}
+    <div style="min-width:10rem"><label class="ui-label" for="r-{{ f.name }}">{{ f.label }}</label>
+      <select id="r-{{ f.name }}" name="{{ f.name }}"><option value="">All</option>{% for v, l in f.options %}<option value="{{ v }}" {% if f.value == v|stringformat:"s" %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+    {% endfor %}
+    <div class="flex gap-2"><button type="submit" class="ui-btn ui-btn-primary">{% icon "filter" "w-4 h-4" %}<span>Apply</span></button></div>
+  </form>
+
+  <div class="ui-kpi-grid">
+    {% for label, text in kpis %}{% ui "kpi" label=label value=text %}{% endfor %}
+  </div>
+
+  {% if chart_json %}
+  <div class="ui-card" style="padding:16px"><div style="position:relative;height:{% if data.chart.type == 'doughnut' %}260{% else %}300{% endif %}px"><canvas id="rpt-chart" role="img" aria-label="{{ title }} chart"></canvas></div></div>
+  {% endif %}
+
+  {% if page_obj.paginator.count %}
+  <div class="ui-table-wrap">
+    <table class="ui-table">
+      <thead><tr>{% for key, label, kind in data.cols %}<th {% if kind == "money" or kind == "num" %}class="num"{% endif %}>{{ label }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for row in rows_view %}
+        <tr>{% for value, kind in row %}
+          {% if value is None %}<td class="{% if kind == 'money' or kind == 'num' %}num {% endif %}">—</td>
+          {% elif kind == "money" %}<td class="num {% if value < 0 %}ui-neg{% endif %}">{{ value|floatformat:"2g" }}</td>
+          {% elif kind == "num" %}<td class="num">{{ value|floatformat:"-3g" }}</td>
+          {% elif kind == "date" %}<td>{{ value|date:"d M Y"|default:"—" }}</td>
+          {% elif kind == "datetime" %}<td>{{ value|date:"d M Y H:i"|default:"—" }}</td>
+          {% else %}<td>{{ value|default:"—" }}</td>{% endif %}{% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% ui "pagination" page_obj=page_obj %}
+  {% else %}
+  <div class="ui-card">{% ui "empty_state" icon="chart" title="Nothing to report for this period" text="Try a wider date range or a different filter." %}</div>
+  {% endif %}
+  {% if data.notes %}<p class="ui-help">{{ data.notes }}</p>{% endif %}
+</div>
+{% if chart_json %}
+<script>
+(function () {
+  var cfg = {{ chart_json|safe }};
+  if (!window.Chart) return;
+  var palette = ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#f97316'];
+  var doughnut = cfg.type === 'doughnut';
+  new Chart(document.getElementById('rpt-chart'), {
+    type: cfg.type,
+    data: { labels: cfg.labels, datasets: cfg.series.map(function (s) {
+      return { label: s.label, data: s.data, backgroundColor: doughnut ? palette : '#4f46e5', borderRadius: doughnut ? 0 : 6, maxBarThickness: 36 };
+    }) },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: cfg.horizontal ? 'y' : 'x',
+      plugins: { legend: { display: doughnut, position: 'right' } },
+      scales: doughnut ? {} : { x: { grid: { display: false } }, y: { beginAtZero: true } } }
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

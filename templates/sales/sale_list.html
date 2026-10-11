@@ -1,0 +1,117 @@
+{% extends "base.html" %}{% load ui xl %}
+{% block title %}Sales orders{% endblock %}
+{% block content %}
+{% url 'dashboard:pos' as pos_url %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <h1 class="page-title">Sales orders <span class="ui-badge ui-badge-neutral no-dot" style="vertical-align:middle;margin-left:6px">{{ result_count }}</span></h1>
+      <p class="page-subtitle">Every sale from the POS counters: search, filter, print or follow up on payments.</p>
+    </div>
+    <div class="page-actions">
+      {% excel_actions "sales" %}
+      <a class="ui-btn ui-btn-secondary" href="{% url 'documents:document_log_list' %}">{% icon "doc" "w-4 h-4" %}<span class="hidden sm:inline">Document log</span></a>
+      <a class="ui-btn ui-btn-primary" href="{% url 'dashboard:pos' %}">{% icon "register" "w-4 h-4" %}<span>New sale (POS)</span></a>
+    </div>
+  </div>
+
+  <div class="ui-kpi-grid">
+    {% ui "kpi" label="Orders" icon="receipt" value=sum_orders foot="in the current filter" %}
+    {% ui "kpi" label="Sales value" icon="currency" value=sum_total|floatformat:2 foot=current_store.currency_symbol %}
+    {% ui "kpi" label="Collected" icon="cash" value=sum_collected|floatformat:2 foot=current_store.currency_symbol %}
+    {% ui "kpi" label="Outstanding" icon="clock" value=sum_due|floatformat:2 foot=current_store.currency_symbol %}
+  </div>
+
+  <form method="get" class="ui-toolbar">
+    <div class="ui-search">
+      <label class="ui-label" for="s-q">Search</label>
+      {% icon "search" "w-4 h-4" %}
+      <input type="search" id="s-q" name="q" value="{{ request.GET.q }}" placeholder="Invoice, customer name or phone" autocomplete="off">
+    </div>
+    <div style="min-width:10rem">
+      <label class="ui-label" for="s-status">Status</label>
+      <select id="s-status" name="status">
+        <option value="">All statuses</option>
+        {% for key, label in status_choices %}<option value="{{ key }}" {% if request.GET.status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div style="min-width:9rem">
+      <label class="ui-label" for="s-pay">Payment</label>
+      <select id="s-pay" name="pay">
+        <option value="">Any</option>
+        <option value="paid" {% if pay == "paid" %}selected{% endif %}>Paid</option>
+        <option value="partial" {% if pay == "partial" %}selected{% endif %}>Partially paid</option>
+        <option value="due" {% if pay == "due" %}selected{% endif %}>Unpaid</option>
+      </select>
+    </div>
+    {% if warehouses|length > 1 %}<div style="min-width:10rem">
+      <label class="ui-label" for="s-wh">Warehouse</label>
+      <select id="s-wh" name="warehouse">
+        <option value="">All warehouses</option>
+        {% for w in warehouses %}<option value="{{ w.pk }}" {% if warehouse_id == w.pk|stringformat:"d" %}selected{% endif %}>{{ w.name }}</option>{% endfor %}
+      </select>
+    </div>{% endif %}
+    <div><label class="ui-label" for="s-df">From</label><input type="date" id="s-df" name="df" value="{{ df }}"></div>
+    <div><label class="ui-label" for="s-dt">To</label><input type="date" id="s-dt" name="dt" value="{{ dt }}"></div>
+    <div style="width:6rem">
+      <label class="ui-label" for="s-per">Per page</label>
+      <select id="s-per" name="per">{% for n in page_sizes %}<option value="{{ n }}" {% if n == per %}selected{% endif %}>{{ n }}</option>{% endfor %}</select>
+    </div>
+    <div class="flex gap-2">
+      <button type="submit" class="ui-btn ui-btn-primary">{% icon "filter" "w-4 h-4" %}<span>Apply</span></button>
+      {% if has_filters %}<a class="ui-btn ui-btn-secondary" href="{% url 'sales:sale_list' %}">Reset</a>{% endif %}
+    </div>
+  </form>
+
+  {% if sales %}
+  <div class="ui-table-wrap">
+    <table class="ui-table ui-table-cards">
+      <thead>
+        <tr>
+          <th>Invoice</th><th>Customer</th><th>Cashier</th>
+          <th class="num">Total</th><th class="num">Paid</th><th class="num">Balance</th>
+          <th>Status</th><th>Payment</th><th>Feedback</th><th class="col-actions"><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sale in sales %}
+        <tr class="is-clickable" data-href="{% url 'sales:sale_detail' sale.pk %}">
+          <td data-label="Invoice">
+            <div class="ui-cell-title"><a class="erp-link" href="{% url 'sales:sale_detail' sale.pk %}">{{ sale.reference }}</a></div>
+            <div class="ui-cell-sub">{{ sale.created_at|date:"d M Y, H:i" }}</div>
+          </td>
+          <td data-label="Customer">{% if sale.customer %}{{ sale.customer.name }}{% else %}<span class="ui-muted">Walk-in customer</span>{% endif %}</td>
+          <td data-label="Cashier">{{ sale.biller.get_full_name|default:sale.biller.username }}</td>
+          <td data-label="Total" class="num"><strong>{% money sale.total_amount %}</strong></td>
+          <td data-label="Paid" class="num ui-pos">{% money sale.paid_amount %}</td>
+          <td data-label="Balance" class="num {% if sale.due_amount > 0 %}ui-neg{% else %}ui-muted{% endif %}">{% money sale.due_amount %}</td>
+          <td data-label="Status">{% if sale.status == "held" or sale.status == "partially_returned" %}{% badge sale.status label=sale.get_status_display tone="warning" %}{% elif sale.status == "returned" %}{% badge sale.status label=sale.get_status_display tone="info" %}{% else %}{% badge sale.status label=sale.get_status_display %}{% endif %}</td>
+          <td data-label="Payment">{% with ps=sale.payment_status %}{% if ps == "due" %}{% badge ps label="Unpaid" tone="danger" %}{% elif ps == "partial" %}{% badge ps label="Partial" %}{% else %}{% badge ps label="Paid" %}{% endif %}{% endwith %}</td>
+          <td data-label="Feedback" class="ui-nowrap">{% if sale.feedback %}<a href="{% url 'sales:sale_detail' sale.pk %}" title="{{ sale.feedback.comment|default:'No comment' }}">{% include "sales/_stars.html" with rating=sale.feedback.rating %}</a>{% else %}<span class="ui-muted">—</span>{% endif %}</td>
+          <td class="col-actions">
+            <div class="ui-row-actions">
+              <a class="icon-btn" href="{% url 'sales:sale_detail' sale.pk %}" data-tip="View details" data-tip-pos="bottom" aria-label="View details">{% icon "eye" "w-4 h-4" %}</a>
+              <a class="icon-btn" href="{% url 'sales:invoice_print' sale.pk %}" target="_blank" rel="noopener" data-tip="Print receipt" data-tip-pos="bottom" aria-label="Print receipt">{% icon "printer" "w-4 h-4" %}</a>
+              {% component "row_menu" %}
+                <a class="ui-menu-item" href="{% url 'sales:sale_detail' sale.pk %}">{% icon "doc" "w-4 h-4" %}Sale details</a>
+                <a class="ui-menu-item" href="{% url 'documents:invoice_pdf' sale.pk %}" target="_blank" rel="noopener">{% icon "download" "w-4 h-4" %}Download PDF</a>
+                {% if sale.due_amount > 0 and sale.status != "held" and sale.status != "cancelled" %}<a class="ui-menu-item success" href="{% url 'sales:sale_detail' sale.pk %}#add-payment">{% icon "cash" "w-4 h-4" %}Add payment</a>{% endif %}
+                {% if sale.status == "completed" or sale.status == "partially_returned" %}{% if perms.sales.change_sale %}<a class="ui-menu-item" href="{% url 'sales:sale_return' sale.pk %}">{% icon "refresh" "w-4 h-4" %}Return / refund</a>{% endif %}{% if perms.sales.add_salereturn %}<a class="ui-menu-item" href="{% url 'sales:sale_return' sale.pk %}?exchange=1">{% icon "refresh" "w-4 h-4" %}Exchange items</a>{% endif %}{% endif %}
+                <div class="ui-menu-sep"></div>
+                {% if perms.sales.add_sale and sale.status != "held" and sale.status != "cancelled" %}<button type="button" class="ui-menu-item" data-drawer-url="{% url 'sales:sale_feedback' sale.pk %}" data-drawer-title="Customer feedback · {{ sale.reference }}">{% icon "star" "w-4 h-4" %}{% if sale.feedback %}Edit feedback{% else %}Add feedback{% endif %}</button>{% endif %}
+                <a class="ui-menu-item" href="{% url 'documents:send_email' sale.pk %}">{% icon "inbox" "w-4 h-4" %}Email invoice</a>
+                <a class="ui-menu-item" href="{% url 'documents:send_whatsapp' sale.pk %}">{% icon "bolt" "w-4 h-4" %}WhatsApp invoice</a>
+              {% endcomponent %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% ui "pagination" page_obj=page_obj %}
+  {% else %}
+  <div class="ui-card">{% if has_filters %}{% ui "empty_state" icon="search" title="No sales match these filters" text="Try a different invoice number, status or date range." %}{% else %}{% ui "empty_state" icon="receipt" title="No sales yet" text="Sales made at the POS counter will appear here." action_url=pos_url action_label="Open POS" %}{% endif %}</div>
+  {% endif %}
+</div>
+{% endblock %}

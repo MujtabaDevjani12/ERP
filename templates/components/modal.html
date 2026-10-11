@@ -1,0 +1,11 @@
+{# Dialog bound to an Alpine flag in the parent scope: {% component "modal" open="showNew" title="New item" %}…{% endcomponent %} #}
+{% load ui %}<div x-cloak x-show="{{ open }}" class="ui-modal" role="dialog" aria-modal="true" @keydown.escape.window="{{ open }} = false">
+  <div class="ui-overlay" style="position:absolute;z-index:0" x-show="{{ open }}" x-transition.opacity @click="{{ open }} = false"></div>
+  <div class="ui-modal-panel{% if size == 'wide' %} wide{% endif %}" style="position:relative;z-index:1" x-show="{{ open }}" x-transition:enter="ui-anim-pop" x-transition:enter-start="from" x-transition:leave="ui-anim-pop" x-transition:leave-end="from">
+    <div class="flex items-start justify-between gap-3">
+      <h3 class="ui-modal-title">{{ title }}</h3>
+      <button type="button" class="icon-btn" style="margin:-6px -8px 0 0" @click="{{ open }} = false" aria-label="Close">{% icon "x" "w-5 h-5" %}</button>
+    </div>
+    <div style="margin-top:12px">{{ body }}</div>
+  </div>
+</div>

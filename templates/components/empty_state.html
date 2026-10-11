@@ -1,0 +1,7 @@
+{% load ui %}<div class="ui-empty">
+  <div class="ui-empty-icon">{% icon icon|default:"inbox" "w-6 h-6" %}</div>
+  <h3>{{ title|default:"Nothing here yet" }}</h3>
+  {% if text %}<p>{{ text }}</p>{% endif %}
+  {% if action_url %}<a class="ui-btn ui-btn-primary" href="{{ action_url }}">{% icon "plus" "w-4 h-4" %}{{ action_label|default:"Create" }}</a>{% endif %}
+  {{ body }}
+</div>

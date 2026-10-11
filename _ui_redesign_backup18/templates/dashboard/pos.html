@@ -1,0 +1,789 @@
+{% load static ui %}<!DOCTYPE html>
+<html lang="en" data-theme="light" data-density="comfortable">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <meta name="color-scheme" content="light dark">
+  <title>POS — {{ current_store.name }} · {{ session.register.name }}</title>
+  <script>
+    (function () {
+      try { var d = document.documentElement, ls = window.localStorage;
+        d.setAttribute('data-theme', ls.getItem('ui.theme') === 'dark' ? 'dark' : 'light');
+        d.setAttribute('data-density', ls.getItem('ui.density') || 'comfortable'); } catch (e) { /* storage blocked: defaults apply */ }
+    })();
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { corePlugins: { preflight: true }, theme: { extend: { colors: {
+      brand: { 50:'{{ brand_shades.50|default:"#eef2ff" }}', 100:'{{ brand_shades.100|default:"#e0e7ff" }}', 200:'{{ brand_shades.200|default:"#c7d2fe" }}',
+        300:'{{ brand_shades.300|default:"#a5b4fc" }}', 400:'{{ brand_shades.400|default:"#818cf8" }}', 500:'{{ brand_shades.500|default:"#6366f1" }}',
+        600:'{{ brand_shades.600|default:"#4f46e5" }}', 700:'{{ brand_shades.700|default:"#4338ca" }}', 800:'{{ brand_shades.800|default:"#3730a3" }}', 900:'{{ brand_shades.900|default:"#312e81" }}' } },
+      fontFamily: { sans: ['{{ system_settings.font_family|default:"Inter" }}', 'ui-sans-serif', 'system-ui'] } } } }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family={{ google_font_query|default:'Inter:wght@400;500;600;700;800' }}&display=swap">
+  <link rel="stylesheet" href="{% static 'css/erp-ui.css' %}">
+  <link rel="stylesheet" href="{% static 'css/pos.css' %}?v=20261007a">
+  <link rel="stylesheet" href="{% static 'css/fx-skin.css' %}?v=20261010j">
+  <style>
+    :root {
+      --brand-50: {{ brand_shades.50|default:"#eef2ff" }}; --brand-100: {{ brand_shades.100|default:"#e0e7ff" }};
+      --brand-200: {{ brand_shades.200|default:"#c7d2fe" }}; --brand-300: {{ brand_shades.300|default:"#a5b4fc" }};
+      --brand-400: {{ brand_shades.400|default:"#818cf8" }}; --brand-500: {{ brand_shades.500|default:"#6366f1" }};
+      --brand-600: {{ brand_shades.600|default:"#4f46e5" }}; --brand-700: {{ brand_shades.700|default:"#4338ca" }};
+      --brand-800: {{ brand_shades.800|default:"#3730a3" }}; --brand-900: {{ brand_shades.900|default:"#312e81" }};
+      --font: '{{ system_settings.font_family|default:"Inter" }}', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    }
+  </style>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.13.5/cdn.min.js"></script>
+  {% include "partials/money_js.html" %}
+</head>
+<body class="pos-body" x-data="posApp()" x-init="init()" @keydown.window="onKeydown($event)">
+{% include "partials/page_loader.html" %}
+{{ payment_methods|json_script:"pos-methods" }}
+<script>
+  window.POS_CONFIG = {
+    urls: {
+      lookup: "{% url 'catalog:api_variant_lookup' %}", customerSearch: "{% url 'customers:customer_search' %}",
+      customerAdd: "{% url 'customers:customer_quick_add' %}", cartGet: "{% url 'sales:pos_cart_get' %}",
+      cartSave: "{% url 'sales:pos_cart_save' %}", cartClear: "{% url 'sales:pos_cart_clear' %}", quote: "{% url 'sales:pos_quote' %}",
+      stockCheck: "{% url 'sales:pos_stock_check' %}", giftCard: "{% url 'customers:giftcard_lookup' %}", expense: "{% url 'expenses:pos_expense' %}", feedback: "{% url 'sales:pos_feedback' %}", finalize: "{% url 'sales:pos_finalize' %}", held: "{% url 'sales:held_sales_api' %}",
+      resume: "{% url 'sales:resume_held_sale' 0 %}", summary: "{% url 'register:summary' %}", close: "{% url 'register:close' %}",
+      counters: "{% url 'register:open' %}?switch=1", home: "{% url 'dashboard:home' %}", sales: "{% url 'sales:sale_list' %}",
+    },
+    currency: "{{ current_store.currency_symbol|default:'Rs'|escapejs }}", decimals: {{ system_settings.decimals|default:2 }},
+    qtyDecimals: {{ system_settings.quantity_decimals|default:0 }}, minScanChars: {{ system_settings.barcode_scan_min_chars|default:4 }},
+    allowOverSelling: {{ system_settings.allow_over_selling|yesno:"true,false" }},
+    defaultMethod: "{{ default_method|escapejs }}", quickCash: [{% for a in quick_cash %}{{ a }}{% if not forloop.last %},{% endif %}{% endfor %}],
+    showClock: {{ pos_settings.show_clock|yesno:"true,false"|default:"true" }},
+    requireCustomer: {% if pos_settings %}{{ pos_settings.require_customer|yesno:"true,false" }}{% else %}true{% endif %},
+    defaultCustomer: {% if pos_settings.default_customer %}{ id: {{ pos_settings.default_customer.id }}, name: "{{ pos_settings.default_customer.name|escapejs }}", phone: "{{ pos_settings.default_customer.phone|default:""|escapejs }}" }{% else %}null{% endif %},
+    session: { id: {{ session.id }}, number: "{{ session.number }}", counter: "{{ session.register.name|escapejs }}", openedBy: {{ session.opened_by_id }} },
+    billerId: {{ session.opened_by_id }}, userId: {{ request.user.id }},
+    exchange: {% if exchange %}{ ret: "{{ exchange.return|escapejs }}", sale: "{{ exchange.sale|escapejs }}", refund: "{{ exchange.refund|escapejs }}" }{% else %}null{% endif %}
+  };
+</script>
+
+<div class="pos-shell">
+  <!-- ============================ top bar ============================ -->
+  <header class="pos-top">
+    <div class="pos-brand">
+      <a href="{% url 'dashboard:home' %}" class="pos-logo" title="Back to dashboard">
+        {% if system_settings.site_logo %}<img src="{{ system_settings.site_logo.url }}" alt="">{% else %}{{ current_store.name|default:"POS"|slice:":1"|upper }}{% endif %}
+      </a>
+      <div class="pos-brand-text pos-hide-sm">
+        <b>{{ current_store.name }}</b>
+        <span><i class="pos-dot"></i>{{ session.register.name }} · {{ session.number }} · {{ user.get_full_name|default:user.username }}</span>
+      </div>
+    </div>
+
+    <div class="pos-search">
+      {% icon "search" "w-4 h-4" %}
+      <input x-ref="searchInput" x-model="query" @input="onSearchInput()" @input.debounce.200ms="search()" @keydown.enter.prevent="handleEnter()" @keydown.arrow-down.prevent="moveHot(1)" @keydown.arrow-up.prevent="moveHot(-1)" type="search" autofocus autocomplete="off"
+             placeholder="Scan barcode or search product…" aria-label="Search products">
+      <span class="pos-kbd">F2</span>
+    </div>
+
+    <div class="pos-top-actions">
+      <span class="pos-chip pos-hide-sm" x-show="cfg.showClock" x-text="clock" x-cloak></span>
+      <button type="button" class="pos-chip is-icon" @click="toggleTheme()" :title="dark ? 'Light mode' : 'Dark mode'" aria-label="Toggle dark mode">
+        <span x-show="!dark">{% icon "moon" "w-4 h-4" %}</span><span x-show="dark" x-cloak>{% icon "sun" "w-4 h-4" %}</span>
+      </button>
+      <button type="button" class="pos-chip is-icon" @click="openCamera()" title="Scan with the camera" aria-label="Scan a barcode with the camera">{% icon "scan" "w-4 h-4" %}</button>
+      <button type="button" class="pos-chip is-icon pos-hide-sm" @click="modal='help'" title="Keyboard shortcuts" aria-label="Keyboard shortcuts">{% icon "question" "w-4 h-4" %}</button>
+      <div class="pos-calc pos-hide-sm">{% include "partials/calculator_widget.html" with trigger_class="pos-chip is-icon" %}</div>
+      <button type="button" class="pos-chip pos-hide-sm" @click="openOrders()" title="Recent orders, returns and exchanges">{% icon "receipt" "w-4 h-4" %}<span>Orders</span></button>
+      <button type="button" class="pos-chip" style="position:relative" @click="openHeld()" title="Held sales (F9)">{% icon "clock" "w-4 h-4" %}<span class="pos-hide-sm">Held</span>
+        <span class="pos-count" x-show="heldCount" x-cloak x-text="heldCount"></span></button>
+      {% if expense_categories %}<button type="button" class="pos-chip" @click="openExpense()" title="Pay an expense from the till">{% icon "cash" "w-4 h-4" %}<span>Expense</span></button>{% endif %}
+      <button type="button" class="pos-chip is-danger" @click="openClose()" title="Close this register">{% icon "logout" "w-4 h-4" %}<span>Close Register</span></button>
+    </div>
+  </header>
+
+  <div class="pos-main">
+    <!-- ============================ catalogue ============================ -->
+    <section class="pos-catalog" aria-label="Products">
+      <div class="pos-cats" role="tablist" aria-label="Categories">
+        <button type="button" role="tab" class="pos-cat" :class="!category && 'is-active'" @click="setCategory(null)">All</button>
+        {% for cat in categories %}<button type="button" role="tab" class="pos-cat" :class="category === {{ cat.id }} && 'is-active'" @click="setCategory({{ cat.id }})">{{ cat.name }}</button>{% endfor %}
+      </div>
+
+      <div class="pos-statusbar">
+        <span class="pos-count-note" x-text="tiles.length ? tiles.length + (tiles.length === 1 ? ' product' : ' products') + (query || category ? ' found' : ' in stock') : ''"></span>
+        <div class="pos-scan" :class="scanMsg ? 'is-' + scanMsg.tone : ''" role="status" aria-live="polite">
+          <template x-if="!scanMsg"><span class="pos-scan-idle"><i class="pos-dot"></i>Scanner ready — scan any barcode</span></template>
+          <template x-if="scanMsg"><span class="pos-scan-msg"><b x-text="scanMsg.text"></b><small x-show="scanMsg.tone !== 'ok'" x-text="scanMsg.code"></small></span></template>
+        </div>
+      </div>
+
+      <div class="pos-grid-wrap">
+        <div class="pos-grid" x-show="loading && !tiles.length" x-cloak><template x-for="n in 10" :key="n"><div class="pos-skel"></div></template></div>
+
+        <div class="pos-grid" x-show="tiles.length" x-cloak>
+          <template x-for="(p, pi) in tiles" :key="p.tileKey">
+            <button type="button" class="pos-tile" :class="[atMax(p) && 'is-maxed', (query.trim() && pi === hot) && 'is-hot', p.isGroup && 'is-group']" @click="addToCart(p)" :aria-label="(p.isGroup ? 'Choose a variant of ' : 'Add ') + p.name">
+              <span class="pos-incart" x-show="!p.isGroup && cartQty(p.id)" x-text="cartQty(p.id)"></span>
+              <span class="pos-thumb" :style="'--h:' + hue(p.name)">
+                <template x-if="p.image"><img :src="p.image" :alt="p.name" loading="lazy"></template>
+                <template x-if="!p.image"><span x-text="p.name.charAt(0).toUpperCase()"></span></template>
+              </span>
+              <span class="pos-tile-name"><span x-text="p.name"></span><em class="pos-tag is-promo" x-show="p.on_promo">Sale</em><em class="pos-tag" x-show="p.item_type === 'combo' && !p.isGroup">Combo</em></span>
+              <span class="pos-tile-sku" x-text="p.isGroup ? p.variant_count + ' variants' : p.sku"></span>
+              <span class="pos-tile-foot">
+                <span class="pos-price"><small class="pos-from" x-show="p.isGroup && p.priceTo > num(p.price)">From</small><span x-text="fmt(p.price)"></span><s class="pos-was" x-show="p.on_promo && !p.isGroup" x-text="fmt(p.regular_price)"></s></span>
+                <span class="pos-stock" :class="isLowStock(p) && 'is-low'" x-text="stockLabel(p)"></span>
+              </span>
+              <span class="pos-tile-add" aria-hidden="true">{% icon "plus" "w-4 h-4" %}</span>
+            </button>
+          </template>
+        </div>
+
+        <div class="pos-empty" x-show="!loading && !tiles.length && !loadError" x-cloak>
+          <div>
+            <div style="margin-bottom:8px;color:var(--ui-text-3)">{% icon "cube" "w-10 h-10" "1.3" %}</div>
+            <b x-text="query ? 'No sellable products match “' + query + '”' : 'No products available to sell'"></b>
+            Only products that are in stock at this counter are shown here.
+          </div>
+        </div>
+        <div class="pos-empty" x-show="loadError" x-cloak>
+          <div><b>Products could not be loaded</b>Check your connection.<br><button type="button" class="ui-btn ui-btn-secondary" style="margin-top:10px" @click="search()">Try again</button></div>
+        </div>
+        <p class="ui-help" style="text-align:center" x-show="results.length >= 60" x-cloak>Showing the first 60 products — search or pick a category to narrow down.</p>
+      </div>
+      <!-- product details popup (scan / Enter / tile click / cart line): details + variants, never blocks the next scan -->
+      <div class="pos-quick-layer" x-show="quick.item" x-cloak x-transition.opacity.duration.150ms @keydown.escape.window="quick.item && closeQuick()">
+        <div class="pos-quick" role="dialog" aria-label="Product details"
+             @mouseenter="quick.hold = true; clearTimeout(quick.timer)" @mouseleave="quick.hold = false; armQuick()">
+          <template x-if="quick.item">
+            <div>
+              <div class="pos-quick-top">
+                <span class="pos-quick-added" :class="!quick.added && 'is-info'">{% icon "check-mark" "w-3.5 h-3.5" "3" %}<span x-text="quick.added ? 'Added to cart' : 'Product details'"></span></span>
+                <div class="flex items-center gap-1">
+                  <button type="button" class="ui-btn ui-btn-ghost ui-btn-sm" :class="quick.pinned && 'is-pinned'" @click="quick.pinned = !quick.pinned; armQuick()" :aria-pressed="quick.pinned"><span x-text="quick.pinned ? 'Pinned' : 'Keep open'"></span></button>
+                  <button type="button" class="pos-iconbtn is-neutral" @click="closeQuick()" aria-label="Close">{% icon "x" "w-4 h-4" %}</button>
+                </div>
+              </div>
+              <div class="pos-quick-main">
+                <div class="pos-quick-img" :style="'--h:' + hue(quick.item.product || quick.item.name)">
+                  <template x-if="quick.item.image"><img :src="quick.item.image" :alt="quick.item.name"></template>
+                  <template x-if="!quick.item.image"><span x-text="(quick.item.product || quick.item.name).charAt(0).toUpperCase()"></span></template>
+                </div>
+                <div class="pos-quick-info">
+                  <h3 x-text="quick.item.product || quick.item.name"></h3>
+                  <div class="pos-quick-variant" x-show="quick.item.variant || (quick.item.attrs && quick.item.attrs.length)">
+                    <span x-show="quick.item.variant" x-text="quick.item.variant"></span>
+                    <template x-for="a in (quick.item.attrs || [])" :key="a.name"><span class="pos-quick-chip"><small x-text="a.name"></small> <b x-text="a.value"></b></span></template>
+                  </div>
+                  <div class="pos-quick-price"><span x-text="fmt(quick.item.price)"></span><s class="pos-was" x-show="quick.item.on_promo" x-text="fmt(quick.item.regular_price)"></s></div>
+                  <div class="pos-quick-meta">
+                    <span x-text="quick.item.tracked === false ? stockLabel(quick.item) : qty(quick.item.stock) + ' ' + (quick.item.unit || '') + ' in stock'"></span>
+                    <span x-show="quick.item.category" x-text="quick.item.category"></span>
+                    <span x-show="quick.item.brand" x-text="quick.item.brand"></span>
+                  </div>
+                </div>
+              </div>
+              <dl class="pos-quick-codes">
+                <div><dt>SKU</dt><dd x-text="quick.item.sku || '—'"></dd></div>
+                <div><dt>Barcode</dt><dd x-text="quick.item.barcode || '—'"></dd></div>
+              </dl>
+              <p class="pos-quick-desc" x-show="quick.item.description" x-text="quick.item.description"></p>
+              <div class="pos-quick-cart">
+                <span>In cart</span>
+                <div class="pos-qty">
+                  <button type="button" @click="quickStep(-1)" aria-label="Remove one">−</button>
+                  <input type="text" readonly :value="quickLine() ? qty(quickLine().quantity) : 0" aria-label="Quantity in cart">
+                  <button type="button" @click="quickStep(1)" :disabled="quickLine() && !allowMore(quickLine())" aria-label="Add one">+</button>
+                </div>
+                <b x-text="quickLine() ? fmt(lineTotal(quickLine())) : fmt(0)"></b>
+              </div>
+              <div class="pos-quick-sibs" x-show="quick.siblings.length > 1">
+                <div class="pos-quick-sibs-title">Other variants</div>
+                <div class="pos-quick-sibs-list">
+                  <template x-for="v in quick.siblings" :key="v.id">
+                    <button type="button" class="pos-quick-sib" :class="v.id === quick.item.id && 'is-on'" @click="addToCart(v)">
+                      <span x-text="v.variant || v.name"></span><small x-text="fmt(v.price)"></small>
+                      <i x-show="cartQty(v.id)" x-text="cartQty(v.id)"></i>
+                    </button>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ cart ============================ -->
+    <aside class="pos-cart" aria-label="Current sale">
+      <div class="pos-cart-head">
+        <div class="pos-cart-title"><span class="pos-cart-name">Current sale<em class="pos-cart-badge" x-show="cart.length" x-cloak x-text="cart.length"></em></span>
+          <span class="flex items-center" style="gap:8px"><span class="pos-saved" x-text="syncLabel"></span>
+            <button type="button" class="pos-iconbtn" x-show="cart.length" x-cloak @click="clearCart()" title="Clear the cart" aria-label="Clear the cart">{% icon "trash" "w-4 h-4" %}</button></span></div>
+        <div class="pos-cust" :class="custAlert && 'is-alert'">
+          <input x-ref="customerInput" x-model="customerQuery" @input.debounce.250ms="searchCustomers()" @focus="searchCustomers(true)" @keydown.escape="showCustomers=false"
+                 type="text" autocomplete="off" x-bind:placeholder="cfg.requireCustomer ? 'Select a customer (F4)' : 'Walk-in customer (F4)'" aria-label="Customer">
+          <button type="button" class="pos-chip is-icon" style="height:38px;width:38px" @click="openAddCustomer()" title="Add customer">{% icon "plus" "w-4 h-4" %}</button>
+          <div class="pos-pop" x-show="showCustomers && customerResults.length" @click.outside="showCustomers=false" x-cloak>
+            <template x-for="c in customerResults" :key="c.id"><button type="button" @click="selectCustomer(c)"><span x-text="c.name"></span><small x-text="c.phone || c.email"></small></button></template>
+          </div>
+        </div>
+        <div class="pos-cust-pill" x-show="customer" x-cloak>
+          <span x-text="'Customer: ' + (customer ? customer.name : '')"></span>
+          <button type="button" class="pos-iconbtn is-neutral" @click="clearCustomer()" aria-label="Remove customer">{% icon "x" "w-3.5 h-3.5" %}</button>
+        </div>
+        <div class="pos-tools" @keydown.escape.window="moreOpen = false" role="toolbar" aria-label="Sale tools">
+          <button type="button" class="pos-tool" style="--tc:#f59e0b" @click="holdSale()" :disabled="!cart.length || busy" title="Park this sale (F7)"><i>{% icon "clock" "w-4 h-4" %}</i><span>Hold</span></button>
+          <button type="button" class="pos-tool" style="--tc:#3b82f6" @click="openHeld()" title="Held sales (F9)"><i>{% icon "refresh" "w-4 h-4" %}</i><span>Resume</span><b class="pos-tool-dot" x-show="heldCount" x-cloak x-text="heldCount"></b></button>
+          <button type="button" class="pos-tool" style="--tc:#8b5cf6" @click="modal='discount'; discountDraft = {...orderDiscount}" :disabled="!cart.length" title="Discount (F6)"><i>{% icon "tag" "w-4 h-4" %}</i><span>Discount</span></button>
+          <button type="button" class="pos-tool" style="--tc:#ef4444" @click="returnMode='return'; modal='return'" title="Return / refund"><i>{% icon "arrow-left" "w-4 h-4" %}</i><span>Return</span></button>
+          <div class="pos-more-wrap">
+            <button type="button" class="pos-tool" style="--tc:#64748b" @click="moreOpen = !moreOpen" :aria-expanded="moreOpen" aria-haspopup="true"><i>{% icon "dots-h" "w-4 h-4" %}</i><span>More</span></button>
+            <div class="pos-more" x-show="moreOpen" x-cloak x-transition.opacity.duration.120ms @click.outside="moreOpen = false" role="menu">
+              <button type="button" role="menuitem" @click="moreOpen=false; openShipping()" :disabled="!cart.length">{% icon "truck" "w-4 h-4" %}<span>Shipping charge</span><small x-text="num(shipping) > 0 ? fmt(num(shipping)) : ''"></small></button>
+              {% if perms.sales.add_salereturn %}<button type="button" role="menuitem" @click="moreOpen=false; returnMode='exchange'; modal='return'">{% icon "switch" "w-4 h-4" %}<span>Exchange items</span></button>{% endif %}
+              <button type="button" role="menuitem" @click="moreOpen=false; printLast()" :disabled="!lastSale">{% icon "printer" "w-4 h-4" %}<span>Print last receipt</span></button>
+              <button type="button" role="menuitem" @click="moreOpen=false; focusCustomer()">{% icon "user" "w-4 h-4" %}<span>Choose customer</span><small>F4</small></button>
+              <div class="pos-more-sep"></div>
+              <button type="button" role="menuitem" class="is-danger" @click="moreOpen=false; clearCart()" :disabled="!cart.length">{% icon "trash" "w-4 h-4" %}<span>Clear cart</span></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <template x-for="(n, i) in notices" :key="i">
+        <div class="pos-notice"><span x-text="n"></span><button type="button" class="pos-iconbtn is-neutral" @click="notices.splice(i,1)" aria-label="Dismiss">{% icon "x" "w-3.5 h-3.5" %}</button></div>
+      </template>
+
+      <div class="pos-lines">
+        <template x-for="(it, idx) in cart" :key="it.key">
+          <div class="pos-line" :data-key="it.key" :class="lastAdded === it.key && 'is-flash'">
+            <div class="pos-line-top">
+              <div style="min-width:0">
+                <div class="pos-line-name" x-text="it.name"></div>
+                <div class="pos-line-sub"><span x-text="fmt(it.unit_price)"></span> each<span x-show="num(it.discount_amount) > 0"> · discount <span x-text="fmt(it.discount_amount)"></span></span></div>
+              </div>
+              <div class="flex items-center">
+                <button type="button" class="pos-iconbtn is-neutral" @click="detailsFor(it)" aria-label="Product details" title="Product details">{% icon "info" "w-4 h-4" %}</button>
+                <button type="button" class="pos-iconbtn" @click="removeLine(idx)" aria-label="Remove item">{% icon "trash" "w-4 h-4" %}</button>
+              </div>
+            </div>
+            <div class="pos-line-bottom">
+              <div class="pos-qty">
+                <button type="button" @click="changeQty(it, -1)" aria-label="Decrease quantity">−</button>
+                <input type="number" :step="qtyStep" min="0" inputmode="decimal" x-model="it.quantity" @change="normalizeQty(it)" @keydown.enter.prevent="$event.target.blur(); focusSearch()" aria-label="Quantity">
+                <button type="button" @click="changeQty(it, 1)" :disabled="!allowMore(it)" aria-label="Increase quantity">+</button>
+              </div>
+              <span class="pos-linetotal" x-text="fmt(lineTotal(it))"></span>
+            </div>
+          </div>
+        </template>
+        <div class="pos-empty" x-show="!cart.length" x-cloak style="min-height:160px">
+          <div><div style="margin-bottom:6px;color:var(--ui-text-3)">{% icon "cart" "w-9 h-9" "1.3" %}</div><b>Cart is empty</b>Scan a barcode or tap a product.</div>
+        </div>
+      </div>
+
+      <div class="pos-status is-ok" x-show="exchangeInfo" x-cloak style="margin:0 12px 8px;flex-wrap:wrap;gap:4px">
+        <span x-text="exchangeInfo ? 'Exchange for ' + exchangeInfo.sale + ' (return ' + exchangeInfo.ret + ')' : ''"></span>
+        <span x-text="exchangeInfo ? 'Refunded ' + fmt(exchangeInfo.refund) : ''"></span>
+        <button type="button" class="pos-iconbtn is-neutral" @click="exchangeInfo = null" aria-label="Dismiss">{% icon "x" "w-3.5 h-3.5" %}</button>
+      </div>
+
+      <div class="pos-totals">
+        <div class="pos-tot-mini">
+          <div><small>Subtotal</small><b x-text="fmt(totals.subtotal)"></b></div>
+          <div><small>Discount</small><b x-text="'− ' + fmt(totals.discount)"></b></div>
+          <div><small>Tax</small><b x-text="fmt(totals.tax)"></b></div>
+        </div>
+        <div class="row" x-show="totals.shipping > 0" x-cloak><span>Shipping</span><span x-text="'+ ' + fmt(totals.shipping)"></span></div>
+        <div class="row" x-show="Math.abs(totals.rounding) > 0.004" x-cloak><span>Rounding</span><span x-text="(totals.rounding > 0 ? '+ ' : '− ') + fmt(Math.abs(totals.rounding))"></span></div>
+        <div class="row grand"><span>Total</span><span x-text="fmt(totals.total)"></span></div>
+      </div>
+
+      <!-- the payment button lives alone at the very bottom, always in reach -->
+      <div class="pos-actions">
+        <button type="button" class="pos-act is-pay" @click="openPayment()" :disabled="!cart.length || busy">
+          <span class="pos-pay-label">{% icon "cash" "w-5 h-5" %}<span>Payment</span><small>F8</small></span>
+          <span class="pos-pay-amt" x-text="fmt(totals.total)"></span>
+        </button>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- ============================ payment ============================ -->
+<div class="pos-overlay" x-show="modal==='payment'" x-cloak @keydown.escape.window="modal==='payment' && closeModal()" role="dialog" aria-modal="true" aria-label="Payment">
+  <div class="pos-modal is-wide" @click.outside="closeModal()">
+    <div class="pos-modal-head"><h2>Payment · <span x-text="fmt(totals.total)"></span></h2><button type="button" class="pos-iconbtn is-neutral" @click="closeModal()" aria-label="Close">{% icon "x" "w-4 h-4" %}</button></div>
+    <div class="pos-pay-grid" style="overflow:hidden;flex:1;min-height:0">
+      <div class="pos-modal-body" style="display:grid;gap:14px;align-content:start">
+        <div class="pos-summary">
+          <div class="pos-stat"><small>Total payable</small><b x-text="fmt(totals.total)"></b></div>
+          <div class="pos-stat" :class="pay.change > 0 ? 'is-ok' : (pay.remaining > 0 ? 'is-warn' : 'is-ok')">
+            <small x-text="pay.change > 0 ? 'Change to return' : 'Remaining'"></small><b x-text="fmt(pay.change > 0 ? pay.change : pay.remaining)"></b></div>
+        </div>
+
+        <div class="pos-credit" :class="pay.remaining > 0.004 && !customer && 'is-needed'">
+          <div class="flex items-center justify-between" style="gap:8px">
+            <label class="ui-label" style="margin:0" for="pay-customer">Customer <span class="ui-help" style="font-weight:500">(needed only for part payment / credit)</span></label>
+          </div>
+          <div class="pos-cust">
+            <input id="pay-customer" x-model="customerQuery" @input.debounce.250ms="searchCustomers()" @focus="searchCustomers(true)" @keydown.escape.stop="showCustomers=false"
+                   type="text" autocomplete="off" placeholder="Search customer by name or phone" aria-label="Customer">
+            <button type="button" class="pos-chip is-icon" style="height:38px;width:38px" @click="openAddCustomer()" title="Add new customer">{% icon "plus" "w-4 h-4" %}</button>
+            <div class="pos-pop" x-show="showCustomers && customerResults.length" @click.outside="showCustomers=false" x-cloak>
+              <template x-for="c in customerResults" :key="'p'+c.id"><button type="button" @click="selectCustomer(c)"><span x-text="c.name"></span><small x-text="c.phone || c.email"></small></button></template>
+            </div>
+          </div>
+          <div class="pos-cust-pill" x-show="customer" x-cloak style="margin-top:0">
+            <span x-text="'Customer: ' + (customer ? customer.name : '')"></span>
+            <button type="button" class="pos-iconbtn is-neutral" @click="clearCustomer()" aria-label="Remove customer">{% icon "x" "w-3.5 h-3.5" %}</button>
+          </div>
+        </div>
+
+        <template x-for="(ln, i) in payLines" :key="i">
+          <div class="pos-payline">
+            <div class="flex items-center justify-between" style="gap:8px">
+              <span class="ui-label" style="margin:0" x-text="payLines.length > 1 ? 'Payment ' + (i+1) : 'Pay with'"></span>
+              <button type="button" class="pos-iconbtn" x-show="payLines.length > 1" @click="payLines.splice(i,1)" aria-label="Remove payment">{% icon "trash" "w-4 h-4" %}</button>
+            </div>
+            <div class="pos-method-grid">
+              <template x-for="m in methods" :key="m.code"><button type="button" class="pos-method" :class="ln.method === m.code && 'is-active'" @click="ln.method = m.code; if (!isCash(ln.method)) ln.cashTendered=''" x-text="m.name"></button></template>
+            </div>
+            <div>
+              <label class="ui-label" x-text="isCash(ln.method) ? 'Cash received' : 'Amount'"></label>
+              <input type="number" step="0.01" min="0" inputmode="decimal" x-model="ln.amount" :id="'pay-amount-' + i" @focus="$event.target.select()" @keydown.enter.prevent="completeSale()">
+            </div>
+            <div x-show="ln.method === 'gift_card'" x-cloak>
+              <label class="ui-label" :for="'pay-gc-' + i">Gift card number <span style="color:var(--ui-danger)">*</span></label>
+              <div class="flex" style="gap:8px">
+                <input type="text" :id="'pay-gc-' + i" maxlength="30" x-model="ln.reference_no" autocomplete="off" placeholder="Type or scan the card number" style="flex:1;text-transform:uppercase"
+                       @input="ln.gc = null" @keydown.enter.prevent="checkGiftCard(ln)">
+                <button type="button" class="ui-btn ui-btn-secondary" @click="checkGiftCard(ln)" :disabled="!(ln.reference_no || '').trim() || (ln.gc && ln.gc.busy)">Check balance</button>
+              </div>
+              <button type="button" class="ui-btn ui-btn-ghost ui-btn-sm" x-show="customer" x-cloak style="margin-top:6px" @click="useDeposit(ln)" :disabled="ln.gc && ln.gc.busy">Use deposit<span x-text="customer ? ' · ' + customer.name : ''"></span></button>
+              <p class="ui-help" x-show="ln.gc && ln.gc.ok" x-cloak style="color:var(--ui-success)" x-text="ln.gc && ln.gc.ok ? 'Balance ' + fmt(ln.gc.balance) + (ln.gc.customer ? ' · ' + ln.gc.customer : '') : ''"></p>
+              <p class="ui-error" x-show="ln.gc && ln.gc.ok === false" x-cloak x-text="ln.gc ? ln.gc.error : ''"></p>
+            </div>
+            <div x-show="ln.method !== 'gift_card' && methodOf(ln.method) && methodOf(ln.method).requires_reference" x-cloak>
+              <label class="ui-label">Reference / transaction ID <span style="color:var(--ui-danger)">*</span></label>
+              <input type="text" maxlength="100" x-model="ln.reference_no" autocomplete="off" placeholder="e.g. last 4 digits, bank ref, wallet txn id" @keydown.enter.prevent="completeSale()">
+            </div>
+          </div>
+        </template>
+
+        <div class="flex" style="gap:8px;flex-wrap:wrap">
+          <button type="button" class="ui-btn ui-btn-secondary ui-btn-sm" @click="addPayLine()">+ Split payment</button>
+        </div>
+
+        <div class="pos-status" :class="pay.tone" x-show="pay.message" x-text="pay.message"></div>
+
+        <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">
+          <div><label class="ui-label">Sale note</label><textarea rows="2" x-model="saleNote" style="min-height:3rem"></textarea></div>
+          <div><label class="ui-label">Staff note</label><textarea rows="2" x-model="staffNote" style="min-height:3rem"></textarea></div>
+        </div>
+      </div>
+
+      <div class="pos-pay-side">
+        <div class="ui-label" style="margin:0">Quick cash</div>
+        <button type="button" class="ui-btn ui-btn-primary" @click="quickCash(totals.total)" x-text="'Exact ' + fmt(totals.total)"></button>
+        <template x-for="a in cfg.quickCash" :key="a"><button type="button" class="ui-btn ui-btn-secondary" @click="quickCash(a)" x-text="fmt(a)"></button></template>
+        <div class="ui-label" style="margin:8px 0 0">Part payment</div>
+        <button type="button" class="ui-btn ui-btn-secondary" @click="partPayment(0.5)">Pay half now</button>
+        <button type="button" class="ui-btn ui-btn-secondary" @click="partPayment(0)">Pay later (credit)</button>
+        <div class="ui-label" style="margin:8px 0 0">Biller</div>
+        {% if billers %}<select x-model.number="billerId">{% for b in billers %}<option value="{{ b.id }}">{{ b.get_full_name|default:b.username }}</option>{% endfor %}</select>{% endif %}
+      </div>
+    </div>
+    <div class="pos-modal-foot">
+      <button type="button" class="ui-btn ui-btn-ghost" @click="closeModal()">Back to cart</button>
+      <button type="button" class="ui-btn ui-btn-primary" style="min-width:220px;height:44px;font-weight:700" :disabled="busy || !pay.canSubmit" @click="completeSale()">
+        <span x-show="!busy" x-text="pay.remaining > 0.004 ? 'Complete · ' + fmt(pay.remaining) + ' due' : 'Complete sale'"></span><span x-show="busy" x-cloak>Processing…</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ till expense ============================ -->
+{% if expense_categories %}
+<div class="pos-overlay" x-show="modal==='expense'" x-cloak role="dialog" aria-modal="true" aria-label="Add expense" @keydown.escape.window="modal==='expense' && closeModal()">
+  <div class="pos-modal" style="max-width:460px" @click.outside="closeModal()">
+    <div class="pos-modal-head"><h2>Expense from the till</h2><button type="button" class="pos-iconbtn is-neutral" @click="closeModal()" aria-label="Close">{% icon "x" "w-4 h-4" %}</button></div>
+    <form class="pos-modal-body" style="display:grid;gap:12px" @submit.prevent="submitExpense()" novalidate>
+      <p class="ui-help" style="margin:0">Cash leaves the drawer, so the shift's expected cash goes down by this amount.</p>
+      <div><label class="ui-label" for="exp-cat">Category <span style="color:var(--ui-danger)">*</span></label>
+        <select id="exp-cat" x-model="exp.category_id"><option value="">Choose…</option>{% for c in expense_categories %}<option value="{{ c.pk }}">{{ c.name }}</option>{% endfor %}</select></div>
+      <div><label class="ui-label" for="exp-amt">Amount <span style="color:var(--ui-danger)">*</span></label>
+        <input id="exp-amt" type="number" step="0.01" min="0.01" inputmode="decimal" x-model="exp.amount" x-ref="expAmount"></div>
+      <div><label class="ui-label" for="exp-to">Paid to</label><input id="exp-to" type="text" maxlength="150" x-model="exp.paid_to" placeholder="Optional"></div>
+      <div><label class="ui-label" for="exp-note">Note</label><textarea id="exp-note" rows="2" maxlength="1000" x-model="exp.note" style="min-height:3rem" placeholder="What was it for?"></textarea></div>
+      <p class="ui-error" x-show="exp.error" x-text="exp.error" x-cloak></p>
+      <div class="pos-modal-foot" style="padding:0;border:0">
+        <button type="button" class="ui-btn ui-btn-ghost" @click="closeModal()">Cancel</button>
+        <button type="submit" class="ui-btn ui-btn-primary" :disabled="exp.busy"><span x-show="!exp.busy">Save expense</span><span x-show="exp.busy" x-cloak>Saving…</span></button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<!-- ============================ success ============================ -->
+<div class="pos-overlay" x-show="modal==='success'" x-cloak role="dialog" aria-modal="true" aria-label="Sale completed" @keydown.escape.window="modal==='success' && newSale()">
+  <div class="pos-modal" style="max-width:440px">
+    <div class="pos-modal-body" style="text-align:center;padding:28px 24px 8px">
+      <div class="pos-success-ic">{% icon "check-mark" "w-8 h-8" "2.5" %}</div>
+      <h2 style="font-size:20px;font-weight:800;margin:0">Sale completed</h2>
+      <p class="ui-help" style="margin-top:4px" x-text="lastSale ? lastSale.reference + (lastSale.customer ? ' · ' + lastSale.customer : '') : ''"></p>
+      <div class="pos-summary" style="margin-top:16px;text-align:left" x-show="lastSale">
+        <div class="pos-stat"><small>Total</small><b x-text="lastSale ? fmt(lastSale.total) : ''"></b></div>
+        <div class="pos-stat"><small>Paid</small><b x-text="lastSale ? fmt(lastSale.paid) : ''"></b></div>
+        <div class="pos-stat" :class="lastSale && num(lastSale.change) > 0 ? 'is-ok' : ''"><small>Change</small><b x-text="lastSale ? fmt(lastSale.change) : ''"></b></div>
+        <div class="pos-stat" :class="lastSale && num(lastSale.due_amount) > 0 ? 'is-bad' : ''"><small>Balance due</small><b x-text="lastSale ? fmt(lastSale.due_amount) : ''"></b></div>
+      </div>
+
+      <!-- customer feedback -->
+      <div class="pos-feedback" x-show="lastSale && lastSale.sale_id" x-cloak>
+        <div x-show="!fb.sent">
+          <p class="pos-feedback-q">How was your experience today?</p>
+          <div class="pos-stars" role="radiogroup" aria-label="Rating">
+            <template x-for="n in 5" :key="n">
+              <button type="button" class="pos-star" :class="n <= (fb.hover || fb.rating) && 'is-on'" role="radio" :aria-checked="fb.rating === n" :aria-label="n + (n === 1 ? ' star' : ' stars')"
+                      @mouseenter="fb.hover = n" @mouseleave="fb.hover = 0" @click="fb.rating = n; fb.error = ''">
+                <svg viewBox="0 0 24 24"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9z"/></svg>
+              </button>
+            </template>
+          </div>
+          <p class="pos-star-label" x-text="['', 'Poor', 'Fair', 'Good', 'Very good', 'Excellent'][fb.hover || fb.rating] || 'Tap a star'"></p>
+          <div x-show="fb.rating" x-cloak>
+            <textarea class="pos-feedback-text" rows="2" maxlength="1000" x-model="fb.comment" placeholder="Any comment? (optional)" @keydown.ctrl.enter.stop.prevent="sendFeedback()"></textarea>
+            <p class="ui-error" x-show="fb.error" x-text="fb.error" x-cloak></p>
+            <button type="button" class="ui-btn ui-btn-secondary" style="width:100%;margin-top:8px" :disabled="fb.busy" @click="sendFeedback()"><span x-text="fb.busy ? 'Saving…' : 'Submit feedback'"></span></button>
+          </div>
+        </div>
+        <div class="pos-feedback-thanks" x-show="fb.sent" x-cloak>{% icon "check-mark" "w-4 h-4" %}<span>Thank you for your feedback!</span></div>
+      </div>
+    </div>
+    <div class="pos-modal-foot" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;border-top:0">
+      <button type="button" class="ui-btn ui-btn-secondary" @click="printLast()">{% icon "printer" "w-4 h-4" %}<span>Print receipt</span></button>
+      <a class="ui-btn ui-btn-secondary" :href="lastSale ? lastSale.invoice_url : '#'" target="_blank" rel="noopener">{% icon "download" "w-4 h-4" %}<span>Download invoice</span></a>
+      <a class="ui-btn ui-btn-secondary" :href="lastSale ? lastSale.order_url : '#'" target="_blank" rel="noopener">{% icon "eye" "w-4 h-4" %}<span>View order</span></a>
+      <a class="ui-btn ui-btn-secondary" x-show="lastSale && lastSale.email_url" x-cloak :href="lastSale ? lastSale.email_url : '#'" target="_blank" rel="noopener">{% icon "mail" "w-4 h-4" %}<span>Email invoice</span></a>
+      <a class="ui-btn ui-btn-secondary" x-show="lastSale && lastSale.whatsapp_url" x-cloak :href="lastSale ? lastSale.whatsapp_url : '#'" target="_blank" rel="noopener">{% icon "chat" "w-4 h-4" %}<span>WhatsApp</span></a>
+      <a class="ui-btn ui-btn-secondary" x-show="lastSale && lastSale.delivery_url" x-cloak :href="lastSale ? lastSale.delivery_url : '#'" target="_blank" rel="noopener">{% icon "truck" "w-4 h-4" %}<span>Deliver this order</span></a>
+      <button type="button" class="ui-btn ui-btn-primary" x-ref="newSaleBtn" @click="newSale()" style="grid-column:1/-1">New sale</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ held sales ============================ -->
+<div class="pos-overlay" x-show="modal==='held'" x-cloak role="dialog" aria-modal="true" aria-label="Held sales" @keydown.escape.window="modal==='held' && closeModal()">
+  <div class="pos-modal is-mid" @click.outside="closeModal()">
+    <div class="pos-modal-head"><h2>Held sales</h2><button type="button" class="pos-iconbtn is-neutral" @click="closeModal()" aria-label="Close">{% icon "x" "w-4 h-4" %}</button></div>
+    <div class="pos-modal-body" style="display:grid;gap:8px">
+      <p class="ui-help" style="margin:0" x-show="cart.length">Your cart has items. Hold or clear it first, then resume a held sale.</p>
+      <div class="pos-empty" x-show="!heldLoading && !held.length" x-cloak style="min-height:140px"><div><b>No held sales</b>Use “Hold” to park a sale and come back to it later.</div></div>
+      <template x-for="s in held" :key="s.id">
+        <div class="pos-line" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+          <div style="min-width:0"><div class="pos-line-name" x-text="s.reference"></div>
+            <div class="pos-line-sub" x-text="s.customer_name + ' · ' + s.item_count + ' item' + (s.item_count == 1 ? '' : 's') + ' · ' + s.created_at + (s.counter ? ' · ' + s.counter : '') + ' · ' + s.cashier"></div></div>
+          <div class="flex items-center" style="gap:10px"><b class="tabular" x-text="fmt(s.total_amount)"></b>
+            <button type="button" class="ui-btn ui-btn-primary ui-btn-sm" :disabled="busy" @click="resumeHeld(s)">Resume</button></div>
+        </div>
+      </template>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ discount ============================ -->
+<div class="pos-overlay" x-show="modal==='discount'" x-cloak role="dialog" aria-modal="true" aria-label="Discount" @keydown.escape.window="modal==='discount' && closeModal()">
+  <div class="pos-modal" @click.outside="closeModal()">
+    <div class="pos-modal-head"><h2>Order discount</h2><button type="button" class="pos-iconbtn is-neutral" @click="closeModal()" aria-label="Close">{% icon "x" "w-4 h-4" %}</button></div>
+    <div class="pos-modal-body" style="display:grid;gap:14px">
+      <div class="pos-method-grid" style="grid-template-columns:1fr 1fr">
+        <button type="button" class="pos-method" :class="discountDraft.type==='amount' && 'is-active'" @click="discountDraft.type='amount'" x-text="'Amount (' + cfg.currency + ')'"></button>
+        <button type="button" class="pos-method" :class="discountDraft.type==='percent' && 'is-active'" @click="discountDraft.type='percent'">Percent (%)</button>
+      </div>
+      <div><label class="ui-label">Discount value</label><input type="number" step="0.01" min="0" inputmode="decimal" x-model="discountDraft.value" @keydown.enter.prevent="applyDiscount()" x-ref="discountInput"></div>
+      <div x-show="cart.length"><label class="ui-label">Line discounts</label>
+        <template x-for="it in cart" :key="it.key"><div class="flex items-center" style="gap:8px;margin-bottom:6px"><span class="text-sm" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" x-text="it.name"></span>
+          <input type="number" step="0.01" min="0" style="width:110px" x-model="it.discount_amount" aria-label="Line discount"></div></template></div>
+    </div>
+    <div class="pos-modal-foot"><button type="button" class="ui-btn ui-btn-ghost" @click="discountDraft={type:'amount',value:'0'}; applyDiscount()">Remove discount</button><button type="button" class="ui-btn ui-btn-primary" @click="applyDiscount()">Apply</button></div>
+  </div>
+</div>
+
+<!-- ============================ camera scan ============================ -->
+<div class="pos-overlay" x-show="modal==='camera'" x-cloak role="dialog" aria-modal="true" aria-label="Scan with the camera" @keydown.escape.window="modal==='camera' && closeModal()">
+  <div class="pos-modal" style="max-width:520px">
+    <div class="pos-modal-head"><h2>Scan with the camera</h2><button type="button" class="pos-iconbtn is-neutral" @click="closeModal()" aria-label="Close">{% icon "x" "w-4 h-4" %}</button></div>
+    <div class="pos-modal-body" style="display:grid;gap:10px">
+      <div style="position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:4/3">
+        <video x-ref="camVideo" playsinline muted style="width:100%;height:100%;object-fit:cover"></video>
+        <div style="position:absolute;inset:20% 12%;border:2px solid rgba(255,255,255,.85);border-radius:10px;box-shadow:0 0 0 999px rgba(0,0,0,.25);pointer-events:none"></div>
+      </div>
+      <p class="ui-error" x-show="cam.error" x-cloak x-text="cam.error"></p>
+      <p class="ui-help" style="margin:0" x-show="!cam.error">Hold a barcode inside the frame. Each product is added to the cart as it is read; keep scanning, then press Done.</p>
+      <div class="pos-status is-ok" x-show="cam.count" x-cloak><span x-text="cam.count + ' scanned'"></span><span x-text="cam.last"></span></div>
+    </div>
+    <div class="pos-modal-foot"><button type="button" class="ui-btn ui-btn-primary" @click="closeModal()">Done</button></div>
+  </div>
+</div>
+
+<!-- ============================ variant picker ============================ -->
+<div class="pos-overlay" x-show="modal==='variants'" x-cloak role="dialog" aria-modal="true" aria-label="Choose a variant" @keydown.escape.window="modal==='variants' && closeModal()">
+  <div class="pos-modal is-mid" @click.outside="closeModal()">
+    <div class="pos-modal-head">
+      <div class="pos-var-head"><span class="pos-var-img" :style="'--h:' + hue(picker.name)"><template x-if="picker.image"><img :src="picker.image" alt=""></template><template x-if="!picker.image"><span x-text="(picker.name || '?').charAt(0).toUpperCase()"></span></template></span>
+        <div><h2 x-text="picker.name"></h2><small class="ui-help">Choose which variant goes into the cart</small></div></div>
+      <button type="button" class="pos-iconbtn is-neutral" @click="closeModal()" aria-label="Close">{% icon "x" "w-4 h-4" %}</button>
+    </div>
+    <div class="pos-modal-body">
+      <div class="pos-var-loading" x-show="picker.loading"><template x-for="n in 3" :key="n"><div class="pos-skel" style="height:62px"></div></template></div>
+      <div class="pos-empty" x-show="!picker.loading && picker.error" x-cloak><div><b x-text="picker.error"></b></div></div>
+      <div class="pos-var-list" x-show="!picker.loading && picker.list.length" x-cloak>
+        <template x-for="v in picker.list" :key="v.id">
+          <button type="button" class="pos-var" :class="v.out_of_stock && 'is-empty'" @click="pickVariant(v)" :disabled="v.out_of_stock || atMax(v)">
+            <span class="pos-var-main">
+              <b x-text="v.variant || v.name"></b>
+              <span class="pos-var-attrs"><template x-for="a in (v.attrs || [])" :key="a.name"><span class="pos-quick-chip"><small x-text="a.name"></small> <b x-text="a.value"></b></span></template></span>
+              <small class="pos-var-sku" x-text="v.sku"></small>
+            </span>
+            <span class="pos-var-side">
+              <span class="pos-price"><span x-text="fmt(v.price)"></span><s class="pos-was" x-show="v.on_promo" x-text="fmt(v.regular_price)"></s></span>
+              <span class="pos-stock" :class="(v.out_of_stock || isLowStock(v)) && 'is-low'" x-text="v.out_of_stock ? 'Out of stock' : stockLabel(v)"></span>
+            </span>
+            <span class="pos-var-qty" x-show="cartQty(v.id)" x-text="'In cart: ' + cartQty(v.id)"></span>
+          </button>
+        </template>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ shipping ============================ -->
+<div class="pos-overlay" x-show="modal==='shipping'" x-cloak role="dialog" aria-modal="true" aria-label="Shipping charge" @keydown.escape.window="modal==='shipping' && closeModal()">
+  <div class="pos-modal" style="max-width:380px" @click.outside="closeModal()">
+    <div class="pos-modal-head"><h2>Shipping charge</h2><button type="button" class="pos-iconbtn is-neutral" @click="closeModal()" aria-label="Close">{% icon "x" "w-4 h-4" %}</button></div>
+    <div class="pos-modal-body" style="display:grid;gap:10px">
+      <p class="ui-help" style="margin:0">A delivery fee added to the bill. It is not discounted or taxed.</p>
+      <div><label class="ui-label" for="ship-amt">Amount</label><input id="ship-amt" type="number" step="0.01" min="0" inputmode="decimal" x-model="shippingDraft" @keydown.enter.prevent="applyShipping()"></div>
+    </div>
+    <div class="pos-modal-foot"><button type="button" class="ui-btn ui-btn-ghost" @click="shippingDraft=''; applyShipping()">Remove</button><button type="button" class="ui-btn ui-btn-primary" @click="applyShipping()">Apply</button></div>
+  </div>
+</div>
+
+<!-- ============================ add customer ============================ -->
+<div class="pos-overlay" x-show="modal==='customer'" x-cloak role="dialog" aria-modal="true" aria-label="Add customer" @keydown.escape.window="modal==='customer' && closeCustomerModal()">
+  <div class="pos-modal" @click.outside="closeCustomerModal()">
+    <div class="pos-modal-head"><h2>Add customer</h2><button type="button" class="pos-iconbtn is-neutral" @click="closeCustomerModal()" aria-label="Close">{% icon "x" "w-4 h-4" %}</button></div>
+    <div class="pos-modal-body" style="display:grid;gap:12px">
+      <div><label class="ui-label">Name <span style="color:var(--ui-danger)">*</span></label><input type="text" x-model="newCustomer.name" x-ref="newCustomerName"></div>
+      <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px"><div><label class="ui-label">Phone</label><input type="text" x-model="newCustomer.phone" placeholder="03xx-xxxxxxx"></div>
+        <div><label class="ui-label">CNIC</label><input type="text" x-model="newCustomer.cnic" placeholder="35201-1234567-1"></div></div>
+      <div><label class="ui-label">Email</label><input type="email" x-model="newCustomer.email"></div>
+      <div><label class="ui-label">Address</label><input type="text" x-model="newCustomer.address"></div>
+      {% if customer_groups %}<div><label class="ui-label">Customer group</label><select x-model="newCustomer.group"><option value="">— None —</option>{% for g in customer_groups %}<option value="{{ g.id }}">{{ g.name }}</option>{% endfor %}</select></div>{% endif %}
+      <p class="ui-error" x-show="newCustomer.error" x-text="newCustomer.error"></p>
+    </div>
+    <div class="pos-modal-foot"><button type="button" class="ui-btn ui-btn-ghost" @click="closeCustomerModal()">Cancel</button><button type="button" class="ui-btn ui-btn-primary" :disabled="!newCustomer.name.trim() || busy" @click="addCustomer()">Save &amp; select</button></div>
+  </div>
+</div>
+
+<!-- ============================ orders (list) ============================ -->
+<div class="pos-overlay" x-show="modal==='orders'" x-cloak role="dialog" aria-modal="true" aria-label="Orders" @keydown.escape.window="modal==='orders' && closeModal()">
+  <div class="pos-modal is-wide" @click.outside="closeModal()">
+    <div class="pos-modal-head"><h2>Orders</h2><button type="button" class="pos-iconbtn is-neutral" @click="closeModal()" aria-label="Close">{% icon "x" "w-4 h-4" %}</button></div>
+    <div class="pos-modal-body" style="display:grid;gap:10px;align-content:start">
+      <div class="pos-ord-tools">
+        <input type="search" x-model="ord.q" @input="onOrdSearch()" placeholder="Search invoice number, customer name or phone…" aria-label="Search orders" autocomplete="off">
+        <select x-model="ord.status" @change="loadOrders(true)" aria-label="Filter by status">
+          <option value="">All statuses</option><option value="completed">Completed</option><option value="partially_returned">Partially returned</option><option value="returned">Returned</option><option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+      <p class="ui-error" x-show="ord.error" x-cloak x-text="ord.error"></p>
+      <div x-show="ord.loading && !ord.list.length" x-cloak style="display:grid;gap:8px"><template x-for="n in 5" :key="n"><div class="pos-skel" style="height:58px"></div></template></div>
+      <div class="pos-empty" x-show="!ord.loading && !ord.error && !ord.list.length" x-cloak style="min-height:160px"><div><b>No orders found</b>Try another invoice number or customer.</div></div>
+      <template x-for="o in ord.list" :key="o.id">
+        <button type="button" class="pos-line pos-ord-row" @click.stop="openSale(o.id)">
+          <span style="min-width:0;text-align:left"><span class="pos-line-name" x-text="o.reference"></span>
+            <span class="pos-line-sub" style="display:block" x-text="o.customer + ' · ' + o.items + ' item' + (o.items == 1 ? '' : 's') + ' · ' + o.date + ' · ' + o.cashier"></span></span>
+          <span class="pos-ord-end"><span class="ui-badge" :class="o.status === 'completed' ? 'ui-badge-success' : (o.status === 'cancelled' ? 'ui-badge-danger' : 'ui-badge-warning')" x-text="o.status_label"></span><b class="tabular" x-text="fmt(o.total)"></b></span>
+        </button>
+      </template>
+      <div style="text-align:center" x-show="ord.more" x-cloak><button type="button" class="ui-btn ui-btn-secondary" :disabled="ord.loading" @click="moreOrders()">Load more</button></div>
+    </div>
+    <div class="pos-modal-foot"><a class="ui-btn ui-btn-ghost" :href="cfg.urls.sales" target="_blank" rel="noopener">{% icon "external" "w-4 h-4" %}<span>Open full orders page</span></a><button type="button" class="ui-btn ui-btn-primary" @click="closeModal()">Close</button></div>
+  </div>
+</div>
+
+<!-- ============================ one order: details, return, exchange ============================ -->
+<div class="pos-overlay" x-show="modal==='sale'" x-cloak role="dialog" aria-modal="true" aria-label="Order details" @keydown.escape.window="modal==='sale' && closeModal()">
+  <div class="pos-modal is-wide" @click.outside="closeModal()">
+    <div class="pos-modal-head">
+      <h2 style="display:flex;align-items:center;gap:10px;min-width:0"><span x-text="ord.mode === 'exchange' ? 'Exchange' : (ord.mode === 'return' ? 'Return' : 'Order')"></span><span x-text="ord.sale ? ord.sale.reference : ''" style="font-weight:600;color:var(--ui-text-2)"></span>
+        <span class="ui-badge" x-show="ord.sale" x-cloak :class="ord.sale && ord.sale.status === 'completed' ? 'ui-badge-success' : (ord.sale && ord.sale.status === 'cancelled' ? 'ui-badge-danger' : 'ui-badge-warning')" x-text="ord.sale ? ord.sale.status_label : ''"></span></h2>
+      <button type="button" class="pos-iconbtn is-neutral" @click="closeModal()" aria-label="Close">{% icon "x" "w-4 h-4" %}</button>
+    </div>
+    <div class="pos-modal-body" style="display:grid;gap:14px;align-content:start">
+      <div x-show="ord.saleLoading" x-cloak style="display:grid;gap:8px"><div class="pos-skel" style="height:54px"></div><div class="pos-skel" style="height:120px"></div></div>
+      <p class="ui-error" x-show="ord.saleError" x-cloak x-text="ord.saleError"></p>
+      <template x-if="ord.sale && !ord.saleLoading">
+        <div style="display:grid;gap:14px">
+          <div class="pos-ord-meta">
+            <div><small>Customer</small><b x-text="ord.sale.customer"></b></div>
+            <div><small>Date</small><b x-text="ord.sale.date"></b></div>
+            <div><small>Cashier</small><b x-text="ord.sale.cashier"></b></div>
+            <div><small>Total</small><b class="tabular" x-text="fmt(ord.sale.total)"></b></div>
+          </div>
+
+          <!-- view mode -->
+          <div x-show="ord.mode === 'view'" style="display:grid;gap:14px">
+            <div class="pos-ord-table">
+              <div class="pos-ord-th"><span>Item</span><span>Qty</span><span>Price</span><span>Total</span></div>
+              <template x-for="l in ord.sale.lines" :key="l.id">
+                <div class="pos-ord-tr"><span><b x-text="l.name"></b><small x-show="num(l.returned) > 0" x-text="'Returned: ' + l.returned"></small></span><span class="tabular" x-text="l.qty"></span><span class="tabular" x-text="fmt(l.unit_price)"></span><span class="tabular" x-text="fmt(l.line_total)"></span></div>
+              </template>
+            </div>
+            <div class="pos-ord-sums">
+              <div><span>Subtotal</span><b class="tabular" x-text="fmt(ord.sale.subtotal)"></b></div>
+              <div x-show="num(ord.sale.discount) > 0"><span>Discount</span><b class="tabular" x-text="'− ' + fmt(ord.sale.discount)"></b></div>
+              <div x-show="num(ord.sale.tax) > 0"><span>Tax</span><b class="tabular" x-text="fmt(ord.sale.tax)"></b></div>
+              <div x-show="num(ord.sale.shipping) > 0"><span>Shipping</span><b class="tabular" x-text="fmt(ord.sale.shipping)"></b></div>
+              <div class="is-total"><span>Total</span><b class="tabular" x-text="fmt(ord.sale.total)"></b></div>
+              <div><span>Paid</span><b class="tabular" x-text="fmt(ord.sale.paid)"></b></div>
+              <div x-show="num(ord.sale.due) > 0"><span>Due</span><b class="tabular" style="color:var(--ui-danger)" x-text="fmt(ord.sale.due)"></b></div>
+            </div>
+            <p class="ui-help" style="margin:0" x-show="ord.sale.payments.length" x-text="'Paid by ' + ord.sale.payments.map(function (p) { return p.method + ' ' + fmt(p.amount); }).join(', ')"></p>
+          </div>
+
+          <!-- return / exchange mode -->
+          <div x-show="ord.mode !== 'view'" x-cloak style="display:grid;gap:12px">
+            <p class="ui-help" style="margin:0" x-text="ord.mode === 'exchange' ? 'Choose what the customer brings back. After this you ring up the new items on the same screen.' : 'Choose the items the customer is returning.'"></p>
+            <div style="display:flex;justify-content:flex-end"><button type="button" class="ui-btn ui-btn-ghost ui-btn-sm" @click="retAll()">Select everything</button></div>
+            <template x-for="l in ord.sale.lines" :key="l.id">
+              <div class="pos-line pos-ret-row" :class="num(l.left) <= 0 && 'is-done'">
+                <div style="min-width:0"><div class="pos-line-name" x-text="l.name"></div>
+                  <div class="pos-line-sub" x-text="'Sold ' + l.qty + (num(l.returned) > 0 ? ' · already returned ' + l.returned : '') + ' · refunds ' + fmt(l.unit_refund) + ' each'"></div></div>
+                <div x-show="num(l.left) > 0" class="pos-qty" style="flex:none">
+                  <button type="button" @click="stepRetQty(l, -1)" :disabled="retQty(l) <= 0" :aria-label="'Less ' + l.name">−</button>
+                  <input type="number" min="0" :max="l.left" step="any" class="pos-qty-input" :value="ord.qty[l.id] || ''" placeholder="0" @input="setRetQty(l, $event.target.value)" :aria-label="'Quantity to return of ' + l.name">
+                  <button type="button" @click="stepRetQty(l, 1)" :disabled="retQty(l) >= num(l.left)" :aria-label="'More ' + l.name">+</button>
+                </div>
+                <span class="ui-badge ui-badge-neutral no-dot" x-show="num(l.left) <= 0">Fully returned</span>
+              </div>
+            </template>
+            <div class="pos-ord-form">
+              <label><span>Reason <i style="color:var(--ui-danger)">*</i></span><input type="text" x-model="ord.reason" maxlength="200" placeholder="e.g. wrong size, defective, customer changed mind"></label>
+              <label><span>Refund by</span><select x-model="ord.method"><template x-for="m in ord.sale.methods" :key="m.code"><option :value="m.code" x-text="m.name"></option></template></select></label>
+            </div>
+            <label class="pf-check" style="margin:0"><input type="checkbox" x-model="ord.restock"> Put the items back into stock</label>
+            <p class="ui-help" style="margin:0" x-text="'Refundable so far: ' + fmt(ord.sale.balance) + (ord.method === 'cash' && ord.sale.cash_in_till !== null ? ' · cash in till: ' + fmt(ord.sale.cash_in_till) : '')"></p>
+            <p class="ui-error" x-show="ord.formError" x-cloak role="alert" x-text="ord.formError"></p>
+          </div>
+        </div>
+      </template>
+    </div>
+    <div class="pos-modal-foot" style="justify-content:space-between;flex-wrap:wrap">
+      <button type="button" class="ui-btn ui-btn-ghost" x-show="ord.mode === 'view'" @click.stop="backToOrders()">{% icon "arrow-left" "w-4 h-4" %}<span>All orders</span></button>
+      <button type="button" class="ui-btn ui-btn-ghost" x-show="ord.mode !== 'view'" x-cloak @click="ord.mode = 'view'; ord.formError = ''">Cancel</button>
+      <span style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end" x-show="ord.mode === 'view' && ord.sale" x-cloak>
+        <button type="button" class="ui-btn ui-btn-secondary" @click="printOrder(ord.sale)">{% icon "printer" "w-4 h-4" %}<span>Print receipt</span></button>
+        <a class="ui-btn ui-btn-secondary" :href="ord.sale ? ord.sale.order_url : '#'" target="_blank" rel="noopener">{% icon "eye" "w-4 h-4" %}<span>Full details</span></a>
+        <template x-if="ord.sale && ord.sale.can_return"><span style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" class="ui-btn ui-btn-secondary" @click="startReturn('exchange')">{% icon "switch" "w-4 h-4" %}<span>Exchange</span></button>
+          <button type="button" class="ui-btn ui-btn-primary" @click="startReturn('return')">{% icon "arrow-left" "w-4 h-4" %}<span>Return / refund</span></button>
+        </span></template>
+      </span>
+      <span style="display:flex;gap:10px;align-items:center" x-show="ord.mode !== 'view'" x-cloak>
+        <b class="tabular" x-text="retCount() ? 'Refund ' + fmt(retTotal()) : ''"></b>
+        <button type="button" class="ui-btn ui-btn-primary" :disabled="ord.busy || !retCount()" @click="submitReturn()"><span x-text="ord.busy ? 'Saving…' : (ord.mode === 'exchange' ? 'Return items & continue' : 'Confirm return')"></span></button>
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ return lookup ============================ -->
+<div class="pos-overlay" x-show="modal==='return'" x-cloak role="dialog" aria-modal="true" aria-label="Return" @keydown.escape.window="modal==='return' && closeModal()">
+  <div class="pos-modal" @click.outside="closeModal()">
+    <div class="pos-modal-head"><h2 x-text="returnMode === 'exchange' ? 'Exchange' : 'Return / refund'"></h2><button type="button" class="pos-iconbtn is-neutral" @click="closeModal()" aria-label="Close">{% icon "x" "w-4 h-4" %}</button></div>
+    <div class="pos-modal-body" style="display:grid;gap:12px">
+      <p class="ui-help" style="margin:0" x-text="returnMode === 'exchange' ? 'Find the original sale, choose what the customer brings back, then ring up the new items.' : 'Find the original sale by its invoice number, then choose the items to take back.'"></p>
+      <input type="search" x-model="returnQuery" placeholder="Invoice number, e.g. SALE-000012" @keydown.enter.prevent="openReturn()" x-ref="returnInput">
+    </div>
+    <div class="pos-modal-foot"><button type="button" class="ui-btn ui-btn-ghost" @click="closeModal()">Cancel</button><button type="button" class="ui-btn ui-btn-primary" @click="openReturn()">Find sale</button></div>
+  </div>
+</div>
+
+<!-- ============================ close register ============================ -->
+<div class="pos-overlay" x-show="modal==='close'" x-cloak role="dialog" aria-modal="true" aria-label="Close register" @keydown.escape.window="modal==='close' && closeModal()">
+  <div class="pos-modal is-wide" @click.outside="closeModal()">
+    <div class="pos-modal-head"><h2>Close register · <span x-text="cfg.session.counter + ' ' + cfg.session.number"></span></h2><button type="button" class="pos-iconbtn is-neutral" @click="closeModal()" aria-label="Close">{% icon "x" "w-4 h-4" %}</button></div>
+    <div class="pos-modal-body" style="display:grid;gap:14px">
+      <div x-show="closing.loading" class="pos-skel" style="height:120px"></div>
+      <p class="ui-error" x-show="closing.error" x-text="closing.error"></p>
+      <template x-if="closing.summary && !closing.confirm">
+        <div style="display:grid;gap:14px">
+          <p class="ui-help" style="margin:0" x-text="'Cashier ' + closing.summary.cashier + ' · opened ' + new Date(closing.summary.opened_at).toLocaleString()"></p>
+          <div class="pos-summary" style="grid-template-columns:repeat(3,1fr)">
+            <div class="pos-stat"><small>Opening cash</small><b x-text="fmt(closing.summary.opening_cash)"></b></div>
+            <div class="pos-stat"><small>Cash sales</small><b x-text="fmt(closing.summary.cash_sales)"></b></div>
+            <div class="pos-stat"><small>Card sales</small><b x-text="fmt(closing.summary.card_sales)"></b></div>
+            <div class="pos-stat"><small>Bank transfer</small><b x-text="fmt(closing.summary.bank_sales)"></b></div>
+            <div class="pos-stat"><small>Other payments</small><b x-text="fmt(closing.summary.other_payments)"></b></div>
+            <div class="pos-stat"><small>Refunds</small><b x-text="fmt(closing.summary.refunds)"></b></div>
+            <div class="pos-stat"><small>Cash expenses</small><b x-text="fmt(closing.summary.expenses)"></b></div>
+            <div class="pos-stat"><small>Total sales</small><b x-text="fmt(closing.summary.total_sales)"></b></div>
+            <div class="pos-stat"><small>Transactions</small><b x-text="closing.summary.transactions"></b></div>
+          </div>
+          <div class="pos-status is-ok"><span>Expected cash in drawer</span><span x-text="fmt(closing.summary.expected_cash)"></span></div>
+          <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;align-items:start">
+            <div><label class="ui-label">Actual cash counted <span style="color:var(--ui-danger)">*</span></label>
+              <input type="number" step="0.01" min="0" inputmode="decimal" x-model="closing.counted" x-ref="countedInput" @keydown.enter.prevent="reviewClose()">
+              <p class="ui-help" x-show="closing.counted !== ''" x-text="'Difference: ' + signed(closingDiff)" :style="closingDiff === 0 ? '' : 'font-weight:700;color:var(--ui-' + (closingDiff < 0 ? 'danger' : 'warning') + ')'"></p></div>
+            <div><label class="ui-label">Closing note</label><textarea rows="2" x-model="closing.note" maxlength="2000" style="min-height:3rem"></textarea></div>
+          </div>
+          <div class="pos-status is-warn" x-show="cart.length"><span>The current cart still has items. They will be discarded when the register closes.</span></div>
+        </div>
+      </template>
+      <template x-if="closing.summary && closing.confirm">
+        <div style="display:grid;gap:12px;text-align:center;padding:12px 0">
+          <h3 style="font-size:17px;font-weight:800;margin:0">Close this register?</h3>
+          <p class="ui-help" style="margin:0">Sales are blocked on this counter until it is opened again. This cannot be undone.</p>
+          <div class="pos-summary"><div class="pos-stat"><small>Expected</small><b x-text="fmt(closing.summary.expected_cash)"></b></div><div class="pos-stat"><small>Counted</small><b x-text="fmt(closing.counted)"></b></div></div>
+          <div class="pos-status" :class="closingDiff === 0 ? 'is-ok' : 'is-warn'"><span>Difference</span><span x-text="signed(closingDiff)"></span></div>
+        </div>
+      </template>
+    </div>
+    <div class="pos-modal-foot">
+      <button type="button" class="ui-btn ui-btn-ghost" x-show="!closing.confirm" @click="closeModal()">Cancel</button>
+      <button type="button" class="ui-btn ui-btn-ghost" x-show="closing.confirm" x-cloak @click="closing.confirm=false">Back</button>
+      <button type="button" class="ui-btn ui-btn-danger" x-show="!closing.confirm" :disabled="!closing.summary || closing.counted === ''" @click="reviewClose()">Review &amp; close</button>
+      <button type="button" class="ui-btn ui-btn-danger" x-show="closing.confirm" x-cloak :disabled="busy" @click="confirmClose()"><span x-show="!busy">Confirm &amp; close register</span><span x-show="busy" x-cloak>Closing…</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ shortcuts help ============================ -->
+<div class="pos-overlay" x-show="modal==='help'" x-cloak role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" @keydown.escape.window="modal==='help' && closeModal()">
+  <div class="pos-modal" @click.outside="closeModal()">
+    <div class="pos-modal-head"><h2>Keyboard shortcuts</h2><button type="button" class="pos-iconbtn is-neutral" @click="closeModal()" aria-label="Close">{% icon "x" "w-4 h-4" %}</button></div>
+    <div class="pos-modal-body" style="display:grid;gap:8px;font-size:13px">
+      {% for key, what in shortcuts %}<div class="flex justify-between" style="gap:12px"><span>{{ what }}</span><span class="pos-kbd" style="position:static;transform:none">{{ key }}</span></div>{% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- ============================ confirm + toasts ============================ -->
+<div class="pos-overlay" style="z-index:110" x-show="confirmBox.open" x-cloak role="alertdialog" aria-modal="true" @keydown.escape.window="confirmBox.open && answerConfirm(false)">
+  <div class="pos-modal" style="max-width:400px">
+    <div class="pos-modal-body"><h2 style="font-size:16px;font-weight:700;margin:0" x-text="confirmBox.title"></h2><p class="ui-help" style="font-size:13.5px;margin-top:8px" x-text="confirmBox.message"></p></div>
+    <div class="pos-modal-foot"><button type="button" class="ui-btn ui-btn-ghost" @click="answerConfirm(false)">Cancel</button>
+      <button type="button" class="ui-btn" :class="confirmBox.tone === 'danger' ? 'ui-btn-danger' : 'ui-btn-primary'" @click="answerConfirm(true)" x-text="confirmBox.label"></button></div>
+  </div>
+</div>
+<div class="pos-toasts" aria-live="polite">
+  <template x-for="t in toasts" :key="t.id"><div class="pos-toast" :class="'is-' + t.type" role="status"><span x-text="t.text"></span></div></template>
+</div>
+
+<script src="{% static 'js/pos-app.js' %}?v=20261010d"></script>
+</body>
+</html>

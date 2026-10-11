@@ -1,0 +1,8 @@
+{% load ui %}<div class="page-header">
+  <div class="min-w-0">
+    {% if crumbs %}<nav class="breadcrumb" aria-label="Breadcrumb">{% for c in crumbs %}{% if c.1 %}<a href="{{ c.1 }}">{{ c.0 }}</a><span class="sep">/</span>{% else %}<span>{{ c.0 }}</span>{% endif %}{% endfor %}</nav>{% endif %}
+    <h1 class="page-title">{{ title }}</h1>
+    {% if subtitle %}<p class="page-subtitle">{{ subtitle }}</p>{% endif %}
+  </div>
+  <div class="page-actions">{{ body }}</div>
+</div>

@@ -1,0 +1,7 @@
+{# Plain input: {% ui "input" name="q" label="Search" value=q placeholder="Type…" %} #}
+<div class="ui-field {{ css }}">
+  {% if label %}<label class="ui-label" for="{{ id|default:name }}">{{ label }}{% if required %} <span style="color:var(--ui-danger)">*</span>{% endif %}</label>{% endif %}
+  <input type="{{ type|default:'text' }}" name="{{ name }}" id="{{ id|default:name }}" value="{{ value|default_if_none:'' }}"{% if placeholder %} placeholder="{{ placeholder }}"{% endif %}{% if required %} required{% endif %}{% if autofocus %} autofocus{% endif %}{% if error %} aria-invalid="true"{% endif %}{% if attrs %} {{ attrs|safe }}{% endif %}>
+  {% if help %}<p class="ui-help">{{ help }}</p>{% endif %}
+  {% if error %}<p class="ui-error">{{ error }}</p>{% endif %}
+</div>

@@ -1,0 +1,79 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Customer feedback{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <h1 class="page-title">Customer feedback <span class="ui-badge ui-badge-neutral no-dot" style="vertical-align:middle;margin-left:6px">{{ result_count }}</span></h1>
+      <p class="page-subtitle">Ratings and comments collected at the POS after payment.</p>
+    </div>
+  </div>
+
+  <div class="fb-summary ui-card">
+    <div class="fb-avg">
+      <div class="fb-avg-num">{{ avg_rating }}</div>
+      <div class="fb-stars" aria-hidden="true">{% for n in star_range %}<svg viewBox="0 0 24 24" class="fb-star {% if n <= avg_stars %}is-on{% endif %}"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9z"/></svg>{% endfor %}</div>
+      <div class="ui-help">{{ total_feedback }} review{{ total_feedback|pluralize }}</div>
+    </div>
+    <div class="fb-bars">
+      {% for b in breakdown %}
+      <div class="fb-bar"><span>{{ b.stars }} ★</span><div class="fb-track"><i style="width:{{ b.pct }}%"></i></div><span class="ui-muted">{{ b.count }}</span></div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <form method="get" class="ui-toolbar">
+    <div class="ui-search">
+      <label class="ui-label" for="f-q">Search</label>
+      {% icon "search" "w-4 h-4" %}
+      <input type="search" id="f-q" name="q" value="{{ request.GET.q }}" placeholder="Comment, invoice or customer" autocomplete="off">
+    </div>
+    <div style="min-width:9rem">
+      <label class="ui-label" for="f-r">Rating</label>
+      <select id="f-r" name="rating"><option value="">All ratings</option>{% for n in star_range reversed %}<option value="{{ n }}" {% if request.GET.rating == n|stringformat:"s" %}selected{% endif %}>{{ n }} star{{ n|pluralize }}</option>{% endfor %}</select>
+    </div>
+    <div><label class="ui-label" for="f-df">From</label><input type="date" id="f-df" name="df" value="{{ df }}"></div>
+    <div><label class="ui-label" for="f-dt">To</label><input type="date" id="f-dt" name="dt" value="{{ dt }}"></div>
+    <div style="width:6rem">
+      <label class="ui-label" for="f-per">Per page</label>
+      <select id="f-per" name="per">{% for n in page_sizes %}<option value="{{ n }}" {% if n == per %}selected{% endif %}>{{ n }}</option>{% endfor %}</select>
+    </div>
+    <div class="flex gap-2">
+      <button type="submit" class="ui-btn ui-btn-primary">{% icon "filter" "w-4 h-4" %}<span>Apply</span></button>
+      {% if has_filters %}<a class="ui-btn ui-btn-secondary" href="{% url 'sales:feedback_list' %}">Reset</a>{% endif %}
+    </div>
+  </form>
+
+  {% if rows %}
+  <div class="ui-table-wrap">
+    <table class="ui-table ui-table-cards">
+      <thead><tr><th>Date</th><th>Invoice</th><th>Customer</th><th>Rating</th><th>Comment</th><th>Cashier</th></tr></thead>
+      <tbody>
+        {% for f in rows %}
+        <tr>
+          <td data-label="Date" class="ui-nowrap">{{ f.created_at|date:"d M Y, H:i" }}</td>
+          <td data-label="Invoice"><a class="erp-link" href="{% url 'sales:sale_detail' f.sale_id %}">{{ f.sale.reference }}</a></td>
+          <td data-label="Customer">{{ f.sale.customer.name|default:"Walk-in" }}</td>
+          <td data-label="Rating" class="ui-nowrap"><span class="fb-stars" title="{{ f.rating }} of 5">{% for n in star_range %}<svg viewBox="0 0 24 24" class="fb-star {% if n <= f.rating %}is-on{% endif %}"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9z"/></svg>{% endfor %}</span></td>
+          <td data-label="Comment" style="max-width:34rem">{% if f.comment %}{{ f.comment }}{% else %}<span class="ui-muted">No comment</span>{% endif %}</td>
+          <td data-label="Cashier">{% if f.created_by %}{{ f.created_by.get_full_name|default:f.created_by.username }}{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% ui "pagination" page_obj=page_obj %}
+  {% else %}
+  <div class="ui-card">{% if has_filters %}{% ui "empty_state" icon="search" title="No feedback matches your filters" text="Try another rating or date range." %}{% else %}{% ui "empty_state" icon="star" title="No feedback yet" text="After a sale is paid, the POS asks the customer to rate their visit. Their answers appear here." %}{% endif %}</div>
+  {% endif %}
+</div>
+<style>
+.fb-summary { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: var(--sp-5, 24px); padding: 18px 22px; align-items: center; }
+@media (max-width: 640px) { .fb-summary { grid-template-columns: 1fr; } }
+.fb-avg-num { font-size: 44px; font-weight: 800; line-height: 1; letter-spacing: -.02em; }
+.fb-bars { display: grid; gap: 7px; }
+.fb-bar { display: grid; grid-template-columns: 36px minmax(0, 1fr) 36px; align-items: center; gap: 10px; font-size: 12.5px; }
+.fb-track { height: 8px; border-radius: 99px; background: var(--ui-surface-2); overflow: hidden; }
+.fb-track i { display: block; height: 100%; background: #f5a623; border-radius: 99px; }
+</style>
+{% endblock %}

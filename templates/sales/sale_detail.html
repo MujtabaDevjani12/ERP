@@ -1,0 +1,178 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Sale {{ sale.reference }}{% endblock %}
+{% block content %}
+<div class="space-y-4 sd-page">
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{% url 'sales:sale_list' %}">Sales</a><span class="sep">/</span><span>{{ sale.reference }}</span></nav>
+      <h1 class="page-title">Sale</h1>
+    </div>
+    <div class="page-actions sd-actions">
+      <a class="ui-btn ui-btn-secondary" href="{% url 'sales:invoice_print' sale.pk %}" target="_blank" rel="noopener">{% icon "printer" "w-4 h-4" %}<span>Receipt</span></a>
+      <a class="ui-btn ui-btn-secondary" href="{% url 'documents:invoice_pdf' sale.pk %}" target="_blank" rel="noopener">{% icon "doc" "w-4 h-4" %}<span>PDF</span></a>
+      {% component "dropdown" label="Send receipt" icon="mail" align="right" %}
+        <a class="ui-menu-item" href="{% url 'documents:send_email' sale.pk %}">{% icon "mail" "w-4 h-4" %}Email receipt</a>
+        <a class="ui-menu-item" href="{% url 'documents:send_whatsapp' sale.pk %}">{% icon "chat" "w-4 h-4" %}WhatsApp receipt</a>
+      {% endcomponent %}
+      {% if can_deliver and perms.sales.add_delivery %}<a class="ui-btn ui-btn-secondary" href="{% url 'sales:delivery_add' %}?sale={{ sale.pk }}">{% icon "truck" "w-4 h-4" %}<span>Delivery</span></a>{% endif %}
+      {% if can_feedback %}<button type="button" class="ui-btn ui-btn-secondary" data-drawer-url="{% url 'sales:sale_feedback' sale.pk %}" data-drawer-title="Customer feedback · {{ sale.reference }}">{% icon "star" "w-4 h-4" %}<span>Feedback</span></button>{% endif %}
+      {% if sale.due_amount > 0 and sale.status != "held" and sale.status != "cancelled" %}{% if perms.payments.add_payment or perms.sales.change_sale %}<a class="ui-btn ui-btn-secondary" href="#add-payment">{% icon "cash" "w-4 h-4" %}<span>Add payment</span></a>{% endif %}{% endif %}
+      {% if sale.status == "completed" or sale.status == "partially_returned" %}{% if perms.sales.add_salereturn %}
+      <a class="ui-btn ui-btn-secondary" href="{% url 'sales:sale_return' sale.pk %}?exchange=1">{% icon "refresh" "w-4 h-4" %}<span>Exchange</span></a>
+      <a class="ui-btn ui-btn-danger-soft" href="{% url 'sales:sale_return' sale.pk %}">{% icon "arrow-left" "w-4 h-4" %}<span>Return items</span></a>
+      {% endif %}{% endif %}
+    </div>
+  </div>
+
+  <div class="sd-layout">
+    <div class="sd-main space-y-4">
+      {# ---------------------------------------------------------------- header card #}
+      <section class="ui-card"><div class="ui-card-body">
+        <div class="sd-top">
+          <div class="min-w-0">
+            <h2 class="sd-ref">{{ sale.reference }}</h2>
+            <div class="sd-date">{{ sale.created_at|date:"d M Y, H:i" }}</div>
+          </div>
+          <div class="sd-badges">
+            {% with ps=sale.payment_status %}{% if ps == "due" %}{% badge ps label="Unpaid" tone="danger" %}{% elif ps == "partial" %}{% badge ps label="Partially paid" tone="warning" %}{% else %}{% badge ps label="Paid" %}{% endif %}{% endwith %}
+            {% if sale.status == "held" or sale.status == "partially_returned" %}{% badge sale.status label=sale.get_status_display tone="warning" %}{% elif sale.status == "returned" %}{% badge sale.status label=sale.get_status_display tone="info" %}{% elif sale.status == "cancelled" %}{% badge sale.status label=sale.get_status_display tone="danger" %}{% else %}{% badge sale.status label=sale.get_status_display %}{% endif %}
+            {% if sale.register_session_id %}<span class="ui-badge ui-badge-neutral no-dot">POS</span>{% endif %}
+          </div>
+        </div>
+        <dl class="sd-meta">
+          <div><dt>Customer</dt><dd>{% if sale.customer %}{{ sale.customer.name }}{% if sale.customer.phone %}<small>{{ sale.customer.phone }}</small>{% endif %}{% else %}Walk-in customer{% endif %}</dd></div>
+          <div><dt>Biller</dt><dd>{{ sale.biller.get_full_name|default:sale.biller.username }}</dd></div>
+          <div><dt>Warehouse</dt><dd>{{ sale.warehouse.name }}</dd></div>
+          <div><dt>Cashier</dt><dd>{% if cashier %}{{ cashier.get_full_name|default:cashier.username }}{% else %}—{% endif %}</dd></div>
+          <div><dt>Branch</dt><dd>{{ sale.store.name }}</dd></div>
+          <div><dt>Counter</dt><dd>{{ sale.register_session.register.name|default:"—" }}</dd></div>
+        </dl>
+      </div></section>
+
+      {# ---------------------------------------------------------------- items #}
+      <section class="ui-card">
+        <div class="ui-card-header"><h3 class="ui-card-title">Items</h3><span class="ui-muted">{{ items|length }} line{{ items|length|pluralize }}</span></div>
+        <div class="ui-table-wrap" style="border:0;border-radius:0;box-shadow:none">
+          <table class="ui-table">
+            <thead><tr><th>Product</th><th class="num">Price</th><th class="num">Qty</th><th class="num">Discount</th><th class="num">Tax</th><th class="num">Subtotal</th><th class="num">Returned</th></tr></thead>
+            <tbody>
+              {% for item in items %}
+              <tr>
+                <td data-label="Product"><div class="ui-cell-title">{{ item.variant.product.name }}{% if item.variant.name and item.variant.name != "Default" %} · {{ item.variant.name }}{% endif %}</div><div class="ui-cell-sub">{% if item.variant.barcode %}{{ item.variant.barcode }}{% else %}{{ item.variant.sku }}{% endif %}</div></td>
+                <td class="num" data-label="Price">{% money item.unit_price %}</td>
+                <td class="num" data-label="Qty">{{ item.quantity|floatformat:"-3" }}</td>
+                <td class="num" data-label="Discount">{% if item.discount_amount %}{% money item.discount_amount %}{% else %}—{% endif %}</td>
+                <td class="num" data-label="Tax">{% if item.tax_amount %}{% money item.tax_amount %}{% else %}—{% endif %}</td>
+                <td class="num" data-label="Subtotal"><strong>{% money item.line_total %}</strong></td>
+                <td class="num" data-label="Returned">{% if item.returned_qty %}<span class="sd-warn">{{ item.returned_qty|floatformat:"-3" }}</span>{% else %}—{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {% if sale.sale_note or sale.staff_note %}
+      <section class="ui-card"><div class="ui-card-body sd-notes">
+        {% if sale.sale_note %}<div><span class="sd-cap">Sale note</span><p>{{ sale.sale_note }}</p></div>{% endif %}
+        {% if sale.staff_note %}<div><span class="sd-cap">Staff note</span><p>{{ sale.staff_note }}</p></div>{% endif %}
+      </div></section>
+      {% endif %}
+    </div>
+
+    <aside class="sd-side space-y-4">
+      {# ---------------------------------------------------------------- summary #}
+      <section class="ui-card">
+        <div class="ui-card-header"><h3 class="ui-card-title">Summary</h3></div>
+        <div class="ui-card-body sd-totals">
+          <div><span>Items total</span><span>{% money sale.subtotal %}</span></div>
+          {% if sale.discount_amount %}<div><span>Discount</span><span class="ui-neg">−{% money sale.discount_amount %}</span></div>{% endif %}
+          <div><span>Tax</span><span>{% money sale.tax_amount %}</span></div>
+          {% if sale.shipping_amount %}<div><span>Shipping</span><span>{% money sale.shipping_amount %}</span></div>{% endif %}
+          {% if sale.rounding_amount %}<div><span>Rounding</span><span>{% if sale.rounding_amount > 0 %}+{% endif %}{% money sale.rounding_amount %}</span></div>{% endif %}
+          <div class="is-grand"><span>Total</span><span>{% money sale.total_amount %}</span></div>
+          <div><span>Paid</span><span class="ui-pos">{% money sale.paid_amount %}</span></div>
+          <div><span>Balance</span><span class="{% if sale.due_amount > 0 %}ui-neg sd-strong{% endif %}">{% money sale.due_amount %}</span></div>
+          {% if returned_total %}<div><span>Returned</span><span class="sd-warn">{% money returned_total %}</span></div>{% endif %}
+        </div>
+      </section>
+
+      {# ---------------------------------------------------------------- payments #}
+      <section class="ui-card">
+        <div class="ui-card-header"><h3 class="ui-card-title">Payments</h3></div>
+        {% for p in sale.payments.all %}
+        <div class="ui-list-row">
+          <div class="sd-pay"><span class="sd-thumb" aria-hidden="true">{% icon "arrow-right" "w-4 h-4" %}</span>
+            <div class="min-w-0">
+              <div class="ui-cell-title">{{ p.get_method_display }}{% if p.status != "completed" %} {% badge p.status %}{% endif %}</div>
+              <div class="ui-cell-sub">{{ p.paid_at|date:"d M Y, H:i" }} · {{ p.reference }}{% if p.reference_no %} · ref {{ p.reference_no }}{% endif %}{% if p.note %} · {{ p.note }}{% endif %}</div>
+            </div>
+          </div>
+          <strong class="tabular">{% money p.amount %}</strong>
+        </div>
+        {% empty %}
+        {% ui "empty_state" icon="cash" title="No payments yet" text="Nothing has been paid on this sale." %}
+        {% endfor %}
+      </section>
+
+      {% if sale.due_amount > 0 and sale.status != "held" and sale.status != "cancelled" %}
+      {% if perms.payments.add_payment or perms.sales.change_sale %}
+      <form id="add-payment" method="post" action="{% url 'sales:sale_add_payment' sale.pk %}" class="ui-card">
+        {% csrf_token %}
+        <div class="ui-card-header"><h3 class="ui-card-title">Add a payment</h3></div>
+        <div class="ui-card-body sd-payform">
+          <div class="ui-field"><label class="ui-label" for="pay-amount">Amount</label><input type="number" id="pay-amount" step="0.01" name="amount" value="{{ sale.due_amount|floatformat:2 }}" required></div>
+          <div class="ui-field"><label class="ui-label" for="pay-method">Method</label>
+            <select name="method" id="pay-method">{% for m in payment_methods %}<option value="{{ m.code }}">{{ m.name }}</option>{% endfor %}</select></div>
+          <div class="ui-field"><label class="ui-label" for="pay-ref">Reference</label><input type="text" id="pay-ref" name="reference_no" placeholder="Transaction ID, or the gift card number"></div>
+          <button type="submit" class="ui-btn ui-btn-primary">{% icon "plus" "w-4 h-4" %}<span>Add payment</span></button>
+        </div>
+      </form>
+      {% endif %}{% endif %}
+
+      {# ---------------------------------------------------------------- feedback #}
+      {% if feedback or can_feedback %}
+      <section class="ui-card">
+        <div class="ui-card-header"><h3 class="ui-card-title">Customer feedback</h3>
+          {% if can_feedback %}<button type="button" class="ui-btn ui-btn-ghost ui-btn-sm" data-drawer-url="{% url 'sales:sale_feedback' sale.pk %}" data-drawer-title="Customer feedback · {{ sale.reference }}">{% icon "star" "w-4 h-4" %}<span>{% if feedback %}Edit feedback{% else %}Add feedback{% endif %}</span></button>{% endif %}</div>
+        <div class="ui-card-body">
+          {% if feedback %}
+            <div class="sd-stars">{% include "sales/_stars.html" with rating=feedback.rating %}</div>
+            {% if feedback.comment %}<p class="sd-feedback-text">{{ feedback.comment }}</p>{% else %}<p class="ui-muted" style="margin:6px 0 0">No comment.</p>{% endif %}
+            <div class="ui-cell-sub" style="margin-top:6px">{{ feedback.updated_at|date:"d M Y, H:i" }}{% if feedback.created_by %} · recorded by {{ feedback.created_by.get_full_name|default:feedback.created_by.username }}{% endif %}</div>
+          {% else %}
+            <p class="ui-muted" style="margin:0">The customer has not rated this visit yet.</p>
+          {% endif %}
+        </div>
+      </section>
+      {% endif %}
+
+      {% if sale.delivery %}
+      <section class="ui-card">
+        <div class="ui-card-header"><h3 class="ui-card-title">Delivery</h3></div>
+        <div class="ui-list-row">
+          <div class="sd-pay"><span class="sd-thumb" aria-hidden="true">{% icon "truck" "w-4 h-4" %}</span>
+            <div class="min-w-0"><a class="ui-cell-title erp-link" href="{% url 'sales:delivery_detail' sale.delivery.pk %}">{{ sale.delivery.reference }}</a>
+              <div class="ui-cell-sub">{% if sale.delivery.scheduled_date %}Due {{ sale.delivery.scheduled_date|date:"d M Y" }}{% else %}No date set{% endif %}</div></div></div>
+          <span class="ui-badge ui-badge-neutral">{{ sale.delivery.get_status_display }}</span>
+        </div>
+      </section>
+      {% endif %}
+
+      {% if returns %}
+      <section class="ui-card">
+        <div class="ui-card-header"><h3 class="ui-card-title">Returns</h3></div>
+        {% for r in returns %}
+        <div class="ui-list-row">
+          <div class="sd-pay"><span class="sd-thumb" aria-hidden="true">{% icon "arrow-left" "w-4 h-4" %}</span>
+            <div class="min-w-0"><div class="ui-cell-title">{{ r.reference }}</div>
+              <div class="ui-cell-sub">{{ r.created_at|date:"d M Y, H:i" }}{% if r.reason %} · {{ r.reason }}{% endif %}{% if r.processed_by %} · by {{ r.processed_by.get_full_name|default:r.processed_by.username }}{% endif %}</div></div></div>
+          <span class="ui-muted">{{ r.items.count }} item{{ r.items.count|pluralize }}</span>
+        </div>
+        {% endfor %}
+      </section>
+      {% endif %}
+    </aside>
+  </div>
+</div>
+{% endblock %}

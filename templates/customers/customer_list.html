@@ -1,0 +1,93 @@
+{% extends "base.html" %}{% load ui xl %}
+{% block title %}Customers{% endblock %}
+{% block content %}
+{% url 'customers:customer_add' as add_url %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <h1 class="page-title">Customers <span class="ui-badge ui-badge-neutral no-dot" style="vertical-align:middle;margin-left:6px">{{ result_count }}</span></h1>
+      <p class="page-subtitle">Customer profiles, loyalty points and purchase history.</p>
+    </div>
+    <div class="page-actions">
+      {% excel_actions "customers" %}
+      <a class="ui-btn ui-btn-primary" href="{{ add_url }}">{% icon "plus" "w-4 h-4" %}<span>Add customer</span></a>
+    </div>
+  </div>
+
+  <form method="get" class="ui-toolbar">
+    <div class="ui-search">
+      <label class="ui-label" for="c-q">Search</label>
+      {% icon "search" "w-4 h-4" %}
+      <input type="search" id="c-q" name="q" value="{{ request.GET.q }}" placeholder="Name, phone, CNIC or email" autocomplete="off">
+    </div>
+    <div style="min-width:9rem">
+      <label class="ui-label" for="c-status">Status</label>
+      <select id="c-status" name="status">
+        <option value="">All</option>
+        <option value="active" {% if request.GET.status == "active" %}selected{% endif %}>Active</option>
+        <option value="inactive" {% if request.GET.status == "inactive" %}selected{% endif %}>Inactive</option>
+      </select>
+    </div>
+    {% if groups %}<div style="min-width:9rem">
+      <label class="ui-label" for="c-group">Group</label>
+      <select id="c-group" name="group">
+        <option value="">All groups</option>
+        {% for g in groups %}<option value="{{ g.pk }}" {% if request.GET.group == g.pk|stringformat:"s" %}selected{% endif %}>{{ g.name }}</option>{% endfor %}
+      </select>
+    </div>{% endif %}
+    <div style="width:6rem">
+      <label class="ui-label" for="c-per">Per page</label>
+      <select id="c-per" name="per">{% for n in page_sizes %}<option value="{{ n }}" {% if n == per %}selected{% endif %}>{{ n }}</option>{% endfor %}</select>
+    </div>
+    <div class="flex gap-2">
+      <button type="submit" class="ui-btn ui-btn-primary">{% icon "filter" "w-4 h-4" %}<span>Apply</span></button>
+      {% if has_filters %}<a class="ui-btn ui-btn-secondary" href="{% url 'customers:customer_list' %}">Reset</a>{% endif %}
+    </div>
+  </form>
+
+  {% if customers %}
+  <div class="ui-table-wrap">
+    <table class="ui-table ui-table-cards">
+      <thead>
+        <tr><th>Customer</th><th>Phone</th><th>CNIC</th><th>Group</th><th class="num">Loyalty points</th><th class="num">Deposit</th><th>Status</th><th class="col-actions"><span class="sr-only">Actions</span></th></tr>
+      </thead>
+      <tbody>
+        {% for c in customers %}
+        <tr class="is-clickable" data-href="{% url 'customers:customer_edit' c.pk %}">
+          <td data-label="Customer">
+            <div class="ui-cell">
+              <span class="ui-avatar-sm">{{ c.name|slice:":2"|upper }}</span>
+              <div class="min-w-0"><div class="ui-cell-title">{{ c.name }}</div><div class="ui-cell-sub">{{ c.email|default:"No email" }}</div></div>
+            </div>
+          </td>
+          <td data-label="Phone" class="ui-nowrap">{{ c.phone|default:"—" }}</td>
+          <td data-label="CNIC" class="ui-nowrap">{{ c.cnic|default:"—" }}</td>
+          <td data-label="Group">{{ c.group.name|default:"—" }}</td>
+          <td data-label="Loyalty points" class="num">{{ c.loyalty_points }}</td>
+          <td data-label="Deposit" class="num">{% if c.deposit_balance %}{{ c.deposit_balance|floatformat:2 }}{% else %}<span class="ui-muted">—</span>{% endif %}</td>
+          <td data-label="Status">{% if c.is_active %}{% badge "active" label="Active" %}{% else %}{% badge "inactive" label="Inactive" tone="neutral" %}{% endif %}</td>
+          <td class="col-actions">
+            <div class="ui-row-actions">
+              <a class="icon-btn" href="{% url 'sales:sale_list' %}?q={{ c.name|urlencode }}" data-tip="View sales" data-tip-pos="bottom" aria-label="View sales">{% icon "receipt" "w-4 h-4" %}</a>
+              {% if perms.customers.add_giftcard and c.is_active %}<button type="button" class="icon-btn" data-drawer-url="{% url 'customers:customer_deposit' c.pk %}" data-drawer-title="Deposit · {{ c.name }}" data-tip="Add deposit" data-tip-pos="bottom" aria-label="Add deposit">{% icon "cash" "w-4 h-4" %}</button>{% endif %}
+              <a class="icon-btn" href="{% url 'customers:customer_edit' c.pk %}" data-tip="Edit" data-tip-pos="bottom" aria-label="Edit customer">{% icon "pencil" "w-4 h-4" %}</a>
+              {% component "row_menu" %}
+                <a class="ui-menu-item" href="{% url 'customers:customer_edit' c.pk %}">{% icon "pencil" "w-4 h-4" %}Edit customer</a>
+                <a class="ui-menu-item" href="{% url 'sales:sale_list' %}?q={{ c.name|urlencode }}">{% icon "receipt" "w-4 h-4" %}View sales</a>
+                {% if perms.customers.add_giftcard and c.is_active %}<button type="button" class="ui-menu-item" data-drawer-url="{% url 'customers:customer_deposit' c.pk %}" data-drawer-title="Deposit · {{ c.name }}">{% icon "cash" "w-4 h-4" %}Add deposit</button>{% endif %}
+                <div class="ui-menu-sep"></div>
+                <a class="ui-menu-item danger" href="{% url 'customers:customer_delete' c.pk %}">{% icon "trash" "w-4 h-4" %}Delete customer</a>
+              {% endcomponent %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% ui "pagination" page_obj=page_obj %}
+  {% else %}
+  <div class="ui-card">{% if has_filters %}{% ui "empty_state" icon="search" title="No customers match your search" text="Check the spelling or clear the filters." %}{% else %}{% ui "empty_state" icon="users" title="No customers yet" text="Add your first customer to track purchases and loyalty points." action_url=add_url action_label="Add customer" %}{% endif %}</div>
+  {% endif %}
+</div>
+{% endblock %}

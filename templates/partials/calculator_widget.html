@@ -1,0 +1,55 @@
+{% comment %}
+Self-contained calculator popover — its own x-data scope, so it can be
+dropped into any page (dark standalone POS screen or a normal base.html
+page like Register close) without clashing with the page's own Alpine
+state. Pass `trigger_class` to match the button style to the page it's
+sitting on; the popover card itself is always a light card since a
+calculator reads best that way regardless of the page theme.
+{% endcomment %}
+<div class="relative" x-data="{
+  calcOpen: false, calcExpr: '',
+  calcPress(v) { this.calcExpr += v; },
+  calcClear() { this.calcExpr = ''; },
+  calcBackspace() { this.calcExpr = this.calcExpr.slice(0, -1); },
+  calcEquals() {
+    if (!/^[0-9+\-*/.() ]*$/.test(this.calcExpr)) { this.calcExpr = 'Error'; return; }
+    try { var r = (new Function('return (' + (this.calcExpr || '0') + ')'))(); this.calcExpr = isFinite(r) ? String(Math.round(r * 1e10) / 1e10) : 'Error'; }
+    catch (e) { this.calcExpr = 'Error'; }
+  },
+}">
+  <button type="button" @click="calcOpen = !calcOpen" title="Calculator" class="{{ trigger_class|default:'h-9 w-9 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition' }}">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 3h-6m0 3h6m-9 5h.01M9 18h.01M9 15h.01M6 21h12a2 2 0 002-2V5a2 2 0 00-2-2H6a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+  </button>
+  <div x-show="calcOpen" x-cloak @click.outside="calcOpen=false" x-transition
+       class="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-200 p-3 z-50 text-ink">
+    <input type="text" x-model="calcExpr" @keydown.enter="calcEquals()" placeholder="0"
+           class="w-full text-right text-lg font-semibold px-2.5 py-2.5 rounded-lg bg-gray-50 border border-gray-200 mb-2 tabular-nums" />
+    <div class="grid grid-cols-4 gap-1.5 text-sm font-medium">
+      <button type="button" @click="calcClear()" class="py-2.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition">C</button>
+      <button type="button" @click="calcBackspace()" class="py-2.5 rounded-lg bg-gray-100 hover:bg-gray-200 transition">⌫</button>
+      <button type="button" @click="calcPress('(')" class="py-2.5 rounded-lg bg-gray-100 hover:bg-gray-200 transition">(</button>
+      <button type="button" @click="calcPress(')')" class="py-2.5 rounded-lg bg-gray-100 hover:bg-gray-200 transition">)</button>
+
+      <button type="button" @click="calcPress('7')" class="py-2.5 rounded-lg bg-gray-50 hover:bg-gray-100 transition">7</button>
+      <button type="button" @click="calcPress('8')" class="py-2.5 rounded-lg bg-gray-50 hover:bg-gray-100 transition">8</button>
+      <button type="button" @click="calcPress('9')" class="py-2.5 rounded-lg bg-gray-50 hover:bg-gray-100 transition">9</button>
+      <button type="button" @click="calcPress('/')" class="py-2.5 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 transition">÷</button>
+
+      <button type="button" @click="calcPress('4')" class="py-2.5 rounded-lg bg-gray-50 hover:bg-gray-100 transition">4</button>
+      <button type="button" @click="calcPress('5')" class="py-2.5 rounded-lg bg-gray-50 hover:bg-gray-100 transition">5</button>
+      <button type="button" @click="calcPress('6')" class="py-2.5 rounded-lg bg-gray-50 hover:bg-gray-100 transition">6</button>
+      <button type="button" @click="calcPress('*')" class="py-2.5 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 transition">×</button>
+
+      <button type="button" @click="calcPress('1')" class="py-2.5 rounded-lg bg-gray-50 hover:bg-gray-100 transition">1</button>
+      <button type="button" @click="calcPress('2')" class="py-2.5 rounded-lg bg-gray-50 hover:bg-gray-100 transition">2</button>
+      <button type="button" @click="calcPress('3')" class="py-2.5 rounded-lg bg-gray-50 hover:bg-gray-100 transition">3</button>
+      <button type="button" @click="calcPress('-')" class="py-2.5 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 transition">−</button>
+
+      <button type="button" @click="calcPress('0')" class="col-span-2 py-2.5 rounded-lg bg-gray-50 hover:bg-gray-100 transition">0</button>
+      <button type="button" @click="calcPress('.')" class="py-2.5 rounded-lg bg-gray-50 hover:bg-gray-100 transition">.</button>
+      <button type="button" @click="calcPress('+')" class="py-2.5 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 transition">+</button>
+
+      <button type="button" @click="calcEquals()" class="col-span-4 py-2.5 rounded-lg bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-700 hover:to-brand-800 text-white font-semibold transition">=</button>
+    </div>
+  </div>
+</div>

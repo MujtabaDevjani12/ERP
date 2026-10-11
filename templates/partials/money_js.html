@@ -1,0 +1,19 @@
+{# Settings > Currency for scripts: window.appMoney(1234.5) -> "Rs 1,234.50" (symbol position, decimals and separators as configured). #}
+<script>
+  window.APP_MONEY = {
+    symbol: "{{ current_store.currency_symbol|default:system_settings.default_currency_symbol|default:'Rs'|escapejs }}",
+    position: "{{ system_settings.currency_position|default:'before'|escapejs }}",
+    decimals: {{ system_settings.decimals|default:2 }},
+    decSep: "{{ system_settings.decimal_separator|default:'.'|escapejs }}",
+    thouSep: "{{ system_settings.thousands_separator|escapejs }}",
+    show: {% if system_settings.display_currency_symbol is False %}false{% else %}true{% endif %}
+  };
+  window.appMoney = function (value, symbol, decimals) {
+    var c = window.APP_MONEY, n = parseFloat(value); if (!isFinite(n)) n = 0;
+    var d = decimals == null ? c.decimals : decimals, neg = n < 0, parts = Math.abs(n).toFixed(d).split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, c.thouSep);
+    var text = parts[0] + (d ? c.decSep + parts[1] : ''), sym = symbol == null ? c.symbol : symbol;
+    if (c.show && sym) text = c.position === 'after' ? text + ' ' + sym : sym + ' ' + text;
+    return (neg ? '-' : '') + text;
+  };
+</script>

@@ -1,0 +1,58 @@
+"""Default chart of accounts. (code, name, type, system_key, is_group, parent_code)
+The system keys are what ERP automation posts to — never rename them."""
+A, L, E, R, X = "asset", "liability", "equity", "revenue", "expense"
+
+DEFAULT_ACCOUNTS = [
+    ("1000", "Assets", A, "", True, None),
+    ("1010", "Cash in Hand", A, "cash", False, "1000"),
+    ("1020", "Bank Accounts", A, "bank", False, "1000"),
+    ("1100", "Accounts Receivable", A, "ar", False, "1000"),
+    ("1200", "Inventory", A, "", True, "1000"),
+    ("1210", "Raw Material Inventory", A, "raw_inventory", False, "1200"),
+    ("1220", "Work In Progress", A, "wip_inventory", False, "1200"),
+    ("1230", "Finished Goods Inventory", A, "fg_inventory", False, "1200"),
+    ("1240", "Merchandise / Retail Inventory", A, "inventory", False, "1200"),
+    ("1250", "Inventory In Transit", A, "inventory_in_transit", False, "1200"),
+    ("1300", "Input Tax Receivable", A, "input_tax", False, "1000"),
+    ("1400", "Fixed Assets", A, "", True, "1000"),
+    ("1410", "Fixed Assets at Cost", A, "fixed_assets", False, "1400"),
+    ("1490", "Accumulated Depreciation", A, "accumulated_depreciation", False, "1400"),
+    ("1500", "Employee Loans & Advances", A, "employee_loans", False, "1000"),
+
+    ("2000", "Liabilities", L, "", True, None),
+    ("2010", "Accounts Payable", L, "ap", False, "2000"),
+    ("2020", "Output Tax Payable", L, "output_tax", False, "2000"),
+    ("2030", "Salary Payable", L, "salary_payable", False, "2000"),
+    ("2040", "Loans Payable", L, "loans_payable", False, "2000"),
+    ("2050", "Payroll Tax Payable", L, "payroll_tax_payable", False, "2000"),
+    ("2060", "Goods Received Not Invoiced", L, "grni", False, "2000"),
+    ("2070", "Gift Card Liability", L, "gift_card_liability", False, "2000"),
+    ("2080", "Customer Advances", L, "customer_advances", False, "2000"),
+
+    ("3000", "Equity", E, "", True, None),
+    ("3010", "Share Capital", E, "capital", False, "3000"),
+    ("3020", "Retained Earnings", E, "retained_earnings", False, "3000"),
+    ("3030", "Opening Balance Equity", E, "opening_balance_equity", False, "3000"),
+
+    ("4000", "Revenue", R, "", True, None),
+    ("4010", "Retail Sales", R, "sales_retail", False, "4000"),
+    ("4020", "Wholesale Sales", R, "sales_wholesale", False, "4000"),
+    ("4030", "Other Income", R, "other_income", False, "4000"),
+    ("4090", "Sales Returns & Allowances", R, "sales_returns", False, "4000"),
+
+    ("5000", "Expenses", X, "", True, None),
+    ("5010", "Cost of Goods Sold", X, "cogs", False, "5000"),
+    ("5020", "Salary Expense", X, "salary_expense", False, "5000"),
+    ("5030", "Rent", X, "rent", False, "5000"),
+    ("5040", "Utilities", X, "utilities", False, "5000"),
+    ("5050", "Transport", X, "transport", False, "5000"),
+    ("5060", "Production Overhead", X, "production_overhead", False, "5000"),
+    ("5065", "Production Overhead Absorbed", X, "production_overhead_absorbed", False, "5000"),
+    ("5070", "Marketing", X, "marketing", False, "5000"),
+    ("5080", "Other Expenses", X, "other_expense", False, "5000"),
+    ("5090", "Depreciation Expense", X, "depreciation_expense", False, "5000"),
+    ("5100", "Inventory Adjustments (Gain/Loss)", X, "stock_adjustment", False, "5000"),
+    ("5110", "Purchase Price Variance", X, "ppv", False, "5000"),
+    ("5130", "Cash Over / Short", X, "cash_over_short", False, "5000"),
+    ("5140", "Production Variance", X, "production_variance", False, "5000"),
+]

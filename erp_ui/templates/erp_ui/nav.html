@@ -1,0 +1,57 @@
+<nav class="flex-1 px-3 py-4 space-y-1 text-sm">
+  <a href="{% url 'dashboard:home' %}" class="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/[0.06] transition">
+    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    Back to POS back office
+  </a>
+
+  <p class="px-3 pt-3 pb-1 text-[10px] font-extrabold uppercase tracking-widest text-slate-400/80">ERP</p>
+  {% url 'reports_erp:dashboard' as erp_dashboard_url %}
+  {% if erp_dashboard_url %}
+  <a href="{{ erp_dashboard_url }}"
+     class="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 {% if request.resolver_match.view_name == 'reports_erp:dashboard' or request.resolver_match.view_name == 'reports_erp:report' %}bg-gradient-to-r from-brand-600 to-brand-700 text-white shadow-md shadow-brand-600/30 font-semibold ring-1 ring-white/10{% else %}text-slate-300 hover:bg-white/[0.08] hover:text-white font-medium{% endif %}">
+    <svg class="w-4 h-4 shrink-0 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2"/></svg>
+    <span>Dashboard &amp; Reports</span>
+  </a>
+  {% endif %}
+  {% url 'notifications:inbox' as notifications_url %}
+  {% if notifications_url %}
+  <a href="{{ notifications_url }}"
+     class="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 {% if request.resolver_match.app_name == 'notifications' %}bg-gradient-to-r from-brand-600 to-brand-700 text-white shadow-md shadow-brand-600/30 font-semibold ring-1 ring-white/10{% else %}text-slate-300 hover:bg-white/[0.08] hover:text-white font-medium{% endif %}">
+    <svg class="w-4 h-4 shrink-0 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+    <span>Notifications</span>
+  </a>
+  {% endif %}
+
+  <p class="px-3 pt-4 pb-1 text-[10px] font-extrabold uppercase tracking-widest text-slate-400/80 border-t border-slate-800/80 mt-3">Modules</p>
+  {% for m in erp_menu %}
+  <div x-data="{ open: {% if m.active %}true{% else %}false{% endif %} }">
+    <button type="button" @click="open = !open"
+            class="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl transition-all duration-150 {% if m.active %}bg-white/10 text-white font-semibold{% else %}text-slate-300 hover:bg-white/[0.08] hover:text-white font-medium{% endif %}">
+      <span class="flex items-center gap-3 min-w-0">
+        <svg class="w-4 h-4 shrink-0 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ m.icon }}"/></svg>
+        <span class="truncate">{{ m.title }}</span>
+      </span>
+      <svg class="w-3.5 h-3.5 shrink-0 transition-transform" :class="open ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+    </button>
+    <div x-show="open" x-cloak class="mt-0.5 mb-1 space-y-0.5">
+      <a href="{{ m.url }}" class="flex items-center gap-2.5 px-3 py-1.5 pl-9 rounded-lg text-xs transition text-slate-400 hover:text-white hover:bg-white/5">
+        <span class="truncate">Overview</span>
+      </a>
+      {% for it in m.items %}
+      <a href="{{ it.url }}" class="flex items-center gap-2.5 px-3 py-1.5 pl-9 rounded-lg text-xs transition {% if it.active %}bg-white/10 text-white font-semibold{% else %}text-slate-400 hover:text-white hover:bg-white/5{% endif %}">
+        <span class="w-1.5 h-1.5 rounded-full shrink-0 {% if it.active %}bg-brand-400{% else %}bg-slate-600{% endif %}"></span>
+        <span class="truncate">{{ it.label }}</span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% empty %}
+  <p class="px-3 py-2 text-xs text-slate-500">No ERP modules are available for your role.</p>
+  {% endfor %}
+
+  {% if user.is_superuser %}
+  <div class="pt-4 mt-3 border-t border-slate-800/80">
+    <a href="{% url 'admin:index' %}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] text-slate-500 hover:text-slate-300 transition">System admin (advanced)</a>
+  </div>
+  {% endif %}
+</nav>

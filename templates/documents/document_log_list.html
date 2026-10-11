@@ -1,0 +1,60 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Document log{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <h1 class="page-title">Document log <span class="ui-badge ui-badge-neutral no-dot" style="vertical-align:middle;margin-left:6px">{{ result_count }}</span></h1>
+      <p class="page-subtitle">An audit trail of every invoice PDF, email and WhatsApp attempt, successful or not.</p>
+    </div>
+    <div class="page-actions"><a class="ui-btn ui-btn-secondary" href="{% url 'sales:sale_list' %}">{% icon "receipt" "w-4 h-4" %}<span>Sales orders</span></a></div>
+  </div>
+
+  <form method="get" class="ui-toolbar">
+    <div class="ui-search">
+      <label class="ui-label" for="d-q">Search</label>
+      {% icon "search" "w-4 h-4" %}
+      <input type="search" id="d-q" name="q" value="{{ request.GET.q }}" placeholder="Invoice number or recipient" autocomplete="off">
+    </div>
+    <div style="min-width:9rem">
+      <label class="ui-label" for="d-ch">Channel</label>
+      <select id="d-ch" name="channel"><option value="">All channels</option>{% for key, label in channel_choices %}<option value="{{ key }}" {% if request.GET.channel == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+    </div>
+    <div style="min-width:9rem">
+      <label class="ui-label" for="d-st">Status</label>
+      <select id="d-st" name="status"><option value="">All statuses</option>{% for key, label in status_choices %}<option value="{{ key }}" {% if request.GET.status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+    </div>
+    <div style="width:6rem">
+      <label class="ui-label" for="d-per">Per page</label>
+      <select id="d-per" name="per">{% for n in page_sizes %}<option value="{{ n }}" {% if n == per %}selected{% endif %}>{{ n }}</option>{% endfor %}</select>
+    </div>
+    <div class="flex gap-2">
+      <button type="submit" class="ui-btn ui-btn-primary">{% icon "filter" "w-4 h-4" %}<span>Apply</span></button>
+      {% if has_filters %}<a class="ui-btn ui-btn-secondary" href="{% url 'documents:document_log_list' %}">Reset</a>{% endif %}
+    </div>
+  </form>
+
+  {% if logs %}
+  <div class="ui-table-wrap">
+    <table class="ui-table ui-table-cards">
+      <thead><tr><th>Invoice</th><th>Channel</th><th>Recipient</th><th>Status</th><th>Error</th><th class="num">When</th></tr></thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+          <td data-label="Invoice"><a class="erp-link ui-cell-title" href="{% url 'sales:sale_detail' log.sale_id %}">{{ log.sale.reference }}</a></td>
+          <td data-label="Channel">{{ log.get_channel_display }}</td>
+          <td data-label="Recipient">{{ log.recipient|default:"—" }}</td>
+          <td data-label="Status">{% if log.status == "pending" %}{% badge log.status label=log.get_status_display tone="warning" %}{% else %}{% badge log.status label=log.get_status_display %}{% endif %}</td>
+          <td data-label="Error" class="ui-neg" style="font-weight:400;font-size:12.5px">{{ log.error_message|default:"" }}</td>
+          <td data-label="When" class="num ui-nowrap ui-muted">{{ log.created_at|date:"d M Y, H:i" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% ui "pagination" page_obj=page_obj %}
+  {% else %}
+  <div class="ui-card">{% if has_filters %}{% ui "empty_state" icon="search" title="Nothing matches these filters" %}{% else %}{% ui "empty_state" icon="doc" title="No documents sent yet" text="Invoices you email, WhatsApp or download will be logged here." %}{% endif %}</div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends "base.html" %}{% load ui xl %}
+{% block title %}Purchase orders{% endblock %}
+{% block content %}
+{% url 'suppliers:purchase_add' as add_url %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <h1 class="page-title">Purchase orders <span class="ui-badge ui-badge-neutral no-dot" style="vertical-align:middle;margin-left:6px">{{ result_count }}</span></h1>
+      <p class="page-subtitle">Stock you have ordered from suppliers, what was received and what is still unpaid.</p>
+    </div>
+    <div class="page-actions">
+      {% excel_actions "purchases" %}
+      <a class="ui-btn ui-btn-primary" href="{{ add_url }}">{% icon "plus" "w-4 h-4" %}<span>New purchase order</span></a>
+    </div>
+  </div>
+
+  <form method="get" class="ui-toolbar">
+    <div class="ui-search">
+      <label class="ui-label" for="po-q">Search</label>
+      {% icon "search" "w-4 h-4" %}
+      <input type="search" id="po-q" name="q" value="{{ request.GET.q }}" placeholder="Reference, supplier or supplier invoice no" autocomplete="off">
+    </div>
+    <div style="min-width:10rem">
+      <label class="ui-label" for="po-status">Status</label>
+      <select id="po-status" name="status">
+        <option value="">All statuses</option>
+        {% for key, label in status_choices %}<option value="{{ key }}" {% if request.GET.status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div style="min-width:9rem">
+      <label class="ui-label" for="po-pay">Payment</label>
+      <select id="po-pay" name="pay">
+        <option value="">Any</option>
+        <option value="paid" {% if pay == "paid" %}selected{% endif %}>Paid</option>
+        <option value="partial" {% if pay == "partial" %}selected{% endif %}>Partially paid</option>
+        <option value="due" {% if pay == "due" %}selected{% endif %}>Unpaid</option>
+      </select>
+    </div>
+    {% if warehouses|length > 1 %}<div style="min-width:10rem">
+      <label class="ui-label" for="po-wh">Warehouse</label>
+      <select id="po-wh" name="warehouse">
+        <option value="">All warehouses</option>
+        {% for w in warehouses %}<option value="{{ w.pk }}" {% if warehouse_id == w.pk|stringformat:"d" %}selected{% endif %}>{{ w.name }}</option>{% endfor %}
+      </select>
+    </div>{% endif %}
+    <div><label class="ui-label" for="po-df">From</label><input type="date" id="po-df" name="df" value="{{ df }}"></div>
+    <div><label class="ui-label" for="po-dt">To</label><input type="date" id="po-dt" name="dt" value="{{ dt }}"></div>
+    <div style="width:6rem">
+      <label class="ui-label" for="po-per">Per page</label>
+      <select id="po-per" name="per">{% for n in page_sizes %}<option value="{{ n }}" {% if n == per %}selected{% endif %}>{{ n }}</option>{% endfor %}</select>
+    </div>
+    <div class="flex gap-2">
+      <button type="submit" class="ui-btn ui-btn-primary">{% icon "filter" "w-4 h-4" %}<span>Apply</span></button>
+      {% if has_filters %}<a class="ui-btn ui-btn-secondary" href="{% url 'suppliers:purchase_list' %}">Reset</a>{% endif %}
+    </div>
+  </form>
+
+  {% if orders %}
+  <div class="ui-table-wrap">
+    <table class="ui-table ui-table-cards">
+      <thead><tr><th>Order</th><th>Supplier</th><th>Warehouse</th><th>Status</th><th class="num">Total</th><th class="num">Due</th><th class="col-actions"><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody>
+        {% for o in orders %}
+        <tr class="is-clickable" data-href="{% url 'suppliers:purchase_detail' o.pk %}">
+          <td data-label="Order"><div class="ui-cell-title"><a class="erp-link" href="{% url 'suppliers:purchase_detail' o.pk %}">{{ o.reference }}</a></div><div class="ui-cell-sub">{{ o.order_date|date:"d M Y" }}</div></td>
+          <td data-label="Supplier"><div class="ui-cell-title" style="font-weight:500">{{ o.supplier.name }}</div>{% if o.supplier_ref %}<div class="ui-cell-sub">Ref {{ o.supplier_ref }}</div>{% endif %}</td>
+          <td data-label="Warehouse">{{ o.warehouse.name }}</td>
+          <td data-label="Status">{% if o.status == "ordered" %}{% badge o.status label=o.get_status_display tone="info" %}{% elif o.status == "draft" %}{% badge o.status label=o.get_status_display tone="neutral" %}{% else %}{% badge o.status label=o.get_status_display %}{% endif %}</td>
+          <td data-label="Total" class="num"><strong>{% money o.total_amount %}</strong></td>
+          <td data-label="Due" class="num {% if o.due_amount > 0 %}ui-neg{% else %}ui-muted{% endif %}">{% money o.due_amount %}</td>
+          <td class="col-actions">
+            <div class="ui-row-actions">
+              <a class="icon-btn" href="{% url 'suppliers:purchase_detail' o.pk %}" data-tip="View details" data-tip-pos="bottom" aria-label="View details">{% icon "eye" "w-4 h-4" %}</a>
+              {% component "row_menu" %}
+                <a class="ui-menu-item" href="{% url 'suppliers:purchase_detail' o.pk %}">{% icon "doc" "w-4 h-4" %}View details</a>
+                <a class="ui-menu-item" href="{% url 'suppliers:purchase_edit' o.pk %}">{% icon "pencil" "w-4 h-4" %}Edit order</a>
+                {% if o.due_amount > 0 %}<a class="ui-menu-item success" href="{% url 'suppliers:purchase_detail' o.pk %}#add-payment">{% icon "cash" "w-4 h-4" %}Add payment</a>{% endif %}
+              {% endcomponent %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% ui "pagination" page_obj=page_obj %}
+  {% else %}
+  <div class="ui-card">{% if has_filters %}{% ui "empty_state" icon="search" title="No purchase orders match your filters" %}{% else %}{% ui "empty_state" icon="truck" title="No purchase orders yet" text="Create a purchase order to order stock from a supplier." action_url=add_url action_label="New purchase order" %}{% endif %}</div>
+  {% endif %}
+</div>
+{% endblock %}

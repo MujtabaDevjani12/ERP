@@ -1,0 +1,37 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Payment methods{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <h1 class="page-title">Payment methods</h1>
+      <p class="page-subtitle">Choose which payment methods cashiers see in the POS payment window, rename them and set their order.</p>
+    </div>
+    <div class="page-actions">
+      {% if perms.payments.add_paymentmethod %}<button type="button" class="ui-btn ui-btn-primary" data-drawer-url="{% url 'payments:method_add' %}" data-drawer-title="New payment method">{% icon "plus" "w-4 h-4" %}<span>New method</span></button>{% endif %}
+    </div>
+  </div>
+  <div class="ui-table-wrap ui-scroll-y">
+    <table class="ui-table">
+      <thead><tr><th class="num">Order</th><th>Name</th><th>Code</th><th>Reference required</th><th>Status</th><th class="col-actions"><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody>
+      {% for m in methods %}
+      <tr>
+        <td class="num">{{ m.sort_order }}</td>
+        <td style="font-weight:600">{{ m.name }}{% if m.is_cash %} <span class="ui-badge ui-badge-neutral no-dot">moves the cash drawer</span>{% endif %}</td>
+        <td><code>{{ m.code }}</code></td>
+        <td>{% if m.requires_reference %}Yes{% else %}No{% endif %}</td>
+        <td>{% if m.is_active %}<span class="ui-badge ui-badge-success">Enabled</span>{% else %}<span class="ui-badge ui-badge-neutral">Disabled</span>{% endif %}</td>
+        <td class="col-actions" style="white-space:nowrap">
+          {% if perms.payments.change_paymentmethod %}
+          <button type="button" class="ui-btn ui-btn-secondary ui-btn-sm" data-drawer-url="{% url 'payments:method_edit' m.pk %}" data-drawer-title="Edit payment method">Edit</button>
+          <form method="post" action="{% url 'payments:method_toggle' m.pk %}" style="display:inline">{% csrf_token %}<button type="submit" class="ui-btn ui-btn-secondary ui-btn-sm">{% if m.is_active %}Disable{% else %}Enable{% endif %}</button></form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

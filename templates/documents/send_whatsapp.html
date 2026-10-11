@@ -1,0 +1,28 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}WhatsApp invoice{% endblock %}
+{% block content %}
+<div class="ui-form-wrap space-y-4" style="max-width:36rem">
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{% url 'sales:sale_detail' sale.pk %}">{{ sale.reference }}</a><span class="sep">/</span><span>WhatsApp</span></nav>
+      <h1 class="page-title">WhatsApp invoice {{ sale.reference }}</h1>
+      <p class="page-subtitle">Sent through the Meta WhatsApp Cloud API.</p>
+    </div>
+  </div>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <section class="ui-form-section">
+      <header><h2>Send to</h2></header>
+      <div class="body space-y-4">
+        <div class="ui-field"><label class="ui-label" for="wa-to">WhatsApp number (with country code) <span style="color:var(--ui-danger)">*</span></label>
+          <input type="tel" id="wa-to" name="phone" value="{{ default_phone }}" placeholder="92300xxxxxxx" inputmode="tel" required autofocus></div>
+        <div class="ui-alert ui-alert-info" role="note">{% icon "info" "w-4 h-4" %}<div><code>WHATSAPP_ACCESS_TOKEN</code> and <code>WHATSAPP_PHONE_NUMBER_ID</code> must be set in the .env file. Otherwise the send fails and the reason appears in the Document log.</div></div>
+      </div>
+    </section>
+    <div class="ui-sticky-actions">
+      <a href="{% url 'sales:sale_detail' sale.pk %}" class="ui-btn ui-btn-secondary">Cancel</a>
+      <button type="submit" class="ui-btn ui-btn-primary">{% icon "send" "w-4 h-4" %}<span>Send on WhatsApp</span></button>
+    </div>
+  </form>
+</div>
+{% endblock %}

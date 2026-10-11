@@ -1,0 +1,2 @@
+{# Process tracker: {% ui "stepper" steps=steps %}  steps = [{"label": "Cutting", "state": "done|current|todo"}] #}
+<ol class="ui-stepper">{% for s in steps %}<li class="ui-step{% if s.state %} is-{{ s.state }}{% endif %}"><span class="bubble">{% if s.state == "done" %}✓{% else %}{{ forloop.counter }}{% endif %}</span><span>{{ s.label }}</span></li>{% endfor %}</ol>

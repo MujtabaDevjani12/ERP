@@ -1,0 +1,13 @@
+{# Card with optional header. {% component "card" title="Orders" subtitle="Last 30 days" action_url=url action_label="View all" flush=True %}…{% endcomponent %} #}
+<section class="ui-card {{ css }}">
+  {% if title or action_url %}
+  <header class="ui-card-header">
+    <div class="min-w-0">
+      <h3 class="ui-card-title">{{ title }}</h3>
+      {% if subtitle %}<p class="page-subtitle" style="margin-top:2px">{{ subtitle }}</p>{% endif %}
+    </div>
+    {% if action_url %}<a class="ui-btn ui-btn-ghost ui-btn-sm" href="{{ action_url }}">{{ action_label|default:"View all" }}</a>{% endif %}
+  </header>
+  {% endif %}
+  <div{% if not flush %} class="ui-card-body"{% endif %}>{{ body }}</div>
+</section>

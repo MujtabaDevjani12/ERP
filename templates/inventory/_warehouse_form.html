@@ -1,0 +1,15 @@
+{% load ui %}{# Warehouse create/edit panel (loaded into the side drawer; JSON {ok:true} closes it). #}
+<form method="post" action="{{ request.get_full_path }}" novalidate>
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div style="margin-bottom:12px">{% for e in form.non_field_errors %}{% ui "alert" tone="danger" message=e %}{% endfor %}</div>{% endif %}
+  <div class="ui-grid" style="grid-template-columns:minmax(0,1fr)">
+    {% ui "field" field=form.name %}
+    {% ui "field" field=form.code %}
+    {% ui "field" field=form.warehouse_type %}
+    {% ui "field" field=form.is_default %}
+  </div>
+  <div class="ui-modal-foot" style="position:sticky;bottom:0;background:var(--ui-surface);padding-top:12px;margin-top:20px">
+    <button type="button" class="ui-btn ui-btn-ghost" @click="$store.drawer.close()">Cancel</button>
+    <button type="submit" class="ui-btn ui-btn-primary"><span>Save warehouse</span></button>
+  </div>
+</form>

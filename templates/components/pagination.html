@@ -1,0 +1,11 @@
+{# {% ui "pagination" page_obj=page_obj %} — keeps the current filters in the links #}
+{% load ui %}{% if page_obj and page_obj.paginator.num_pages > 1 %}
+<nav class="ui-pagination" aria-label="Pagination">
+  <div>Showing <strong>{{ page_obj.start_index }}</strong>–<strong>{{ page_obj.end_index }}</strong> of <strong>{{ page_obj.paginator.count }}</strong></div>
+  <div class="flex items-center gap-1">
+    {% if page_obj.has_previous %}<a class="ui-page-link" href="{% qs page=page_obj.previous_page_number %}" aria-label="Previous page">{% icon "chevron-left" "w-4 h-4" %}</a>{% endif %}
+    {% for n in page_obj.paginator.page_range %}{% if n == 1 or n == page_obj.paginator.num_pages or n >= page_obj.number|add:"-2" and n <= page_obj.number|add:"2" %}<a class="ui-page-link{% if n == page_obj.number %} is-current{% endif %}" href="{% qs page=n %}"{% if n == page_obj.number %} aria-current="page"{% endif %}>{{ n }}</a>{% elif n == page_obj.number|add:"-3" or n == page_obj.number|add:"3" %}<span class="px-1" style="color:var(--ui-text-3)">…</span>{% endif %}{% endfor %}
+    {% if page_obj.has_next %}<a class="ui-page-link" href="{% qs page=page_obj.next_page_number %}" aria-label="Next page">{% icon "chevron-right" "w-4 h-4" %}</a>{% endif %}
+  </div>
+</nav>
+{% endif %}

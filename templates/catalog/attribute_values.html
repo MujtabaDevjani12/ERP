@@ -1,0 +1,45 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{{ attribute.name }} values{% endblock %}
+{% block content %}
+<div class="space-y-4" style="max-width:40rem">
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{% url 'catalog:attribute_list' %}">{% icon "arrow-left" "w-3.5 h-3.5" %} Attributes</a></nav>
+      <h1 class="page-title">{{ attribute.name }}: values</h1>
+      <p class="page-subtitle">The choices for {{ attribute.name }}, for example Small, Medium, Large. They appear as buttons on the product's variants.</p>
+    </div>
+  </div>
+
+  <form method="post" class="ui-card" novalidate>
+    {% csrf_token %}
+    <div class="ui-card-body">
+      <label class="ui-label" for="bulk">Add several at once</label>
+      <div class="flex gap-2">
+        <input type="text" id="bulk" name="bulk" placeholder="Small, Medium, Large" autocomplete="off" autofocus>
+        <button type="submit" class="ui-btn ui-btn-primary">{% icon "plus" "w-4 h-4" %}<span>Add</span></button>
+      </div>
+      <p class="ui-help">Separate with commas. Values that already exist are skipped.</p>
+    </div>
+  </form>
+
+  <form method="post" class="ui-card" novalidate>
+    {% csrf_token %}
+    {{ formset.management_form }}
+    <div class="ui-card-header"><div class="ui-cell-title">Existing values</div></div>
+    <div class="ui-card-body space-y-3">
+      {% for e in formset.non_form_errors %}<div class="ui-alert ui-alert-danger">{{ e }}</div>{% endfor %}
+      {% for vf in formset %}
+      <div class="flex items-center gap-3">
+        {% for hidden in vf.hidden_fields %}{{ hidden }}{% endfor %}
+        <div style="flex:1;min-width:0">{{ vf.value }}{% for e in vf.value.errors %}<p class="ui-error">{{ e }}</p>{% endfor %}</div>
+        {% if vf.DELETE %}<label class="flex items-center gap-1 text-xs" style="color:var(--ui-danger);white-space:nowrap">{{ vf.DELETE }} Delete</label>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    <div class="ui-card-header" style="border-top:1px solid var(--ui-border);border-bottom:0;justify-content:flex-end">
+      <a class="ui-btn ui-btn-secondary" href="{% url 'catalog:attribute_list' %}">Back</a>
+      <button type="submit" class="ui-btn ui-btn-primary">{% icon "check-mark" "w-4 h-4" %}<span>Save changes</span></button>
+    </div>
+  </form>
+</div>
+{% endblock %}

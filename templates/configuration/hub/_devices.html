@@ -1,0 +1,17 @@
+{% load ui %}
+<div class="st-body">
+  <div class="st-list">
+    {% for d in devices %}
+      <div class="st-row">
+        <span class="st-row-ico">{% if d.type == "printer" %}{% icon "printer" "w-4 h-4" %}{% else %}{% icon "scan" "w-4 h-4" %}{% endif %}</span>
+        <div class="min-w-0"><b>{{ d.name }}</b><span class="dx-row-meta">{{ d.connection_info|default:"No connection details" }}</span></div>
+        <span class="ui-badge {% if d.is_active %}ui-badge-success{% else %}ui-badge-neutral{% endif %}" style="margin-left:auto">{% if d.is_active %}Active{% else %}Off{% endif %}</span>
+        {% if perms.devices.change_device %}<a href="{% url 'devices:device_edit' d.pk %}" class="ui-btn ui-btn-secondary" style="height:34px">Edit</a>{% endif %}
+      </div>
+    {% empty %}
+      <div class="dx-empty"><span class="dx-ico">{% icon "printer" "w-4 h-4" %}</span>Nothing added yet.</div>
+    {% endfor %}
+  </div>
+</div>
+<div class="st-foot"><span class="dx-cap">Browser printing needs no device; add a printer here only for a network or print-bridge printer.</span>
+  {% if perms.devices.add_device %}<a href="{% url 'devices:device_add' %}" class="ui-btn ui-btn-primary">{% icon "plus" "w-4 h-4" %}<span>Add device</span></a>{% else %}<a href="{% url 'devices:device_list' %}" class="ui-btn ui-btn-secondary">All devices</a>{% endif %}</div>

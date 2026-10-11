@@ -1,0 +1,44 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Warehouses{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <h1 class="page-title">Warehouses <span class="ui-badge ui-badge-neutral no-dot" style="vertical-align:middle;margin-left:6px">{{ warehouses|length }}</span></h1>
+      <p class="page-subtitle">Places where this branch keeps stock. Counters sell from one warehouse; transfers move stock between them.</p>
+    </div>
+    <div class="page-actions">
+      <a class="ui-btn ui-btn-secondary" href="{% url 'inventory:transfer_list' %}">{% icon "switch" "w-4 h-4" %}<span>Stock transfers</span></a>
+      {% if perms.tenants.add_warehouse %}<button type="button" class="ui-btn ui-btn-primary" data-drawer-url="{% url 'inventory:warehouse_add' %}" data-drawer-title="New warehouse">{% icon "plus" "w-4 h-4" %}<span>New warehouse</span></button>{% endif %}
+    </div>
+  </div>
+
+  {% if warehouses %}
+  <div class="ui-table-wrap">
+    <table class="ui-table ui-table-cards">
+      <thead><tr><th>Warehouse</th><th>Code</th><th>Type</th><th class="num">Products in stock</th><th class="num">Units</th><th class="num">Counters</th><th class="col-actions"><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody>
+      {% for w in warehouses %}
+      <tr>
+        <td data-label="Warehouse"><div class="ui-cell-title">{{ w.name }} {% if w.is_default %}<span class="ui-badge ui-badge-success no-dot">Default</span>{% endif %}</div></td>
+        <td data-label="Code">{{ w.code|default:"—" }}</td>
+        <td data-label="Type">{{ w.get_warehouse_type_display }}</td>
+        <td data-label="Products in stock" class="num">{{ w.n_products }}</td>
+        <td data-label="Units" class="num">{{ w.units|default:0|floatformat:"-3" }}</td>
+        <td data-label="Counters" class="num">{{ w.n_counters }}</td>
+        <td class="col-actions" style="white-space:nowrap">
+          {% if perms.tenants.change_warehouse %}
+          <button type="button" class="ui-btn ui-btn-secondary ui-btn-sm" data-drawer-url="{% url 'inventory:warehouse_edit' w.pk %}" data-drawer-title="Edit warehouse">Edit</button>
+          {% if not w.is_default %}<form method="post" action="{% url 'inventory:warehouse_default' w.pk %}" style="display:inline" data-confirm="Make {{ w.name }} the default?|New counters and the POS will use it unless told otherwise.|Make default">{% csrf_token %}<button type="submit" class="ui-btn ui-btn-secondary ui-btn-sm">Make default</button></form>{% endif %}
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="ui-card">{% ui "empty_state" icon="archive" title="No warehouses yet" text="Add the place where this branch keeps its stock." %}</div>
+  {% endif %}
+</div>
+{% endblock %}

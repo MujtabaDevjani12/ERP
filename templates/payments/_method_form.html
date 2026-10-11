@@ -1,0 +1,16 @@
+{% load ui %}
+<form method="post" action="{{ request.get_full_path }}" novalidate>
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div style="margin-bottom:12px">{% for e in form.non_field_errors %}{% ui "alert" tone="danger" message=e %}{% endfor %}</div>{% endif %}
+  <div class="ui-grid" style="grid-template-columns:minmax(0,1fr)">
+    {% ui "field" field=form.name %}
+    {% ui "field" field=form.code %}
+    {% ui "field" field=form.sort_order %}
+    {% ui "field" field=form.requires_reference %}
+    {% ui "field" field=form.is_active %}
+  </div>
+  <div class="ui-modal-foot" style="position:sticky;bottom:0;background:var(--ui-surface);padding-top:12px;margin-top:20px">
+    <button type="button" class="ui-btn ui-btn-ghost" @click="$store.drawer.close()">Cancel</button>
+    <button type="submit" class="ui-btn ui-btn-primary"><span>Save</span></button>
+  </div>
+</form>

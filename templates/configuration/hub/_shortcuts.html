@@ -1,0 +1,13 @@
+<div class="st-body">
+  {% for title, rows in shortcut_groups %}
+    <fieldset class="st-group">
+      <legend>{{ title }}</legend>
+      <div class="st-keys">
+        {% for keys, what in rows %}
+          <div class="st-key"><span>{{ what }}</span><span class="st-keycaps">{% for part in keys %}<kbd>{{ part }}</kbd>{% endfor %}</span></div>
+        {% endfor %}
+      </div>
+    </fieldset>
+  {% endfor %}
+  <p class="ui-help">Shortcuts work on the billing screen. Press <kbd>?</kbd> there to see them any time.</p>
+</div>

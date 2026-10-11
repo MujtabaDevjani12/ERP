@@ -1,0 +1,9 @@
+{% load ui %}<div class="kpi {{ css }}">
+  <div class="kpi-head">{% if icon %}{% icon icon "w-4 h-4" %}{% endif %}<span>{{ label }}</span></div>
+  <div class="kpi-value">{{ value }}</div>
+  <div class="kpi-foot">
+    {% if delta %}<span class="kpi-delta {{ delta_dir|default:'up' }}">{% if delta_dir == "down" %}{% icon "trend-down" "w-3.5 h-3.5" %}{% else %}{% icon "trend-up" "w-3.5 h-3.5" %}{% endif %}{{ delta }}</span>{% endif %}
+    {% if foot %}<span>{{ foot }}</span>{% endif %}
+  </div>
+  {% if spark %}{% sparkline spark %}{% endif %}
+</div>

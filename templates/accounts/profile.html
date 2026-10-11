@@ -1,0 +1,64 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}My profile{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><span>Account</span><span class="sep">/</span><span>My profile</span></nav>
+      <h1 class="page-title">My profile</h1>
+      <p class="page-subtitle">Your own details, photo and password. Your role and branch are set by an administrator.</p>
+    </div>
+  </div>
+
+  <div class="pr-layout">
+    <aside class="ui-form-section pr-card">
+      <div class="body">
+        <div class="pr-avatar" aria-hidden="true">{% if user.photo %}<img src="{{ user.photo.url }}" alt="">{% else %}<span>{{ user.get_full_name|default:user.username|initials }}</span>{% endif %}</div>
+        <h2 class="pr-name">{{ user.get_full_name|default:user.username }}</h2>
+        <p class="pr-role">{% if roles %}{{ roles }}{% elif user.is_superuser %}Administrator{% elif user.is_staff %}Manager{% else %}Staff{% endif %}</p>
+        <dl class="pr-list">
+          <div><dt>Username</dt><dd>{{ user.username }}</dd></div>
+          <div><dt>Email</dt><dd>{{ user.email|default:"—" }}</dd></div>
+          <div><dt>Phone</dt><dd>{{ user.phone|default:"—" }}</dd></div>
+          <div><dt>Branch</dt><dd>{{ user.store.name|default:"All branches" }}</dd></div>
+          <div><dt>Register</dt><dd>{% if register_session %}<span class="ui-badge ui-badge-success">Open since {{ register_session.opened_at|date:"d M, H:i" }}</span>{% else %}<span class="ui-muted">Not open</span>{% endif %}</dd></div>
+          {% if user.is_biller %}<div><dt>Seller</dt><dd><span class="ui-badge ui-badge-neutral no-dot">Biller</span></dd></div>{% endif %}
+        </dl>
+      </div>
+    </aside>
+
+    <div class="pr-forms">
+      <section class="ui-form-section" id="details">
+        <header><h2>Your details</h2><p>Shown on receipts you print and in the staff list.</p></header>
+        <form method="post" enctype="multipart/form-data" novalidate>
+          {% csrf_token %}<input type="hidden" name="form" value="details">
+          <div class="body pf-fields">
+            {% for e in details.non_field_errors %}<div class="ui-alert ui-alert-danger" role="alert">{{ e }}</div>{% endfor %}
+            <div class="ui-grid ui-grid-2">{% ui "field" field=details.first_name %}{% ui "field" field=details.last_name %}</div>
+            <div class="ui-grid ui-grid-2">{% ui "field" field=details.email %}{% ui "field" field=details.phone %}</div>
+            <div>
+              {% ui "field" field=details.photo %}
+              {% if user.photo %}<label class="pf-check"><input type="checkbox" name="remove_photo" value="on"> Remove my photo</label>{% endif %}
+            </div>
+          </div>
+          <div class="pr-foot"><button type="submit" class="ui-btn ui-btn-primary">{% icon "check-mark" "w-4 h-4" %}<span>Save details</span></button></div>
+        </form>
+      </section>
+
+      <section class="ui-form-section" id="password">
+        <header><h2>Change password</h2><p>Use at least 8 characters. Avoid common or easily guessed passwords.</p></header>
+        <form method="post" novalidate>
+          {% csrf_token %}<input type="hidden" name="form" value="password">
+          <div class="body pf-fields" style="max-width:480px">
+            {% for e in password_form.non_field_errors %}<div class="ui-alert ui-alert-danger" role="alert">{{ e }}</div>{% endfor %}
+            {% ui "field" field=password_form.old_password %}
+            {% ui "field" field=password_form.new_password1 %}
+            {% ui "field" field=password_form.new_password2 %}
+          </div>
+          <div class="pr-foot"><button type="submit" class="ui-btn ui-btn-primary">{% icon "lock" "w-4 h-4" %}<span>Update password</span></button></div>
+        </form>
+      </section>
+    </div>
+  </div>
+</div>
+{% endblock %}

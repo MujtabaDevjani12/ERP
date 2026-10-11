@@ -1,0 +1,4 @@
+{% load ui %}<div class="ui-alert ui-alert-{{ tone|default:'info' }}" role="{% if tone == 'danger' %}alert{% else %}status{% endif %}">
+  {% if tone == "success" %}{% icon "success" "w-5 h-5 shrink-0" %}{% elif tone == "danger" %}{% icon "error" "w-5 h-5 shrink-0" %}{% elif tone == "warning" %}{% icon "warning" "w-5 h-5 shrink-0" %}{% else %}{% icon "info" "w-5 h-5 shrink-0" %}{% endif %}
+  <div class="min-w-0">{% if title %}<div class="font-semibold">{{ title }}</div>{% endif %}{% if message %}<div>{{ message }}</div>{% endif %}{{ body }}</div>
+</div>

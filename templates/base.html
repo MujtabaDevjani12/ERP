@@ -1,0 +1,270 @@
+{% load static ui %}<!DOCTYPE html>
+<html lang="en" data-theme="light" data-density="comfortable">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <meta name="color-scheme" content="light dark">
+  <title>{% block title %}{{ system_settings.site_name|default:"POS" }}{% endblock %}</title>
+  {# Apply the saved theme / sidebar / density BEFORE first paint so there is no flash. #}
+  <script>
+    (function () {
+      try {
+        var d = document.documentElement, ls = window.localStorage;
+        d.setAttribute('data-theme', ls.getItem('ui.theme') === 'dark' ? 'dark' : 'light');
+        d.setAttribute('data-density', ls.getItem('ui.density') || 'comfortable');
+        if (ls.getItem('ui.sidebar') === 'collapsed' && window.innerWidth >= 1024) d.classList.add('sidebar-collapsed');
+      } catch (e) { /* storage blocked: defaults apply */ }
+    })();
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    {% comment %}
+    The whole app's colour scheme comes from ONE "Primary color" chosen in Settings > System Configuration > Branding.
+    brand_shades (core.utils.generate_color_shades) turns that hex into a 50-900 scale, used both as Tailwind's
+    `brand` colour (so every bg-brand-600 / text-brand-700 already in the templates re-colours) and as the CSS variables
+    --brand-50 ... --brand-900 that the design system (static/css/erp-ui.css) is built on.
+    {% endcomment %}
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50:'{{ brand_shades.50|default:"#eef2ff" }}', 100:'{{ brand_shades.100|default:"#e0e7ff" }}',
+              200:'{{ brand_shades.200|default:"#c7d2fe" }}', 300:'{{ brand_shades.300|default:"#a5b4fc" }}',
+              400:'{{ brand_shades.400|default:"#818cf8" }}', 500:'{{ brand_shades.500|default:"#6366f1" }}',
+              600:'{{ brand_shades.600|default:"#4f46e5" }}', 700:'{{ brand_shades.700|default:"#4338ca" }}',
+              800:'{{ brand_shades.800|default:"#3730a3" }}', 900:'{{ brand_shades.900|default:"#312e81" }}',
+            },
+            surface: '{{ system_settings.secondary_color|default:"#111827" }}',
+            ink: '#111827',
+          },
+          fontFamily: { sans: ['{{ system_settings.font_family|default:"Inter" }}', 'ui-sans-serif', 'system-ui'] }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family={{ google_font_query|default:'Inter:wght@400;500;600;700;800' }}&display=swap">
+  <link rel="stylesheet" href="{% static 'css/erp-ui.css' %}?v=20261010j">
+  <link rel="stylesheet" href="{% static 'css/fx-skin.css' %}?v=20261010j">
+  <style>
+    :root {
+      --brand-50: {{ brand_shades.50|default:"#eef2ff" }}; --brand-100: {{ brand_shades.100|default:"#e0e7ff" }};
+      --brand-200: {{ brand_shades.200|default:"#c7d2fe" }}; --brand-300: {{ brand_shades.300|default:"#a5b4fc" }};
+      --brand-400: {{ brand_shades.400|default:"#818cf8" }}; --brand-500: {{ brand_shades.500|default:"#6366f1" }};
+      --brand-600: {{ brand_shades.600|default:"#4f46e5" }}; --brand-700: {{ brand_shades.700|default:"#4338ca" }};
+      --brand-800: {{ brand_shades.800|default:"#3730a3" }}; --brand-900: {{ brand_shades.900|default:"#312e81" }};
+      --font: '{{ system_settings.font_family|default:"Inter" }}', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      --ui-sidebar-bg: {{ system_settings.secondary_color|default:"#111827" }};
+    }
+    html[data-theme="dark"] { --ui-sidebar-bg: #0d131c; }
+    html { font-size: {% if system_settings.font_size == "small" %}93.75%{% elif system_settings.font_size == "large" %}108.75%{% else %}100%{% endif %}; }
+    {% if system_settings.text_color %}html[data-theme="light"] { --ui-text: {{ system_settings.text_color }}; }{% endif %}
+    body { font-family: var(--font); }
+    [x-cloak] { display: none !important; }
+    /* Tailwind utilities that hard-code the brand colour keep following the chosen theme. */
+    .bg-surface { background-color: var(--ui-sidebar-bg); }
+    .bg-brand-50 { background-color: var(--brand-50); } .bg-brand-100 { background-color: var(--brand-100); }
+    .bg-brand-500 { background-color: var(--brand-500); } .bg-brand-600 { background-color: var(--brand-600); }
+    .border-brand-100 { border-color: var(--brand-100); } .border-brand-600 { border-color: var(--brand-600); }
+    .text-brand-100 { color: var(--brand-100); } .text-brand-300 { color: var(--brand-300); } .text-brand-400 { color: var(--brand-400); }
+    .text-brand-600 { color: var(--brand-600); } .text-brand-700 { color: var(--brand-700); } .text-brand-800 { color: var(--brand-800); }
+    .hover\:bg-brand-100:hover { background-color: var(--brand-100); } .hover\:bg-brand-600:hover { background-color: var(--brand-600); }
+    .hover\:bg-brand-700:hover { background-color: var(--brand-700); } .hover\:text-brand-600:hover { color: var(--brand-600); }
+    .hover\:text-brand-800:hover { color: var(--brand-800); } .focus\:border-brand-500:focus { border-color: var(--brand-500); }
+    .from-brand-100 { --tw-gradient-from: var(--brand-100); --tw-gradient-to: rgb(255 255 255 / 0); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+    .from-brand-400 { --tw-gradient-from: var(--brand-400); --tw-gradient-to: rgb(255 255 255 / 0); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+    .from-brand-500 { --tw-gradient-from: var(--brand-500); --tw-gradient-to: rgb(255 255 255 / 0); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+    .from-brand-600 { --tw-gradient-from: var(--brand-600); --tw-gradient-to: rgb(255 255 255 / 0); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+    .via-brand-400 { --tw-gradient-stops: var(--tw-gradient-from), var(--brand-400), var(--tw-gradient-to); }
+    .to-brand-200 { --tw-gradient-to: var(--brand-200); } .to-brand-600 { --tw-gradient-to: var(--brand-600); }
+    .to-brand-700 { --tw-gradient-to: var(--brand-700); } .to-brand-900 { --tw-gradient-to: var(--brand-900); }
+    .hover\:from-brand-600:hover { --tw-gradient-from: var(--brand-600); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+    .hover\:from-brand-700:hover { --tw-gradient-from: var(--brand-700); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+    .hover\:to-brand-700:hover { --tw-gradient-to: var(--brand-700); } .hover\:to-brand-800:hover { --tw-gradient-to: var(--brand-800); }
+  </style>
+  {% include "partials/money_js.html" %}
+  <script src="{% static 'js/erp-ui.js' %}?v=20261010j" defer></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.13.5/cdn.min.js"></script>
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="antialiased{% if system_settings.secondary_color and system_settings.secondary_color|lower != '#111827' %} fx-sb-custom{% endif %}" data-pos-url="{% url 'dashboard:pos' %}"{% if shell.search_url %} data-search-url="{{ shell.search_url }}"{% endif %}>
+{% include "partials/page_loader.html" %}
+{{ shell.messages|json_script:"ui-messages" }}
+{% if user.is_authenticated %}
+{{ shell.commands|json_script:"ui-commands" }}
+<a href="#main" class="sr-only-focusable ui-btn ui-btn-primary" style="position:fixed;left:12px;top:12px;z-index:200">Skip to content</a>
+<div class="app-shell" x-data>
+
+  <div class="ui-overlay" style="z-index:25" x-cloak x-show="$store.ui.mobileOpen" x-transition.opacity @click="$store.ui.mobileOpen = false"></div>
+
+  <!-- ===== Sidebar: three floating cards (theme, menu, footer) ===== -->
+  <aside class="app-sidebar" id="app-sidebar" :class="{ 'is-open': $store.ui.mobileOpen }" aria-label="Main navigation">
+    <div class="sb-card sb-theme" role="group" aria-label="Colour theme">
+      <button type="button" class="sb-theme-btn" :class="{ on: $store.ui.theme !== 'dark' }" @click="$store.ui.setTheme('light')" aria-label="Light theme" data-tip="Light theme" data-tip-collapsed>{% icon "sun" "w-5 h-5" %}</button>
+      <button type="button" class="sb-theme-btn" :class="{ on: $store.ui.theme === 'dark' }" @click="$store.ui.setTheme('dark')" aria-label="Dark theme" data-tip="Dark theme" data-tip-collapsed>{% icon "moon" "w-5 h-5" %}</button>
+    </div>
+
+    <nav class="sb-card app-sidebar-scroll" aria-label="Primary" @click="if ($event.target.closest('a')) $store.ui.mobileOpen = false">
+      {% for section in shell.nav %}
+        <div class="nav-section"><span class="nav-section-text">{{ section.title }}</span></div>
+        {% for e in section.entries %}
+          {% if e.type == "link" %}
+            <a class="nav-link{% if e.active %} is-active{% endif %}" href="{{ e.url }}" data-tip="{{ e.label }}" data-tip-collapsed{% if e.active %} aria-current="page"{% endif %}>
+              <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ e.icon }}"/></svg>
+              <span class="nav-label">{{ e.label }}</span>
+              {% if e.hint %}<span class="ui-kbd nav-label fx-nav-hint">{{ e.hint }}</span>{% endif %}
+            </a>
+          {% else %}
+            <div class="nav-group{% if e.active %} has-active is-open{% endif %}" data-group-label="{{ e.label }}" x-data="{ open: {% if e.active %}true{% else %}$store.ui.groupOpen('{{ e.key }}', false){% endif %} }" :class="{ 'is-open': open }">
+              <button type="button" class="nav-group-btn" :aria-expanded="open" aria-haspopup="true"
+                      @click="if (!($store.ui.collapsed && window.innerWidth >= 1024)) { open = !open; $store.ui.setGroup('{{ e.key }}', open); }">
+                <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ e.icon }}"/></svg>
+                <span class="nav-label">{{ e.label }}</span>
+                <svg class="nav-chevron" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+              </button>
+              <div class="nav-children"><div>
+                {% for it in e.items %}
+                  {% if it.type == "label" %}<div class="nav-sublabel">{{ it.label }}</div>
+                  {% else %}<a class="nav-child{% if it.active %} is-active{% endif %}" href="{{ it.url }}"{% if it.active %} aria-current="page"{% endif %}>{{ it.label }}</a>{% endif %}
+                {% endfor %}
+              </div></div>
+            </div>
+          {% endif %}
+        {% endfor %}
+      {% endfor %}
+    </nav>
+
+    <div class="sb-card app-sidebar-foot">
+      {% if current_store %}
+        <div class="fx-store" data-tip="{{ current_store.name }}" data-tip-collapsed>
+          <span class="fx-live" aria-hidden="true"></span>
+          <span class="sidebar-store-text min-w-0">
+            <span class="fx-store-name">{{ current_store.name }}</span>
+            <span class="fx-store-type">{{ current_store.get_business_type_display }}</span>
+          </span>
+        </div>
+      {% endif %}
+      <a href="{% url 'dashboard:pos' %}" class="fx-cta" data-tip="Open POS" data-tip-collapsed>{% icon "bolt" "w-5 h-5" %}<span class="nav-label">Open POS</span></a>
+      <form method="post" action="{% url 'accounts:logout' %}" data-no-loading>{% csrf_token %}
+        <button type="submit" class="nav-link fx-logout" data-tip="Sign out" data-tip-collapsed>{% icon "logout" "nav-icon" %}<span class="nav-label">Sign out</span></button>
+      </form>
+    </div>
+  </aside>
+
+  <!-- ===== Main column ===== -->
+  <div class="app-main">
+    <header class="app-topbar">
+      <div class="fx-pill fx-left">
+        <button type="button" class="icon-btn fx-burger" @click="$store.ui.mobileOpen = !$store.ui.mobileOpen" aria-label="Open navigation" aria-controls="app-sidebar">{% icon "menu" "w-5 h-5" %}</button>
+        <button type="button" class="icon-btn fx-sbtoggle" @click="$store.ui.toggleSidebar()" :aria-expanded="!$store.ui.collapsed" aria-controls="app-sidebar" :aria-label="$store.ui.collapsed ? 'Expand menu' : 'Collapse menu'" :data-tip="$store.ui.collapsed ? 'Expand menu' : 'Collapse menu'" data-tip-pos="bottom">{% icon "sidebar" "w-5 h-5" %}</button>
+        <a href="{% url 'dashboard:home' %}" class="fx-brand" aria-label="{{ system_settings.site_name|default:'Home' }}">
+          {% if system_settings.site_logo %}<img src="{{ system_settings.site_logo.url }}" alt="" class="fx-logo">{% else %}<span class="fx-logo fx-logo-letter">{{ system_settings.site_name|default:"P"|slice:":1"|upper }}</span>{% endif %}
+          <span class="fx-brand-text"><span class="fx-brand-name">{{ system_settings.site_name|default:"Multiple POS" }}</span>{% if current_store %}<span class="fx-brand-sub">{{ current_store.name }}</span>{% else %}<span class="fx-brand-sub">ERP &amp; POS</span>{% endif %}</span>
+        </a>
+      </div>
+
+      {% with tabs=shell.nav|nav_tabs %}{% if tabs %}
+      <nav class="fx-pill fx-tabs" aria-label="Sections">
+        {% for t in tabs %}<a class="fx-tab{% if t.active %} is-active{% endif %}" href="{{ t.url }}"{% if t.active %} aria-current="page"{% endif %}>{{ t.label }}</a>{% endfor %}
+      </nav>
+      {% endif %}{% endwith %}
+
+      <div class="fx-pill fx-right">
+      {% if current_store %}
+        <div class="fx-company" title="Company and branch you are working in">
+          {% icon "building" "w-4 h-4" %}
+          <span class="font-semibold" style="color:var(--ui-text)">{% if request.company %}{{ request.company.name }}{% else %}{{ system_settings.site_name|default:"Company" }}{% endif %}</span>
+          <span style="opacity:.5">/</span><span>{{ current_store.name }}</span>
+        </div>
+      {% endif %}
+
+      <button type="button" class="icon-btn" @click="$dispatch('ui-palette')" aria-label="Search (Ctrl+K)" data-tip="Search (Ctrl+K)" data-tip-pos="bottom">{% icon "search" "w-5 h-5" %}</button>
+
+      <div class="fx-hide-sm fx-calc">{% include "partials/calculator_widget.html" with trigger_class="icon-btn" %}</div>
+
+      {% if shell.inbox_url %}
+      <div class="relative" x-data="bell({ unread: {{ shell.unread }}, readAllUrl: '{{ shell.read_all_url }}' })" @click.outside="open = false" @keydown.escape="open = false">
+        <button type="button" class="icon-btn" @click="open = !open" aria-label="Notifications" aria-haspopup="menu" :aria-expanded="open">
+          {% icon "bell" "w-5 h-5" %}<span class="dot" x-cloak x-show="unread > 0" x-text="unread > 99 ? '99+' : unread"></span>
+        </button>
+        <div x-cloak x-show="open" x-transition:enter="ui-pop-enter" x-transition:enter-start="ui-pop-from" class="ui-menu" style="right:0;top:100%;margin-top:6px;width:380px;max-width:calc(100vw - 24px);padding:0" role="menu">
+          <div class="flex items-center justify-between px-4 py-3" style="border-bottom:1px solid var(--ui-border)">
+            <span class="text-sm font-semibold" style="color:var(--ui-text)">Notifications</span>
+            <button type="button" class="ui-btn ui-btn-ghost ui-btn-sm" x-show="unread > 0" @click="markAll()">Mark all read</button>
+          </div>
+          <div style="max-height:360px;overflow-y:auto">
+            {% for n in shell.notifications %}
+              <a class="notif-item{% if not n.is_read %} is-unread{% endif %}" href="{{ n.link|default:shell.inbox_url }}" data-read-url="{% if not n.is_read %}{% url 'notifications:read' n.pk %}{% endif %}" @click="openItem($event)">
+                <span class="notif-dot notif-{{ n.level }}"></span>
+                <span class="min-w-0 flex-1">
+                  <span class="block text-[13px] font-semibold truncate" style="color:var(--ui-text)">{{ n.title }}</span>
+                  {% if n.body %}<span class="block text-xs" style="color:var(--ui-text-2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ n.body }}</span>{% endif %}
+                  <span class="block text-[11px] mt-0.5" style="color:var(--ui-text-3)">{{ n.created_at|timesince }} ago</span>
+                </span>
+              </a>
+            {% empty %}
+              <div class="ui-empty" style="padding:28px 16px"><div class="ui-empty-icon" style="width:40px;height:40px">{% icon "bell" "w-5 h-5" %}</div><h3>You're all caught up</h3><p>New alerts and approvals will show up here.</p></div>
+            {% endfor %}
+          </div>
+          <a class="block text-center text-[13px] font-semibold py-2.5" style="border-top:1px solid var(--ui-border);color:var(--ui-primary)" href="{{ shell.inbox_url }}">View all notifications</a>
+        </div>
+      </div>
+      {% endif %}
+
+      <a href="{% url 'dashboard:pos' %}" class="icon-btn fx-pos-btn" aria-label="Open POS (F2)" data-tip="Open POS (F2)" data-tip-pos="bottom">{% icon "bolt" "w-5 h-5" %}</a>
+
+      <div class="relative" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
+        <button type="button" class="fx-user" @click="open = !open" aria-haspopup="menu" :aria-expanded="open" aria-label="Account menu">
+          <span class="avatar">{{ user.get_full_name|default:user.username|initials }}</span>
+          <span class="fx-user-text">
+            <span class="block text-xs font-semibold" style="color:var(--ui-text)">{{ user.get_full_name|default:user.username }}</span>
+            <span class="block text-[11px]" style="color:var(--ui-text-3)">{% if user.is_superuser %}Administrator{% elif user.is_staff %}Manager{% else %}Staff{% endif %}</span>
+          </span>
+          {% icon "chevron-down" "w-3.5 h-3.5 fx-user-text" %}
+        </button>
+        <div x-cloak x-show="open" x-transition:enter="ui-pop-enter" x-transition:enter-start="ui-pop-from" class="ui-menu" style="right:0;top:100%;margin-top:6px;min-width:240px" role="menu">
+          <div class="px-2.5 py-2">
+            <div class="text-sm font-semibold" style="color:var(--ui-text)">{{ user.get_full_name|default:user.username }}</div>
+            {% if user.email %}<div class="text-xs" style="color:var(--ui-text-3)">{{ user.email }}</div>{% endif %}
+          </div>
+          <div class="ui-menu-sep"></div>
+          <div class="ui-menu-label">Table density</div>
+          <div class="flex gap-1 px-1.5 pb-1.5">
+            <button type="button" class="ui-btn ui-btn-sm flex-1" :class="$store.ui.density === 'compact' ? 'ui-btn-primary' : 'ui-btn-secondary'" @click="$store.ui.setDensity('compact')">Compact</button>
+            <button type="button" class="ui-btn ui-btn-sm flex-1" :class="$store.ui.density === 'comfortable' ? 'ui-btn-primary' : 'ui-btn-secondary'" @click="$store.ui.setDensity('comfortable')">Normal</button>
+            <button type="button" class="ui-btn ui-btn-sm flex-1" :class="$store.ui.density === 'spacious' ? 'ui-btn-primary' : 'ui-btn-secondary'" @click="$store.ui.setDensity('spacious')">Roomy</button>
+          </div>
+          <div class="ui-menu-sep"></div>
+          <button type="button" class="ui-menu-item" @click="open = false; $dispatch('ui-shortcuts')">{% icon "question" "w-4 h-4" %}Keyboard shortcuts</button>
+          <a class="ui-menu-item" href="{% url 'accounts:profile' %}">{% icon "user" "w-4 h-4" %}My profile</a>
+          <a class="ui-menu-item" href="{% url 'dashboard:pos' %}">{% icon "register" "w-4 h-4" %}Open POS</a>
+          <button type="button" class="ui-menu-item" @click="$store.ui.toggleTheme()">
+            <span x-show="$store.ui.theme !== 'dark'">{% icon "moon" "w-4 h-4" %}</span><span x-cloak x-show="$store.ui.theme === 'dark'">{% icon "sun" "w-4 h-4" %}</span>
+            <span x-text="$store.ui.theme === 'dark' ? 'Light mode' : 'Dark mode'">Dark mode</span>
+          </button>
+          <a class="ui-menu-item" href="{% url 'accounts:password_change' %}">{% icon "lock" "w-4 h-4" %}Change password</a>
+          {% if user.is_superuser %}{% url 'admin:index' as admin_url %}{% if admin_url %}<a class="ui-menu-item" href="{{ admin_url }}">{% icon "cog" "w-4 h-4" %}System admin (advanced)</a>{% endif %}{% endif %}
+          <div class="ui-menu-sep"></div>
+          <form method="post" action="{% url 'accounts:logout' %}" data-no-loading>{% csrf_token %}<button type="submit" class="ui-menu-item danger">{% icon "logout" "w-4 h-4" %}Sign out</button></form>
+        </div>
+      </div>
+      </div>
+    </header>
+
+    <main id="main" class="app-content" tabindex="-1">
+      <div class="page">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+  </div>
+</div>
+{% include "components/overlays.html" %}
+{% else %}
+  {% block auth_content %}{% endblock %}
+  {% include "components/overlays.html" %}
+{% endif %}
+{% block extra_body %}{% endblock %}
+</body>
+</html>

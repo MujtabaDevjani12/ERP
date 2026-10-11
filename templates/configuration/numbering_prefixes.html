@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Number prefixes{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto">
+  <h1 class="text-xl font-bold text-ink mb-1">Document number prefixes</h1>
+  <p class="text-sm text-gray-500 mb-5">Each document type's reference number is built from this prefix + padding — e.g. SALE-000001.</p>
+
+  <form method="post" class="bg-white rounded-xl border border-gray-200 card-shadow divide-y divide-gray-100">
+    {% csrf_token %}
+    {% for row in rows %}
+    <div class="flex items-center gap-3 px-5 py-3">
+      <span class="flex-1 text-sm text-gray-700">{{ row.get_document_type_display }}</span>
+      <input type="text" name="prefix_{{ row.pk }}" value="{{ row.prefix }}" class="w-24 rounded-lg border-gray-300 text-sm text-center" />
+      <span class="text-gray-300">-</span>
+      <input type="number" name="padding_{{ row.pk }}" value="{{ row.padding }}" min="3" max="10" class="w-16 rounded-lg border-gray-300 text-sm text-center" />
+      <span class="text-xs text-gray-400 w-32 tabular-nums">next: {{ row.prefix }}-{{ row.next_number|stringformat:"06d" }}</span>
+    </div>
+    {% endfor %}
+    <div class="px-5 py-4">
+      <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold px-5 py-2.5 rounded-lg">Save</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

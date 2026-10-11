@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+{% load receipt ui %}<html>
+<head>
+<meta charset="UTF-8">
+<title>{{ sale.reference }} — {{ sale.store.name }}</title>
+<style>
+  @page { size: A4; margin: 16mm 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #111827; font-size: 13px; margin: 0; background: #f3f4f6; }
+  .sheet { max-width: 800px; margin: 0 auto; background: #fff; padding: 28px 32px; }
+  .toolbar { max-width: 800px; margin: 0 auto 12px; padding: 10px 32px 0; display: flex; justify-content: flex-end; gap: 8px; }
+  .toolbar button { font-family: inherit; font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 8px; border: 1px solid #d1d5db; background: #fff; cursor: pointer; }
+  .toolbar button.primary { background: #4f46e5; border-color: #4f46e5; color: #fff; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid {{ system_settings.primary_color|default:"#4f46e5" }}; padding-bottom: 14px; margin-bottom: 18px; }
+  .store-name { font-size: 20px; font-weight: 800; color: #111827; }
+  .store-meta { color: #6b7280; font-size: 11px; margin-top: 3px; }
+  .invoice-title { text-align: right; }
+  .invoice-title h1 { font-size: 22px; margin: 0; color: {{ system_settings.primary_color|default:"#4f46e5" }}; letter-spacing: 1px; }
+  .invoice-title p { margin: 2px 0 0; color: #6b7280; }
+  .meta-grid { display: flex; justify-content: space-between; margin-bottom: 18px; }
+  .meta-grid .box { width: 48%; }
+  .meta-grid h3 { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: #9ca3af; margin: 0 0 4px; }
+  .meta-grid p { margin: 0; line-height: 1.5; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+  th { background: #f9fafb; text-align: left; font-size: 10px; text-transform: uppercase; color: #6b7280; padding: 8px 10px; border-bottom: 1px solid #e5e7eb; }
+  th.num, td.num { text-align: right; }
+  td { padding: 8px 10px; border-bottom: 1px solid #f3f4f6; }
+  .totals { width: 45%; margin-left: auto; }
+  .totals tr td { border: none; padding: 4px 10px; }
+  .totals tr.grand td { border-top: 2px solid #111827; font-weight: 800; font-size: 14px; padding-top: 8px; }
+  .totals tr.due td { font-weight: 800; color: #b91c1c; }
+  .footer { margin-top: 28px; padding-top: 14px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 10px; text-align: center; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; }
+  .badge-paid { background: #d1fae5; color: #065f46; }
+  .badge-partial { background: #fef3c7; color: #92400e; }
+  .badge-due { background: #fee2e2; color: #991b1b; }
+  @media print { .toolbar, .no-print { display: none !important; } body { background: #fff; } .sheet { padding: 0; } }
+</style>
+</head>
+<body>
+  {% receipt_template sale.store as rcpt %}
+  <div class="toolbar no-print">
+    <button onclick="window.print()" class="primary">Print</button>
+    <button onclick="window.close()">Close</button>
+  </div>
+
+  <div class="sheet">
+    <div class="header">
+      <div>
+        {% if system_settings.site_logo and not rcpt or system_settings.site_logo and rcpt.show_logo %}<img src="{{ system_settings.site_logo.url }}" alt="" style="height:36px;width:36px;border-radius:8px;object-fit:cover;margin-bottom:8px;" />{% endif %}
+        <div class="store-name">{{ sale.store.name }}</div>
+        {% if system_settings.tagline %}<div class="store-meta" style="font-style:italic">{{ system_settings.tagline }}</div>{% endif %}
+        <div class="store-meta">
+          {{ sale.store.address }}<br>
+          {% if sale.store.phone %}{{ sale.store.phone }}{% endif %}{% if sale.store.phone and sale.store.email %} · {% endif %}{{ sale.store.email }}
+          {% if system_settings.website %}<br>{{ system_settings.website }}{% endif %}
+          {% if system_settings.tax_number %}<br>Tax / NTN: {{ system_settings.tax_number }}{% endif %}
+        </div>
+      </div>
+      <div class="invoice-title">
+        <h1>INVOICE</h1>
+        <p>{{ sale.reference }}</p>
+        <p>{{ sale.created_at|date:"d M Y, H:i" }}</p>
+      </div>
+    </div>
+
+    <div class="meta-grid">
+      <div class="box">
+        <h3>Billed to</h3>
+        <p><strong>{{ sale.customer.name|default:"Walk-in customer" }}</strong></p>
+        {% if not pos_settings or pos_settings.show_customer_details_on_receipt %}
+          {% if sale.customer.phone %}<p>{{ sale.customer.phone }}</p>{% endif %}
+          {% if sale.customer.address %}<p>{{ sale.customer.address }}</p>{% endif %}
+        {% endif %}
+      </div>
+      <div class="box" style="text-align:right;">
+        <h3>Sale details</h3>
+        <p>Biller: {{ sale.biller.get_full_name|default:sale.biller.username }}</p>
+        <p>Warehouse: {{ sale.warehouse.name }}</p>
+        <p>
+          {% if sale.payment_status == "paid" %}<span class="badge badge-paid">PAID</span>
+          {% elif sale.payment_status == "partial" %}<span class="badge badge-partial">PARTIAL</span>
+          {% else %}<span class="badge badge-due">DUE</span>{% endif %}
+        </p>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>Item</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Discount</th><th class="num">Tax</th><th class="num">Total</th></tr>
+      </thead>
+      <tbody>
+        {% for item in sale.items.all %}
+        <tr>
+          <td>{{ item.variant.product.name }}{% if item.variant.name != "Default" %} — {{ item.variant.name }}{% endif %}</td>
+          <td class="num">{{ item.quantity }}</td>
+          <td class="num">{{ item.unit_price|floatformat:2 }}</td>
+          <td class="num">{{ item.discount_amount|floatformat:2 }}</td>
+          <td class="num">{{ item.tax_amount|floatformat:2 }}</td>
+          <td class="num">{{ item.line_total|floatformat:2 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <table class="totals">
+      <tr><td>Subtotal</td><td class="num">{% money sale.subtotal sale.store.currency_symbol %}</td></tr>
+      <tr><td>Discount</td><td class="num">-{% money sale.discount_amount sale.store.currency_symbol %}</td></tr>
+      <tr><td>Tax</td><td class="num">+{% money sale.tax_amount sale.store.currency_symbol %}</td></tr>
+{% if sale.shipping_amount %}<tr><td>Shipping</td><td class="num">+{% money sale.shipping_amount sale.store.currency_symbol %}</td></tr>{% endif %}
+{% if sale.rounding_amount %}<tr><td>Rounding</td><td class="num">{% if sale.rounding_amount > 0 %}+{% endif %}{% money sale.rounding_amount sale.store.currency_symbol %}</td></tr>{% endif %}
+      <tr class="grand"><td>Total</td><td class="num">{% money sale.total_amount sale.store.currency_symbol %}</td></tr>
+      <tr><td>Paid</td><td class="num">{% money sale.paid_amount sale.store.currency_symbol %}</td></tr>
+      {% if sale.due_amount > 0 %}<tr class="due"><td>Balance due</td><td class="num">{% money sale.due_amount sale.store.currency_symbol %}</td></tr>{% endif %}
+    </table>
+
+    {% if sale.sale_note %}<p style="color:#6b7280;">Note: {{ sale.sale_note }}</p>{% endif %}
+    {% if pos_settings.receipt_custom_field1_title and pos_settings.receipt_custom_field1_value %}<p style="color:#374151;margin:2px 0;"><strong>{{ pos_settings.receipt_custom_field1_title }}:</strong> {{ pos_settings.receipt_custom_field1_value }}</p>{% endif %}
+    {% if pos_settings.receipt_custom_field2_title and pos_settings.receipt_custom_field2_value %}<p style="color:#374151;margin:2px 0;"><strong>{{ pos_settings.receipt_custom_field2_title }}:</strong> {{ pos_settings.receipt_custom_field2_value }}</p>{% endif %}
+    {% if rcpt.terms_and_conditions %}<p style="color:#6b7280;font-size:11px;white-space:pre-line;margin-top:12px;"><strong>Terms &amp; conditions</strong><br>{{ rcpt.terms_and_conditions }}</p>{% endif %}
+
+    <div class="footer">
+      {% if rcpt.footer_text %}{{ rcpt.footer_text }}{% else %}Thank you for shopping with {{ sale.store.name }}!{% endif %}<br>
+      This is a computer-generated invoice.
+    </div>
+  </div>
+
+  <script>
+    // Auto-open the print dialog as soon as the receipt is ready — this is
+    // what makes "complete payment" hand the cashier a printable bill
+    // immediately, the way a real POS till does. If the browser blocks
+    // auto-print (some popup-blocker configurations do), the on-screen
+    // "Print" button above still works as a one-click fallback.
+    window.addEventListener("load", function () {
+      setTimeout(function () { window.print(); }, 200);
+    });
+  </script>
+</body>
+</html>

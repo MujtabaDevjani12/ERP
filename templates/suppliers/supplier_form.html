@@ -1,0 +1,62 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="ui-form-wrap space-y-4" style="max-width:56rem">
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{{ back_url }}">Suppliers</a><span class="sep">/</span><span>{% if object %}{{ object.name }}{% else %}New{% endif %}</span></nav>
+      <h1 class="page-title">{{ title }}</h1>
+      <p class="page-subtitle">The people and companies you buy stock from. Fields marked <span style="color:var(--ui-danger)">*</span> are required.</p>
+    </div>
+    {% if object and perms.suppliers.add_purchaseorder %}<div class="page-actions"><a class="ui-btn ui-btn-secondary" href="{% url 'suppliers:purchase_list' %}?q={{ object.name|urlencode }}">{% icon "receipt" "w-4 h-4" %}<span>Purchase orders</span></a></div>{% endif %}
+  </div>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="ui-alert ui-alert-danger" role="alert" style="margin-bottom:var(--sp-4)">{% icon "error" "w-4 h-4" %}<div>{% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}</div></div>{% endif %}
+
+    <section class="ui-form-section">
+      <header><h2>Business</h2><p>How the supplier appears on purchase orders.</p></header>
+      <div class="body ui-grid ui-grid-2">
+        {% ui "field" field=form.name %}
+        {% ui "field" field=form.company %}
+        {% ui "field" field=form.tax_no %}
+        {% ui "field" field=form.payment_term_days %}
+      </div>
+    </section>
+
+    <section class="ui-form-section">
+      <header><h2>Contact</h2><p>Who to call or email when placing an order.</p></header>
+      <div class="body ui-grid ui-grid-3">
+        {% ui "field" field=form.contact_person %}
+        {% ui "field" field=form.phone %}
+        {% ui "field" field=form.email %}
+      </div>
+    </section>
+
+    <section class="ui-form-section">
+      <header><h2>Address</h2></header>
+      <div class="body ui-grid ui-grid-3">
+        {% ui "field" field=form.address css="ui-span-all" %}
+        {% ui "field" field=form.city %}
+        {% ui "field" field=form.state %}
+        {% ui "field" field=form.postal_code %}
+        {% ui "field" field=form.country css="ui-span-2" %}
+      </div>
+    </section>
+
+    <section class="ui-form-section">
+      <header><h2>Notes &amp; status</h2></header>
+      <div class="body space-y-4">
+        {% ui "field" field=form.notes %}
+        {% ui "field" field=form.is_active %}
+      </div>
+    </section>
+
+    <div class="ui-sticky-actions">
+      <a href="{{ back_url }}" class="ui-btn ui-btn-secondary">Cancel</a>
+      <button type="submit" class="ui-btn ui-btn-primary">{% icon "check-mark" "w-4 h-4" %}<span>Save supplier</span></button>
+    </div>
+  </form>
+</div>
+{% endblock %}

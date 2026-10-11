@@ -1,0 +1,181 @@
+{% extends "base.html" %}{% load ui static %}
+{% block title %}{% if instance %}Edit {{ instance.reference }}{% else %}New purchase order{% endif %}{% endblock %}
+{% block content %}
+{% with cs=current_store.currency_symbol %}
+<div class="ui-form-wrap space-y-4" x-data="poForm()" x-init="init()" @keydown.window.f2.prevent="$refs.scan && $refs.scan.focus()">
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{% url 'suppliers:purchase_list' %}">Purchase orders</a><span class="sep">/</span><span>{% if instance %}{{ instance.reference }}{% else %}New{% endif %}</span></nav>
+      <h1 class="page-title">{% if instance %}Edit purchase order <span class="ui-muted" style="font-weight:500">{{ instance.reference }}</span>{% else %}New purchase order{% endif %}</h1>
+      <p class="page-subtitle">Choose the supplier, then scan a barcode or type a product name to build the order.</p>
+    </div>
+  </div>
+
+  <form method="post" @submit="beforeSubmit($event)" novalidate>
+    {% csrf_token %}
+
+    {% if form.non_field_errors or formset.non_form_errors %}
+    <div class="ui-alert ui-alert-danger" role="alert" style="margin-bottom:var(--sp-4)">{% icon "error" "w-4 h-4" %}<div>{% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}{% for e in formset.non_form_errors %}<div>{{ e }}</div>{% endfor %}</div></div>
+    {% endif %}
+
+    <section class="ui-form-section">
+      <header><h2>Order details</h2><p>Who you are buying from and where the goods will arrive.</p></header>
+      <div class="body ui-grid ui-grid-3">
+        <div class="ui-span-2">{% ui "field" field=form.supplier %}
+          {% if perms.suppliers.add_supplier %}<p class="ui-help" style="margin-top:4px"><a href="{% url 'suppliers:supplier_add' %}" target="_blank" rel="noopener" style="color:var(--brand-600);font-weight:600">+ New supplier</a> <span class="ui-muted">(opens in a new tab - refresh this page after saving it)</span></p>{% endif %}
+        </div>
+        {% ui "field" field=form.warehouse %}
+        {% ui "field" field=form.order_date %}
+        {% ui "field" field=form.expected_date %}
+        {% ui "field" field=form.status %}
+        {% ui "field" field=form.supplier_ref css="ui-span-2" %}
+        {% ui "field" field=form.note css="ui-span-all" %}
+        <div class="ui-alert ui-alert-warning ui-span-all" x-show="status === 'received'" x-cloak role="status">{% icon "warning" "w-4 h-4" %}<div>Saving as <strong>Received</strong> adds every line to the warehouse stock straight away. {% if instance %}It cannot be undone here - use a purchase return afterwards.{% endif %}</div></div>
+      </div>
+    </section>
+
+    <section class="ui-form-section" style="overflow:visible">
+      <header><h2>Products</h2><p>Scan a barcode (Enter adds it) or type a name / SKU and pick from the list. <kbd class="ui-kbd">F2</kbd> jumps to the scan box.</p></header>
+      <div class="body space-y-3">
+        <div class="lp-box">
+          <div class="ui-search" style="max-width:none">
+            {% icon "scan" "w-4 h-4" %}
+            <input type="search" x-ref="scan" x-model="query" @input.debounce.180ms="search()"
+                   @keydown.enter.prevent="enter()" @keydown.arrow-down.prevent="move(1)" @keydown.arrow-up.prevent="move(-1)" @keydown.escape="clear()"
+                   placeholder="Scan a barcode or type a product name, SKU…" autocomplete="off" aria-label="Scan or search products to add" role="combobox" :aria-expanded="results.length > 0">
+            <span class="lp-spin" x-show="busy" x-cloak aria-hidden="true"></span>
+          </div>
+          <div class="lp-list" x-show="results.length" x-cloak role="listbox">
+            <template x-for="(r, i) in results" :key="r.id">
+              <button type="button" class="lp-item" :class="{ 'is-hi': i === hi }" role="option" :aria-selected="i === hi" @mouseenter="hi = i" @click="pick(r)">
+                <span class="lp-thumb"><img x-show="r.image" :src="r.image" alt="" loading="lazy"><span x-show="!r.image" x-text="(r.product || '?').slice(0, 1).toUpperCase()"></span></span>
+                <span class="min-w-0 lp-main"><span class="ui-cell-title" x-text="r.name"></span><span class="ui-cell-sub" x-text="[r.sku, r.barcode].filter(Boolean).join(' · ')"></span></span>
+                <span class="lp-side"><span class="tabular lp-cost" x-text="'{{ cs }} ' + money(r.cost)"></span><span class="ui-muted lp-stock" x-text="'on hand ' + r.stock + (r.unit ? ' ' + r.unit : '')"></span></span>
+                <span class="lp-in" x-show="has(r.id)" x-cloak>On order</span>
+              </button>
+            </template>
+          </div>
+          <p class="ui-error" x-show="miss" x-cloak style="margin-top:6px">No product found for “<span x-text="miss"></span>”. Check the code, or <a href="{% url 'catalog:product_add' %}" target="_blank" rel="noopener" style="text-decoration:underline">create the product</a> first.</p>
+          <p class="ui-error" x-show="failed" x-cloak style="margin-top:6px">Could not reach the server to search. Check your connection and try again.</p>
+          <p class="ui-help" x-show="searched && !results.length && !miss && !failed && query" x-cloak style="margin-top:6px">No product matches “<span x-text="query"></span>”. Press Enter to try it as an exact barcode.</p>
+        </div>
+
+        <div class="ui-table-wrap" x-show="active().length" x-cloak>
+          <table class="ui-table ui-table-cards">
+            <thead><tr><th>Product</th><th class="num" style="width:9.5rem">Quantity</th><th class="num" style="width:10.5rem">Unit cost ({{ cs }})</th><th class="num" style="width:9rem">Line total</th><th class="col-actions"><span class="sr-only">Remove</span></th></tr></thead>
+            <tbody>
+              <template x-for="(l, i) in lines" :key="l.key">
+                <tr x-show="!l.deleted" :class="{ 'lp-bad': l.error }">
+                  <td data-label="Product">
+                    <div class="ui-cell-title" x-text="l.name || ('Product #' + l.variant)"></div>
+                    <div class="ui-cell-sub" x-text="[l.sku, l.barcode].filter(Boolean).join(' · ')"></div>
+                    <div class="ui-error" x-show="l.error" x-text="l.error" style="margin-top:2px"></div>
+                  </td>
+                  <td class="num" data-label="Quantity">
+                    <div class="lp-qty">
+                      <button type="button" class="icon-btn" @click="step(l, -1)" aria-label="One less">{% icon "minus" "w-3.5 h-3.5" %}</button>
+                      <input type="number" min="0" step="any" inputmode="decimal" x-model="l.quantity" :id="'po-q-' + i" style="text-align:center" :aria-label="'Quantity of ' + l.name">
+                      <button type="button" class="icon-btn" @click="step(l, 1)" aria-label="One more">{% icon "plus" "w-3.5 h-3.5" %}</button>
+                    </div>
+                    <div class="ui-cell-sub" x-show="l.unit" x-text="l.unit" style="text-align:center"></div>
+                  </td>
+                  <td class="num" data-label="Unit cost"><input type="number" min="0" step="0.01" inputmode="decimal" x-model="l.cost" style="text-align:right" :aria-label="'Unit cost of ' + l.name"></td>
+                  <td class="num tabular" data-label="Line total"><strong x-text="money(total(l))"></strong></td>
+                  <td class="col-actions"><button type="button" class="icon-btn" @click="remove(i)" aria-label="Remove this line" style="color:var(--ui-danger)">{% icon "trash" "w-4 h-4" %}</button></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+        <div class="ui-empty" x-show="!active().length" x-cloak style="padding:28px 0"><div class="ui-empty-icon">{% icon "cube" "w-6 h-6" %}</div><h3>No products on this order yet</h3><p>Scan a barcode or search above - the unit cost is filled in from the product and you can change it.</p></div>
+
+        <dl class="lp-totals" x-show="active().length" x-cloak>
+          <div><dt>Products</dt><dd class="tabular" x-text="active().length"></dd></div>
+          <div><dt>Total units</dt><dd class="tabular" x-text="units()"></dd></div>
+          <div class="is-grand"><dt>Order total</dt><dd class="tabular">{{ cs }} <span x-text="money(grand())"></span></dd></div>
+        </dl>
+      </div>
+    </section>
+
+    {# the formset the server reads: one hidden group per line, existing lines first so the form numbers line up #}
+    <input type="hidden" name="items-TOTAL_FORMS" :value="lines.length">
+    <input type="hidden" name="items-INITIAL_FORMS" value="{{ initial_forms }}">
+    <input type="hidden" name="items-MIN_NUM_FORMS" value="0">
+    <input type="hidden" name="items-MAX_NUM_FORMS" value="1000">
+    <template x-for="(l, i) in lines" :key="'h' + l.key">
+      <div hidden>
+        <input type="hidden" :name="'items-' + i + '-id'" :value="l.id">
+        <input type="hidden" :name="'items-' + i + '-purchase_order'" value="{{ instance.pk|default:'' }}">
+        <input type="hidden" :name="'items-' + i + '-variant'" :value="l.variant">
+        <input type="hidden" :name="'items-' + i + '-quantity'" :value="l.quantity">
+        <input type="hidden" :name="'items-' + i + '-cost_price'" :value="l.cost">
+        <input type="hidden" :name="'items-' + i + '-DELETE'" :value="l.deleted ? 'on' : ''">
+      </div>
+    </template>
+
+    <div class="ui-sticky-actions">
+      <span class="ui-muted" style="margin-right:auto"><strong x-text="active().length"></strong> product<span x-show="active().length !== 1">s</span> · {{ cs }} <strong class="tabular" x-text="money(grand())"></strong></span>
+      <a href="{% url 'suppliers:purchase_list' %}" class="ui-btn ui-btn-secondary">Cancel</a>
+      <button type="submit" class="ui-btn ui-btn-primary" :disabled="submitting">
+        <span x-show="!submitting" class="inline-flex items-center gap-2">{% icon "check-mark" "w-4 h-4" %}<span>Save purchase order</span></span>
+        <span x-show="submitting" x-cloak>Saving…</span>
+      </button>
+    </div>
+    <p class="ui-error" x-show="problem" x-cloak x-text="problem" role="alert" style="text-align:right;margin-top:6px"></p>
+  </form>
+</div>
+{% endwith %}
+{{ lines|json_script:"po-seed" }}
+<script src="{% static 'js/line-picker.js' %}?v=20261010j"></script>
+<script>
+function poForm() {
+  const seed = JSON.parse(document.getElementById("po-seed").textContent || "[]");
+  let n = 0;
+  const num = v => { const x = parseFloat(v); return isNaN(x) ? 0 : x; };
+  return {
+    ...lpSearch({
+      url: '{% url "catalog:api_variant_lookup" %}',
+      onPick(v) { this.addVariant(v); },
+    }),
+    lines: [], status: '{{ order_status }}', submitting: false, problem: '',
+    init() {
+      this.lines = seed.map(l => ({ ...l, key: ++n }));
+      this.$nextTick(() => this.$refs.scan && this.$refs.scan.focus());
+    },
+    money(v) { return num(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
+    total(l) { return num(l.quantity) * num(l.cost); },
+    active() { return this.lines.filter(l => !l.deleted); },
+    units() { const u = this.active().reduce((s, l) => s + num(l.quantity), 0); return Math.round(u * 1000) / 1000; },
+    grand() { return this.active().reduce((s, l) => s + this.total(l), 0); },
+    has(id) { return this.lines.some(l => !l.deleted && String(l.variant) === String(id)); },
+    addVariant(v) {
+      const same = this.lines.find(l => String(l.variant) === String(v.id));
+      if (same) {
+        if (same.deleted) { same.deleted = false; same.quantity = '1'; }       // bringing back a line that was removed
+        else same.quantity = String(Math.round((num(same.quantity) + 1) * 1000) / 1000);
+        same.error = '';
+      } else {
+        this.lines.push({ key: ++n, id: '', variant: String(v.id), name: v.name, sku: v.sku, barcode: v.barcode, unit: v.unit || '',
+                          quantity: '1', cost: v.cost ? num(v.cost).toFixed(2) : '', deleted: false, error: '' });
+      }
+      this.problem = '';
+      this.$nextTick(() => this.$refs.scan && this.$refs.scan.focus());
+    },
+    step(l, d) { l.quantity = String(Math.max(0, Math.round((num(l.quantity) + d) * 1000) / 1000)); },
+    remove(i) {
+      const l = this.lines[i];
+      if (l.id) l.deleted = true; else this.lines.splice(i, 1);     // a saved line is flagged for deletion, a new one just disappears
+    },
+    beforeSubmit(e) {
+      const rows = this.active();
+      this.problem = '';
+      if (!rows.length) { e.preventDefault(); this.problem = 'Add at least one product to the order.'; this.$refs.scan.focus(); return; }
+      const bad = rows.find(l => !(num(l.quantity) > 0));
+      if (bad) { e.preventDefault(); this.problem = 'Enter a quantity above zero for ' + (bad.name || 'every line') + '.'; return; }
+      if (rows.some(l => l.cost === '' || num(l.cost) < 0)) { e.preventDefault(); this.problem = 'Every line needs a unit cost (0 is allowed).'; return; }
+      this.submitting = true;
+    },
+  };
+}
+</script>
+{% endblock %}

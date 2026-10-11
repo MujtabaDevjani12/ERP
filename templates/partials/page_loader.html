@@ -1,0 +1,121 @@
+{% comment %}
+  Page loader. Self-contained (inline CSS + JS) so it paints before the stylesheets / Tailwind / Alpine arrive.
+    * On first paint a branded full-screen loader is shown, and fades out once the page has loaded.
+    * Navigating to another page shows a thin top progress bar straight away and the centred loader if the
+      next page is slow (>250ms), so fast navigations never flash.
+    * Downloads / exports / new-tab links / hash links / modifier clicks and anything marked data-no-loading are skipped.
+    * It can never get stuck: a CSS animation hides it after ~9s even if JavaScript fails.
+  Include once, as the first child of <body>.
+{% endcomment %}
+<style>
+  #pl-root{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;
+    background:#f4f4f5;color:#18181b;opacity:1;visibility:visible;transition:opacity .32s ease,visibility 0s linear 0s;
+    font-family:var(--font,Inter,system-ui,-apple-system,"Segoe UI",sans-serif);
+    animation:pl-failsafe 0s linear 9s forwards}
+  html[data-theme="dark"] #pl-root{background:#0f0f12;color:#f4f4f5}
+  #pl-root.pl-nav{background:rgba(244,244,245,.72);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);animation:none}
+  html[data-theme="dark"] #pl-root.pl-nav{background:rgba(15,15,18,.7)}
+  #pl-root.pl-hide{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .32s ease,visibility 0s linear .32s}
+  @keyframes pl-failsafe{to{opacity:0;visibility:hidden;pointer-events:none}}
+  .pl-card{display:flex;flex-direction:column;align-items:center;gap:18px;animation:pl-rise .5s cubic-bezier(.2,.8,.2,1) both}
+  .pl-mark{position:relative;width:76px;height:76px;display:grid;place-items:center}
+  .pl-mark::before,.pl-mark::after{content:"";position:absolute;inset:0;border-radius:24px;border:2px solid var(--brand-500,#6366f1);opacity:0;animation:pl-ring 1.8s ease-out infinite}
+  .pl-mark::after{animation-delay:.9s}
+  .pl-logo{position:relative;width:60px;height:60px;border-radius:18px;display:grid;place-items:center;overflow:hidden;
+    background:var(--brand-600,#4f46e5);color:#fff;font-weight:800;font-size:26px;letter-spacing:-.02em;
+    box-shadow:0 10px 30px -8px var(--brand-500,#6366f1);animation:pl-pop 1.6s ease-in-out infinite}
+  .pl-logo img{width:100%;height:100%;object-fit:contain;background:#fff;padding:6px}
+  .pl-name{font-size:15px;font-weight:700;letter-spacing:-.01em}
+  .pl-sub{margin-top:-12px;font-size:12px;opacity:.55;font-weight:500}
+  .pl-bar{position:relative;width:132px;height:4px;border-radius:99px;background:rgba(113,113,122,.22);overflow:hidden}
+  .pl-bar::after{content:"";position:absolute;top:0;bottom:0;width:42%;border-radius:99px;
+    background:linear-gradient(90deg,var(--brand-400,#818cf8),var(--brand-600,#4f46e5));animation:pl-slide 1.15s ease-in-out infinite}
+  @keyframes pl-slide{0%{left:-45%}100%{left:103%}}
+  @keyframes pl-ring{0%{transform:scale(.8);opacity:.55}100%{transform:scale(1.35);opacity:0}}
+  @keyframes pl-pop{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+  @keyframes pl-rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  #pl-top{position:fixed;left:0;top:0;height:3px;width:0;z-index:2147483001;pointer-events:none;opacity:0;
+    background:linear-gradient(90deg,var(--brand-400,#818cf8),var(--brand-600,#4f46e5));
+    box-shadow:0 0 10px var(--brand-500,#6366f1);transition:width .25s ease,opacity .25s ease}
+  #pl-top.on{opacity:1}
+  /* page content eases in once the loader is gone */
+  @keyframes pl-enter{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  html.pl-ready .app-main,html.pl-ready #main{animation:pl-enter .38s ease both}
+  @media (prefers-reduced-motion:reduce){
+    .pl-card,.pl-logo,.pl-mark::before,.pl-mark::after,html.pl-ready .app-main,html.pl-ready #main{animation:none!important}
+    .pl-bar::after{animation-duration:2.4s}
+    #pl-root,#pl-root.pl-hide{transition:none}
+  }
+  @media print{#pl-root,#pl-top{display:none!important}}
+</style>
+<div id="pl-top" aria-hidden="true"></div>
+<div id="pl-root" role="status" aria-live="polite" aria-label="Loading">
+  <div class="pl-card">
+    <div class="pl-mark">
+      <div class="pl-logo">{% if system_settings.site_logo %}<img src="{{ system_settings.site_logo.url }}" alt="">{% else %}{{ system_settings.site_name|default:"P"|slice:":1"|upper }}{% endif %}</div>
+    </div>
+    <div class="pl-name">{{ system_settings.site_name|default:"Multiple POS" }}</div>
+    {% if current_store %}<div class="pl-sub">{{ current_store.name }}</div>{% endif %}
+    <div class="pl-bar"></div>
+  </div>
+</div>
+<script>
+(function () {
+  var root = document.getElementById('pl-root'), top = document.getElementById('pl-top');
+  if (!root) return;
+  var de = document.documentElement, shownAt = Date.now(), navTimer = null, trickle = null, safety = null, pct = 0;
+
+  function hide() {
+    clearTimeout(navTimer); clearInterval(trickle); clearTimeout(safety);
+    root.classList.add('pl-hide'); root.classList.remove('pl-nav');
+    if (top) { top.style.width = '100%'; setTimeout(function () { top.classList.remove('on'); top.style.width = '0'; }, 260); }
+    de.classList.add('pl-ready');
+  }
+  /* ---- first load: wait for the page, but never show the loader for less than ~350ms (avoids a flash) ---- */
+  function onLoaded() { setTimeout(hide, Math.max(0, 350 - (Date.now() - shownAt))); }
+  if (document.readyState === 'complete') onLoaded(); else window.addEventListener('load', onLoaded);
+  setTimeout(hide, 8000);   // Tailwind/Alpine CDN slow or blocked: show the page anyway
+
+  /* ---- leaving the page: progress bar now, centred loader if the next page is slow ---- */
+  function start() {
+    if (!top) return;
+    pct = 8; top.style.width = pct + '%'; top.classList.add('on');
+    clearInterval(trickle);
+    trickle = setInterval(function () { pct += (92 - pct) * 0.08; top.style.width = pct + '%'; }, 220);
+    clearTimeout(navTimer);
+    navTimer = setTimeout(function () { root.classList.remove('pl-hide'); root.classList.add('pl-nav'); }, 250);
+    clearTimeout(safety); safety = setTimeout(hide, 10000);   // e.g. the navigation turned into a download
+  }
+  function skipLink(a, e) {
+    if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return true;
+    if (a.hasAttribute('data-no-loading') || a.hasAttribute('download') || a.closest('[data-no-loading]')) return true;
+    var t = a.getAttribute('target'); if (t && t !== '_self') return true;
+    var h = a.getAttribute('href'); if (!h || h.charAt(0) === '#' || /^(javascript|mailto|tel|blob|data):/i.test(h)) return true;
+    if (a.origin !== location.origin) return true;
+    if (a.pathname === location.pathname && a.search === location.search && a.hash) return true;
+    if (/\.(pdf|csv|xlsx?|docx?|zip|png|jpe?g|svg|gif|webp|txt)(\?|$)/i.test(a.pathname + a.search)) return true;
+    if (/\/(export|download|print|pdf|csv|xlsx)(\/|$|\.)/i.test(a.pathname)) return true;
+    return false;
+  }
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('a[href]');
+    if (!a || skipLink(a, e)) return;
+    /* other handlers (confirm dialogs, drawers, Alpine) run AFTER this one and may cancel the click:
+       decide once the event has finished, otherwise the loader would stay on top of the popup */
+    setTimeout(function () { if (!e.defaultPrevented) start(); }, 0);
+  });
+  document.addEventListener('submit', function (e) {
+    var f = e.target;
+    if (!f || !f.getAttribute || f.hasAttribute('data-no-loading') || f.closest('[data-no-loading]')) return;
+    var t = f.getAttribute('target'); if (t && t !== '_self') return;
+    var act = f.getAttribute('action') || '';
+    if (/\/(export|download|print|pdf|csv|xlsx)(\/|$|\.)/i.test(act)) return;
+    var s = e.submitter; if (s && (s.hasAttribute('data-no-loading') || (s.getAttribute('formtarget') && s.getAttribute('formtarget') !== '_self'))) return;
+    setTimeout(function () { if (!e.defaultPrevented) start(); }, 0);
+  });
+  /* back/forward cache restores the old DOM without re-running load: make sure we are not stuck on the bar */
+  window.addEventListener('pageshow', function (e) { if (e.persisted) hide(); });
+  window.addEventListener('pl:start', start);
+  window.addEventListener('pl:done', hide);
+})();
+</script>

@@ -1,0 +1,10 @@
+/* ERP admin polish (loaded by django-jazzmin). Kept small and conservative. */
+body { font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif; }
+.content-wrapper { background: #f4f6f9; }
+.card { border-radius: 10px; box-shadow: 0 1px 3px rgba(16, 24, 40, .08); border: 0; }
+.card-header { background: #fff; font-weight: 600; }
+table thead th { background: #f8fafc; text-transform: uppercase; font-size: 12px; letter-spacing: .03em; color: #475467; }
+.main-sidebar .brand-link { font-weight: 700; letter-spacing: .02em; }
+.btn-primary, .btn-success { border-radius: 8px; }
+.form-control, .select2-container--default .select2-selection--single { border-radius: 8px; }
+.callout { border-radius: 8px; }

@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="ui-form-wrap space-y-4" style="max-width:44rem">
+  <div class="page-header">
+    <div class="min-w-0">
+      {% if back_url %}<nav class="breadcrumb" aria-label="Breadcrumb"><a href="{{ back_url }}">{% icon "arrow-left" "w-3.5 h-3.5" %} Back</a></nav>{% endif %}
+      <h1 class="page-title">{{ title }}</h1>
+      <p class="page-subtitle">Fields marked <span style="color:var(--ui-danger)">*</span> are required.</p>
+    </div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" class="ui-card" novalidate>
+    {% csrf_token %}
+    <div class="ui-card-body space-y-4">
+      {% if form.non_field_errors %}
+      <div class="ui-alert ui-alert-danger" role="alert">{% icon "error" "w-4 h-4" %}<div>{% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}</div></div>
+      {% endif %}
+      {% for field in form %}{% ui "field" field=field %}{% endfor %}
+    </div>
+    <div class="ui-card-header" style="border-top:1px solid var(--ui-border);border-bottom:0;justify-content:flex-end">
+      {% if back_url %}<a href="{{ back_url }}" class="ui-btn ui-btn-secondary">Cancel</a>{% endif %}
+      <button type="submit" class="ui-btn ui-btn-primary">{% icon "check-mark" "w-4 h-4" %}<span>Save</span></button>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,23 @@
+{% load ui %}{# Customer feedback for one sale (side drawer; JSON {ok:true} closes it). #}
+<form method="post" action="{{ request.get_full_path }}" novalidate x-data="{ r: {{ rating|default:0 }}, hover: 0 }">
+  {% csrf_token %}
+  {% if error %}<div style="margin-bottom:12px">{% ui "alert" tone="danger" message=error %}</div>{% endif %}
+  <dl class="ui-dl" style="grid-template-columns:minmax(90px,120px) 1fr;margin-bottom:14px">
+    <dt>Invoice</dt><dd>{{ sale.reference }}</dd>
+    <dt>Customer</dt><dd>{{ sale.customer.name|default:"Walk-in customer" }}</dd>
+  </dl>
+  <div class="ui-field">
+    <span class="ui-label" id="sf-rating-label">How was the visit? <span style="color:var(--ui-danger)">*</span></span>
+    <input type="hidden" name="rating" :value="r">
+    <div class="sf-stars" role="radiogroup" aria-labelledby="sf-rating-label" style="justify-content:flex-start" @mouseleave="hover = 0">
+      {% for n in "12345" %}<button type="button" class="sf-star" :class="(hover || r) >= {{ n }} && 'is-on'" role="radio" :aria-checked="r === {{ n }}" aria-label="{{ n }} star{{ n|pluralize }}" @mouseenter="hover = {{ n }}" @click="r = {{ n }}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9z"/></svg></button>{% endfor %}
+    </div>
+  </div>
+  <div class="ui-field" style="margin-top:14px"><label class="ui-label" for="sf-comment">Comment</label>
+    <textarea id="sf-comment" name="comment" rows="4" maxlength="1000" placeholder="Optional - what the customer said">{{ comment }}</textarea></div>
+  <div class="ui-modal-foot" style="position:sticky;bottom:0;background:var(--ui-surface);padding-top:12px;margin-top:20px">
+    <button type="button" class="ui-btn ui-btn-ghost" @click="$store.drawer.close()">Cancel</button>
+    <button type="submit" class="ui-btn ui-btn-primary" :disabled="!r"><span>Save feedback</span></button>
+  </div>
+</form>

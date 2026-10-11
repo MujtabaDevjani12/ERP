@@ -1,0 +1,74 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Deliveries{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <h1 class="page-title">Deliveries <span class="ui-badge ui-badge-neutral no-dot" style="vertical-align:middle;margin-left:6px">{{ result_count }}</span></h1>
+      <p class="page-subtitle">Parcels going out to customers, from packing to delivered.</p>
+    </div>
+    <div class="page-actions">
+      {% if perms.sales.add_delivery %}<a class="ui-btn ui-btn-primary" href="{% url 'sales:delivery_add' %}">{% icon "plus" "w-4 h-4" %}<span>New delivery</span></a>{% endif %}
+    </div>
+  </div>
+
+  <div class="ui-kpi-grid">
+    {% ui "kpi" label="Packing" icon="archive" value=n_packing foot="waiting to leave" %}
+    {% ui "kpi" label="On the way" icon="truck" value=n_way foot="with the rider" %}
+    {% ui "kpi" label="Delivered" icon="check" value=n_done foot="completed" %}
+    {% ui "kpi" label="Late" icon="clock" value=n_late foot="past the promised day" %}
+  </div>
+
+  <form method="get" class="ui-toolbar">
+    <div class="ui-search">
+      <label class="ui-label" for="d-q">Search</label>
+      {% icon "search" "w-4 h-4" %}
+      <input type="search" id="d-q" name="q" value="{{ request.GET.q }}" placeholder="Delivery, invoice, name, phone, address or tracking no." autocomplete="off">
+    </div>
+    <div style="min-width:10rem">
+      <label class="ui-label" for="d-status">Status</label>
+      <select id="d-status" name="status">
+        <option value="">All statuses</option>
+        {% for key, label in status_choices %}<option value="{{ key }}" {% if request.GET.status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div><label class="ui-label" for="d-df">Promised from</label><input type="date" id="d-df" name="df" value="{{ request.GET.df }}"></div>
+    <div><label class="ui-label" for="d-dt">to</label><input type="date" id="d-dt" name="dt" value="{{ request.GET.dt }}"></div>
+    <div style="width:6rem">
+      <label class="ui-label" for="d-per">Per page</label>
+      <select id="d-per" name="per">{% for n in page_sizes %}<option value="{{ n }}" {% if n == per %}selected{% endif %}>{{ n }}</option>{% endfor %}</select>
+    </div>
+    <div class="flex gap-2">
+      <button type="submit" class="ui-btn ui-btn-primary">{% icon "filter" "w-4 h-4" %}<span>Apply</span></button>
+      {% if has_filters %}<a class="ui-btn ui-btn-secondary" href="{% url 'sales:delivery_list' %}">Reset</a>{% endif %}
+    </div>
+  </form>
+
+  {% if deliveries %}
+  <div class="ui-table-wrap">
+    <table class="ui-table ui-table-cards">
+      <thead><tr><th>Delivery</th><th>Sale</th><th>Deliver to</th><th>Rider</th><th>Promised</th><th>Status</th><th class="col-actions"><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody>
+        {% for d in deliveries %}
+        <tr class="is-clickable" data-href="{% url 'sales:delivery_detail' d.pk %}">
+          <td data-label="Delivery"><div class="ui-cell-title"><a class="erp-link" href="{% url 'sales:delivery_detail' d.pk %}">{{ d.reference }}</a></div><div class="ui-cell-sub">{{ d.created_at|date:"d M Y, H:i" }}</div></td>
+          <td data-label="Sale"><a class="erp-link" href="{% url 'sales:sale_detail' d.sale_id %}">{{ d.sale.reference }}</a></td>
+          <td data-label="Deliver to"><div class="ui-cell-title">{{ d.recipient_name|default:"—" }}</div><div class="ui-cell-sub">{{ d.address|truncatechars:42 }}{% if d.city %}, {{ d.city }}{% endif %}{% if d.phone %} · {{ d.phone }}{% endif %}</div></td>
+          <td data-label="Rider">{% if d.rider %}{{ d.rider }}{% elif d.delivery_person %}{{ d.delivery_person.get_full_name|default:d.delivery_person.username }}{% else %}<span class="ui-muted">Not assigned</span>{% endif %}{% if d.tracking_no %}<div class="ui-cell-sub">{{ d.tracking_no }}</div>{% endif %}</td>
+          <td data-label="Promised">{% if d.scheduled_date %}<span {% if d.scheduled_date < today and not d.is_closed %}class="ui-neg"{% endif %}>{{ d.scheduled_date|date:"d M Y" }}</span>{% else %}<span class="ui-muted">—</span>{% endif %}</td>
+          <td data-label="Status">{% if d.status == "pending" %}{% badge d.status label=d.get_status_display tone="warning" %}{% elif d.status == "out_for_delivery" %}{% badge d.status label=d.get_status_display tone="info" %}{% else %}{% badge d.status label=d.get_status_display %}{% endif %}</td>
+          <td class="col-actions"><div class="ui-row-actions">
+            <a class="icon-btn" href="{% url 'sales:delivery_detail' d.pk %}" data-tip="View" data-tip-pos="bottom" aria-label="View">{% icon "eye" "w-4 h-4" %}</a>
+            <a class="icon-btn" href="{% url 'sales:delivery_note' d.pk %}" target="_blank" rel="noopener" data-tip="Print delivery note" data-tip-pos="bottom" aria-label="Print delivery note">{% icon "printer" "w-4 h-4" %}</a>
+          </div></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% ui "pagination" page_obj=page_obj %}
+  {% else %}
+  <div class="ui-card">{% url 'sales:delivery_add' as add_url %}{% if has_filters %}{% ui "empty_state" icon="search" title="No deliveries match these filters" text="Try another name, status or date range." %}{% else %}{% ui "empty_state" icon="truck" title="No deliveries yet" text="Open a completed sale and choose Create delivery, or start one here." action_url=add_url action_label="New delivery" %}{% endif %}</div>
+  {% endif %}
+</div>
+{% endblock %}

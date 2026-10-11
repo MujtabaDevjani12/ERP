@@ -1,0 +1,70 @@
+{% extends "base.html" %}{% load ui xl %}
+{% block title %}Stock levels{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <h1 class="page-title">Stock levels <span class="ui-badge ui-badge-neutral no-dot" style="vertical-align:middle;margin-left:6px">{{ result_count }}</span></h1>
+      <p class="page-subtitle">Quantity on hand for every product variant in each warehouse.</p>
+    </div>
+    <div class="page-actions">
+      {% excel_actions "stock" %}
+      <a class="ui-btn ui-btn-secondary" href="{% url 'inventory:adjustment_list' %}">{% icon "clock" "w-4 h-4" %}<span class="hidden sm:inline">Adjustment history</span></a>
+      <a class="ui-btn ui-btn-primary" href="{% url 'inventory:quantity_adjustment' %}">{% icon "sliders" "w-4 h-4" %}<span>Adjust quantity</span></a>
+    </div>
+  </div>
+
+  <form method="get" class="ui-toolbar">
+    <div class="ui-search">
+      <label class="ui-label" for="st-q">Search</label>
+      {% icon "search" "w-4 h-4" %}
+      <input type="search" id="st-q" name="q" value="{{ request.GET.q }}" placeholder="Product, SKU or barcode" autocomplete="off">
+    </div>
+    <div style="min-width:10rem">
+      <label class="ui-label" for="st-wh">Warehouse</label>
+      <select id="st-wh" name="warehouse">
+        <option value="">All warehouses</option>
+        {% for w in warehouses %}<option value="{{ w.pk }}" {% if request.GET.warehouse == w.pk|stringformat:"s" %}selected{% endif %}>{{ w.name }}</option>{% endfor %}
+      </select>
+    </div>
+    {% if categories %}<div style="min-width:10rem">
+      <label class="ui-label" for="st-cat">Category</label>
+      <select id="st-cat" name="category">
+        <option value="">All categories</option>
+        {% for c in categories %}<option value="{{ c.pk }}" {% if request.GET.category == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+      </select>
+    </div>{% endif %}
+    <label class="flex items-center gap-2 text-sm" style="padding-bottom:9px"><input type="checkbox" name="low" value="1" {% if request.GET.low %}checked{% endif %}> Low stock only</label>
+    <div style="width:6rem">
+      <label class="ui-label" for="st-per">Per page</label>
+      <select id="st-per" name="per">{% for n in page_sizes %}<option value="{{ n }}" {% if n == per %}selected{% endif %}>{{ n }}</option>{% endfor %}</select>
+    </div>
+    <div class="flex gap-2">
+      <button type="submit" class="ui-btn ui-btn-primary">{% icon "filter" "w-4 h-4" %}<span>Apply</span></button>
+      {% if has_filters %}<a class="ui-btn ui-btn-secondary" href="{% url 'inventory:stock_list' %}">Reset</a>{% endif %}
+    </div>
+  </form>
+
+  {% if stock_items %}
+  <div class="ui-table-wrap">
+    <table class="ui-table ui-table-cards">
+      <thead><tr><th>Product</th><th>SKU</th><th>Warehouse</th><th class="num">Quantity</th><th>Level</th></tr></thead>
+      <tbody>
+        {% for s in stock_items %}
+        <tr>
+          <td data-label="Product"><div class="ui-cell-title">{{ s.variant }}</div></td>
+          <td data-label="SKU" class="ui-nowrap ui-muted">{{ s.variant.sku }}</td>
+          <td data-label="Warehouse">{{ s.warehouse.name }}</td>
+          <td data-label="Quantity" class="num {% if s.quantity <= 0 %}ui-neg{% endif %}"><strong>{{ s.quantity|floatformat:"-3" }}</strong></td>
+          <td data-label="Level">{% if s.quantity <= 0 %}{% badge "out_of_stock" label="Out of stock" %}{% elif s.quantity <= s.variant.product.alert_quantity %}{% badge "low" label="Low stock" %}{% else %}{% badge "in_stock" label="In stock" %}{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% ui "pagination" page_obj=page_obj %}
+  {% else %}
+  <div class="ui-card">{% ui "empty_state" icon="archive" title="No stock records found" text="Change the filters, or add stock with a purchase order or a quantity adjustment." %}</div>
+  {% endif %}
+</div>
+{% endblock %}

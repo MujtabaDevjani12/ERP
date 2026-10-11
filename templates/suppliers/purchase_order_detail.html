@@ -1,0 +1,85 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{{ order.reference }}{% endblock %}
+{% block content %}
+{% with cs=current_store.currency_symbol %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{% url 'suppliers:purchase_list' %}">Purchase orders</a><span class="sep">/</span><span>{{ order.reference }}</span></nav>
+      <h1 class="page-title">{{ order.reference }}
+        {% if order.status == "received" %}{% badge order.status label=order.get_status_display %}{% elif order.status == "cancelled" %}{% badge order.status label=order.get_status_display tone="danger" %}{% elif order.status == "ordered" %}{% badge order.status label=order.get_status_display tone="info" %}{% else %}{% badge order.status label=order.get_status_display tone="warning" %}{% endif %}</h1>
+      <p class="page-subtitle">{{ order.order_date|date:"d M Y" }} · Supplier: {% if perms.suppliers.change_supplier %}<a href="{% url 'suppliers:supplier_edit' order.supplier_id %}" style="text-decoration:underline">{{ order.supplier.name }}</a>{% else %}{{ order.supplier.name }}{% endif %}{% if order.supplier.phone %} ({{ order.supplier.phone }}){% endif %} · Warehouse: {{ order.warehouse.name }}{% if order.supplier_ref %} · Supplier ref: {{ order.supplier_ref }}{% endif %}{% if order.expected_date %} · Expected {{ order.expected_date|date:"d M Y" }}{% endif %}</p>
+    </div>
+    <div class="page-actions">
+      {% if can_return %}<a class="ui-btn ui-btn-secondary" href="{% url 'suppliers:purchase_return' order.pk %}">{% icon "arrow-left" "w-4 h-4" %}<span>Return to supplier</span></a>{% endif %}
+      {% if perms.suppliers.change_purchaseorder and not erp_managed %}<a class="ui-btn ui-btn-secondary" href="{% url 'suppliers:purchase_edit' order.pk %}">{% icon "pencil" "w-4 h-4" %}<span>Edit</span></a>{% endif %}
+    </div>
+  </div>
+
+  <div class="ui-kpi-grid">
+    {% ui "kpi" label="Order total" icon="receipt" value=order.total_amount|floatformat:"2g" foot=cs %}
+    {% if returned %}{% ui "kpi" label="Sent back" icon="arrow-left" value=returned|floatformat:"2g" foot="credited by the supplier" %}{% endif %}
+    {% ui "kpi" label="Paid" icon="cash" value=order.paid_amount|floatformat:"2g" foot=cs %}
+    {% ui "kpi" label=due_label icon="clock" value=due_abs|floatformat:"2g" foot=cs %}
+  </div>
+
+  {% component "card" title="Items" flush=True %}
+  <div class="ui-table-wrap" style="border:0;box-shadow:none"><table class="ui-table ui-table-cards">
+    <thead><tr><th>Product</th><th class="num">Qty</th><th class="num">Cost price</th><th class="num">Line total</th></tr></thead>
+    <tbody>
+      {% for item in order.items.all %}
+      <tr>
+        <td data-label="Product"><div class="ui-cell-title">{{ item.variant.product.name }}</div><div class="ui-cell-sub">{% if item.variant.name %}{{ item.variant.name }} · {% endif %}{{ item.variant.sku }}</div></td>
+        <td data-label="Qty" class="num">{{ item.quantity|floatformat:"-3" }}</td>
+        <td data-label="Cost price" class="num">{{ item.cost_price|floatformat:"2g" }}</td>
+        <td data-label="Line total" class="num"><strong>{{ item.line_total|floatformat:"2g" }}</strong></td>
+      </tr>
+      {% empty %}<tr><td colspan="4" class="ui-muted" style="text-align:center;padding:24px">No items.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+  {% if order.note %}<p class="ui-help" style="padding:0 16px 14px;margin:0">Note: {{ order.note }}</p>{% endif %}
+  {% endcomponent %}
+
+  {% if returns %}
+  {% component "card" title="Returned to the supplier" flush=True %}
+  <div class="ui-table-wrap" style="border:0;box-shadow:none"><table class="ui-table ui-table-cards">
+    <thead><tr><th>Return</th><th>Products</th><th>Reason</th><th class="num">Value</th></tr></thead>
+    <tbody>{% for r in returns %}<tr>
+      <td data-label="Return"><div class="ui-cell-title">{{ r.reference }}</div><div class="ui-cell-sub">{{ r.created_at|date:"d M Y, H:i" }}</div></td>
+      <td data-label="Products">{% for i in r.items.all %}{{ i.variant }} × {{ i.quantity|floatformat:"-3" }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</td>
+      <td data-label="Reason">{{ r.reason|default:"—" }}</td>
+      <td data-label="Value" class="num">{{ r.value|floatformat:"2g" }}</td>
+    </tr>{% endfor %}</tbody></table></div>
+  {% endcomponent %}
+  {% endif %}
+
+  {% component "card" title="Payments" flush=True %}
+  {% if order.payments.all %}
+  <div class="ui-table-wrap" style="border:0;box-shadow:none"><table class="ui-table ui-table-cards">
+    <thead><tr><th>Payment</th><th>Method</th><th>Date</th><th class="num">Amount</th></tr></thead>
+    <tbody>{% for p in order.payments.all %}<tr>
+      <td data-label="Payment"><div class="ui-cell-title">{{ p.reference }}</div>{% if p.note %}<div class="ui-cell-sub">{{ p.note }}</div>{% endif %}</td>
+      <td data-label="Method">{{ p.get_method_display }}</td><td data-label="Date">{{ p.paid_on|date:"d M Y" }}</td>
+      <td data-label="Amount" class="num"><strong>{{ p.amount|floatformat:"2g" }}</strong></td>
+    </tr>{% endfor %}</tbody></table></div>
+  {% else %}<p class="ui-muted" style="padding:20px 16px;margin:0">No payment records yet.</p>{% endif %}
+  {% endcomponent %}
+
+  {% if order.due_amount > 0 %}
+  <form id="add-payment" method="post" class="ui-card" style="padding:16px">
+    {% csrf_token %}
+    <h2 class="ui-cell-title" style="margin-bottom:10px">Record a payment</h2>
+    <div class="ui-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));align-items:end">
+      <div class="ui-field"><label class="ui-label" for="{{ payment_form.amount.id_for_label }}">Amount</label>{{ payment_form.amount }}</div>
+      <div class="ui-field"><label class="ui-label" for="{{ payment_form.method.id_for_label }}">Method</label>{{ payment_form.method }}</div>
+      <div class="ui-field"><label class="ui-label" for="{{ payment_form.paid_on.id_for_label }}">Paid on</label>{{ payment_form.paid_on }}</div>
+      <div class="ui-field"><label class="ui-label" for="{{ payment_form.note.id_for_label }}">Note</label>{{ payment_form.note }}</div>
+    </div>
+    {% for e in payment_form.non_field_errors %}<p class="ui-error">{{ e }}</p>{% endfor %}
+    {% for f in payment_form %}{% for e in f.errors %}<p class="ui-error">{{ f.label }}: {{ e }}</p>{% endfor %}{% endfor %}
+    <div style="margin-top:12px"><button type="submit" class="ui-btn ui-btn-primary">Add payment</button></div>
+  </form>
+  {% endif %}
+</div>
+{% endwith %}
+{% endblock %}

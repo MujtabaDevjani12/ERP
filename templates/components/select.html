@@ -1,0 +1,10 @@
+{# Plain select: {% ui "select" name="status" label="Status" options=choices selected=value placeholder="All" %}  (options = [(value, label), ...]) #}
+<div class="ui-field {{ css }}">
+  {% if label %}<label class="ui-label" for="{{ id|default:name }}">{{ label }}{% if required %} <span style="color:var(--ui-danger)">*</span>{% endif %}</label>{% endif %}
+  <select name="{{ name }}" id="{{ id|default:name }}"{% if required %} required{% endif %}{% if error %} aria-invalid="true"{% endif %}{% if attrs %} {{ attrs|safe }}{% endif %}>
+    {% if placeholder %}<option value="">{{ placeholder }}</option>{% endif %}
+    {% for opt in options %}<option value="{{ opt.0 }}"{% if opt.0|stringformat:"s" == selected|stringformat:"s" %} selected{% endif %}>{{ opt.1 }}</option>{% endfor %}
+  </select>
+  {% if help %}<p class="ui-help">{{ help }}</p>{% endif %}
+  {% if error %}<p class="ui-error">{{ error }}</p>{% endif %}
+</div>

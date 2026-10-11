@@ -1,0 +1,54 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}ERP dashboard{% endblock %}
+{% block content %}
+<div class="space-y-5">
+  <div class="page-header">
+    <div class="min-w-0">
+      <h1 class="page-title">ERP dashboard</h1>
+      <p class="page-subtitle">{{ company }} &mdash; you only see the modules your role can access.</p>
+    </div>
+  </div>
+
+  {% for block in blocks %}
+  <section aria-label="{{ block.title }}">
+    <h2 class="ui-section-title" style="margin-bottom:10px">{{ block.title }}</h2>
+    <div class="ui-kpi-grid">
+      {% for k in block.kpis %}{% ui "kpi" label=k.label value=k.value %}{% endfor %}
+    </div>
+  </section>
+  {% empty %}
+  {% ui "empty_state" title="Nothing to show yet" message="There is no ERP data for your role yet." %}
+  {% endfor %}
+
+  {% if trend %}
+  <section class="ui-card" style="padding:16px 18px" aria-label="POS sales, last 14 days">
+    <h2 class="ui-card-title" style="margin-bottom:14px">POS sales, last 14 days</h2>
+    <div style="display:flex;align-items:flex-end;gap:6px;height:150px">
+      {% for t in trend %}
+      <div style="flex:1;min-width:0;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end" title="{{ t.day }}: {{ t.total }}">
+        <div style="width:100%;border-radius:8px 8px 3px 3px;background:var(--brand-500);min-height:3px;height:{{ t.pct }}%"></div>
+        <div style="font-size:10.5px;color:var(--ui-text-3);margin-top:6px">{{ t.day|date:"d" }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if reports %}
+  <section aria-label="Reports">
+    <h2 class="ui-section-title" style="margin-bottom:10px">Reports</h2>
+    <div class="ui-grid ui-grid-3">
+      {% regroup reports by group as groups %}
+      {% for g in groups %}
+      <div class="ui-card" style="padding:16px 18px">
+        <h3 class="ui-card-title" style="margin-bottom:8px">{{ g.grouper }}</h3>
+        <div style="display:grid;gap:2px">
+          {% for r in g.list %}<a class="ui-menu-item" style="padding-left:6px" href="{% url 'reports_erp:report' r.key %}">{{ r.title }}</a>{% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

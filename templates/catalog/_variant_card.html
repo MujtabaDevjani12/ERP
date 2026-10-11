@@ -1,0 +1,53 @@
+{% load ui %}{# One variant as a table-style row. Same formset field names as before, so saving is unchanged. #}
+<div class="pv-row" data-variant {% if not vf.instance.pk %}data-new{% endif %}>
+  {% for hidden in vf.hidden_fields %}{{ hidden }}{% endfor %}
+  <div class="pv-main">
+    <div class="pv-cell pv-name" data-label="Variant name" data-cell="name">{{ vf.name }}{% for e in vf.name.errors %}<p class="ui-error">{{ e }}</p>{% endfor %}</div>
+    <div class="pv-cell" data-label="Cost" data-cell="cost_price">{{ vf.cost_price }}{% for e in vf.cost_price.errors %}<p class="ui-error">{{ e }}</p>{% endfor %}</div>
+    <div class="pv-cell" data-label="Selling price" data-cell="selling_price">{{ vf.selling_price }}{% for e in vf.selling_price.errors %}<p class="ui-error">{{ e }}</p>{% endfor %}</div>
+    <div class="pv-cell pv-qty" data-cell="opening_stock" data-label="{% if vf.instance.pk %}In stock{% else %}Opening qty{% endif %}">
+      {% if vf.instance.pk %}<span class="pv-onhand" title="Stock on hand in all warehouses">{{ vf.on_hand|default:0|floatformat:"-3" }}</span>
+      {% else %}{{ vf.opening_stock }}{% for e in vf.opening_stock.errors %}<p class="ui-error">{{ e }}</p>{% endfor %}{% endif %}
+    </div>
+    <div class="pv-cell pv-barcode" data-label="Barcode value" data-cell="barcode">{{ vf.barcode }}{% for e in vf.barcode.errors %}<p class="ui-error">{{ e }}</p>{% endfor %}</div>
+    <div class="pv-cell pv-act">
+      <button type="button" class="pv-icon" data-act="more" aria-expanded="{% if vf.sku.errors or vf.attribute_values.errors or vf.image.errors or vf.non_field_errors %}true{% else %}false{% endif %}" aria-label="More options for this variant" title="SKU, attributes, picture">{% icon "sliders" "w-4 h-4" %}</button>
+      {% if vf.instance.pk %}
+        {% if vf.DELETE %}<label class="pv-icon pv-del" title="Remove this variant" aria-label="Remove this variant">{{ vf.DELETE }}{% icon "trash" "w-4 h-4" %}</label>{% endif %}
+      {% else %}
+        <button type="button" class="pv-icon pv-del" title="Remove this row" aria-label="Remove this row" data-act="remove-row">{% icon "x" "w-4 h-4" %}</button>
+      {% endif %}
+    </div>
+  </div>
+  <p class="pv-gone-tag">This variant will be removed when you save (kept but switched off if it was already sold or bought).</p>
+  <div class="pv-more" data-more {% if not vf.sku.errors and not vf.attribute_values.errors and not vf.image.errors and not vf.non_field_errors %}hidden{% endif %}>
+    {% if vf.non_field_errors %}<div class="ui-alert ui-alert-danger" role="alert">{% for e in vf.non_field_errors %}<div>{{ e }}</div>{% endfor %}</div>{% endif %}
+    <div class="ui-grid ui-grid-3">
+      {% ui "field" field=vf.sku %}
+      {% ui "field" field=vf.image %}
+      {% ui "field" field=vf.is_active %}
+    </div>
+    <div data-attr-wrap>
+      {% with groups=vf.attribute_groups %}
+      <span class="ui-label">Attributes <span class="ui-help" style="font-weight:500">(pick one value for each, e.g. Size = Large and Color = Red)</span></span>
+      {% if groups %}
+      <div class="pf-attrs">
+        {% for g in groups %}
+        <div class="pf-attr">
+          <span class="pf-attr-name">{{ g.name }}</span>
+          <div class="pf-attr-opts" role="group" aria-label="{{ g.name }}">
+            {% for o in g.options %}<label for="{{ o.id }}"><input type="checkbox" id="{{ o.id }}" name="{{ o.html_name }}" value="{{ o.value }}" {% if o.checked %}checked{% endif %} data-attr><span>{{ o.label }}</span></label>{% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <p class="ui-help">The variant name is filled in from your choices. Type your own name any time.</p>
+      {% else %}
+      <p class="pf-note">No attributes yet. <a class="erp-link" href="{% url 'catalog:attribute_list' %}" target="_blank" rel="noopener">Create attributes such as Size or Color</a>, then reload this page to pick them. Or simply type a variant name.</p>
+      {% endif %}
+      {% endwith %}
+      {% for e in vf.attribute_values.errors %}<p class="ui-error">{{ e }}</p>{% endfor %}
+    </div>
+    {% if vf.instance.pk and vf.instance.barcode %}<a class="ui-btn ui-btn-ghost ui-btn-sm" style="justify-self:start" href="{% url 'catalog:barcode_print' %}?variant={{ vf.instance.pk }}" target="_blank" rel="noopener">{% icon "tag" "w-4 h-4" %}<span>Print barcode label</span></a>{% endif %}
+  </div>
+</div>

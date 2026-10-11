@@ -1,0 +1,8 @@
+{% load ui %}
+<div class="st-body">
+  <div class="st-links">
+    <a href="{% url 'pricing:tax_list' %}" class="st-link"><span class="st-row-ico">{% icon "percent" "w-4 h-4" %}</span><span><b>Tax rates</b><small>GST / sales tax rates and how they are applied</small></span>{% icon "chevron-right" "w-4 h-4" %}</a>
+    <a href="{% url 'pricing:discount_list' %}" class="st-link"><span class="st-row-ico">{% icon "tag" "w-4 h-4" %}</span><span><b>Discounts</b><small>Promotions and automatic discounts</small></span>{% icon "chevron-right" "w-4 h-4" %}</a>
+    <a href="{% url 'pricing:group_list' %}" class="st-link"><span class="st-row-ico">{% icon "users" "w-4 h-4" %}</span><span><b>Customer groups</b><small>Group-wide price rules</small></span>{% icon "chevron-right" "w-4 h-4" %}</a>
+  </div>
+</div>

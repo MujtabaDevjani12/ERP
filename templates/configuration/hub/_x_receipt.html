@@ -1,0 +1,46 @@
+{% load ui %}
+{# Live preview of the receipt designer: the real print page, fed with a sample sale and whatever is currently typed in the form. #}
+<aside class="rp-preview" aria-label="Receipt preview" data-url="{% url 'configuration:receipt_preview' %}">
+  <div class="rp-head">
+    <b>Live preview</b>
+    <span class="dx-cap">Sample sale — nothing here is saved until you press Save</span>
+  </div>
+  <div class="rp-frame-wrap" id="rp-wrap">
+    <iframe id="rp-frame" title="Receipt preview" loading="lazy"></iframe>
+  </div>
+  <div class="st-hint" style="margin-top:.75rem"><b>Business details</b> (name, address, phone, tax number) come from <a href="{% url 'configuration:hub_section' 'business' %}" class="dx-link-inline">Settings › Business</a>; the logo and brand colour from <a href="{% url 'configuration:hub_section' 'branding' %}" class="dx-link-inline">Logo &amp; colours</a>.</div>
+</aside>
+<script>
+(function () {
+  var form = document.getElementById('st-main-form'), frame = document.getElementById('rp-frame'), wrap = document.getElementById('rp-wrap');
+  var box = document.querySelector('.rp-preview');
+  if (!form || !frame || !box) return;
+  var names = ['paper','style','header_align','font_style','font_size','title_text','header_note','accent_color','use_brand_color',
+    'show_logo','show_address','show_contact','show_tax_number','show_biller','show_warehouse','show_item_sku','show_item_discount',
+    'show_item_tax','show_payments','show_notes','footer_text','terms_and_conditions'];
+  var timer = null;
+  function query() {
+    var p = new URLSearchParams();
+    names.forEach(function (n) {
+      var el = form.elements[n]; if (!el) return;
+      p.set(n, el.type === 'checkbox' ? (el.checked ? '1' : '0') : el.value);
+    });
+    return p.toString();
+  }
+  function fit() {
+    // the page is a fixed width (A4 794px / roll 302px); scale the frame so the whole sheet shows in the panel
+    var paper = form.elements.paper ? form.elements.paper.value : 'a4';
+    var w = paper === 'a4' ? 840 : (paper === 'thermal80' ? 340 : 260);
+    var avail = wrap.clientWidth || w, scale = Math.min(1, avail / w);
+    frame.style.width = w + 'px'; frame.style.transform = 'scale(' + scale + ')'; frame.style.transformOrigin = 'top left';
+    frame.style.height = paper === 'a4' ? '1100px' : '720px';
+    wrap.style.height = (parseFloat(frame.style.height) * scale) + 'px';
+  }
+  function brand() { var cb = form.elements.use_brand_color, ac = form.elements.accent_color; if (cb && ac) { ac.disabled = cb.checked; ac.style.opacity = cb.checked ? '.45' : ''; } }
+  function refresh() { brand(); fit(); frame.src = box.getAttribute('data-url') + '?' + query(); }
+  function later() { clearTimeout(timer); timer = setTimeout(refresh, 250); }
+  form.addEventListener('input', later); form.addEventListener('change', later);
+  window.addEventListener('resize', fit);
+  refresh();
+})();
+</script>

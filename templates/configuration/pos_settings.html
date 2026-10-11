@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}POS configuration{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto">
+  <div class="flex items-center gap-3 mb-1">
+    <h1 class="text-xl font-bold text-ink">POS Configuration</h1>
+    <span class="text-xs bg-brand-50 text-brand-700 px-2 py-0.5 rounded-full font-medium">{{ current_store.name }}</span>
+  </div>
+  <p class="text-sm text-gray-500 mb-5">Billing screen behaviour — each store/branch can have its own settings. System-wide options are in <a href="{% url 'configuration:system_settings' %}" class="text-brand-600 hover:underline">System Configuration</a>.</p>
+
+  <form method="post" class="space-y-5">
+    {% csrf_token %}
+
+    <div class="bg-white rounded-xl border border-gray-200 card-shadow p-6">
+      <h2 class="text-sm font-semibold text-ink mb-4">Display</h2>
+      <div class="grid grid-cols-2 gap-4">
+        {% for field in form %}
+          {% if field.name in "products_per_page,pos_access_pin,default_category,default_biller,default_customer,default_warehouse,show_clock,require_customer,on_screen_keyboard,product_button_color,show_tooltips,rounding,item_order,after_sale_page,show_customer_details_on_receipt" %}
+          <div class="{% if field.name == 'product_button_color' %}col-span-2{% endif %}">
+            <label class="block text-xs font-medium text-gray-700 mb-1">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}<p class="text-[11px] text-gray-400 mt-1">{{ field.help_text }}</p>{% endif %}
+          </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 card-shadow p-6">
+      <h2 class="text-sm font-semibold text-ink mb-4">Printing</h2>
+      <div class="grid grid-cols-2 gap-4">
+        {% for field in form %}
+          {% if field.name in "printing_mode,receipt_custom_field1_title,receipt_custom_field1_value,receipt_custom_field2_title,receipt_custom_field2_value" %}
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">{{ field.label }}</label>
+            {{ field }}
+          </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+      <p class="text-[11px] text-gray-400 mt-3">Browser printing is fine for a local install; on a live server, run a local print server.</p>
+    </div>
+
+    <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold px-6 py-2.5 rounded-lg">Save POS configuration</button>
+  </form>
+</div>
+{% endblock %}

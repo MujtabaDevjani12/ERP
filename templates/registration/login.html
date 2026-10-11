@@ -1,0 +1,26 @@
+{% extends "registration/_auth_shell.html" %}{% load ui %}
+{% block title %}Sign in{% endblock %}
+{% block lx_title %}Welcome back{% endblock %}
+{% block lx_lead %}Sign in to continue to your dashboard.{% endblock %}
+{% block lx_form %}
+<form method="post" novalidate class="lx-form">
+  {% csrf_token %}
+  {% if form.errors %}
+    <div class="ui-alert ui-alert-danger" role="alert">{% icon "error" "w-4 h-4" %}<div>{% for e in form.non_field_errors %}{{ e }}{% empty %}Please check your username and password.{% endfor %}</div></div>
+  {% endif %}
+  <div class="lx-field">
+    <label for="id_username">Username</label>
+    <div class="lx-input"><span class="lx-in-ico">{% icon "user" "w-4 h-4" %}</span>
+      <input type="text" name="username" id="id_username" value="{{ form.username.value|default:'' }}" required autofocus autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Your username"></div>
+  </div>
+  <div class="lx-field" x-data="{ show: false }">
+    <div class="lx-label-row"><label for="id_password">Password</label><a href="{% url 'accounts:password_reset' %}" class="lx-link">Forgot password?</a></div>
+    <div class="lx-input"><span class="lx-in-ico">{% icon "lock" "w-4 h-4" %}</span>
+      <input type="password" :type="show ? 'text' : 'password'" name="password" id="id_password" required autocomplete="current-password" placeholder="Your password">
+      <button type="button" class="lx-eye" @click="show = !show" :aria-label="show ? 'Hide password' : 'Show password'" :aria-pressed="show">{% icon "eye" "w-4 h-4" %}</button></div>
+  </div>
+  <label class="lx-check"><input type="checkbox" name="remember" value="1" checked><span>Keep me signed in on this device</span></label>
+  <input type="hidden" name="next" value="{{ next }}">
+  <button type="submit" class="lx-btn">{% icon "lock" "w-4 h-4" %}<span>Sign in</span></button>
+</form>
+{% endblock %}

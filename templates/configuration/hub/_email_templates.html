@@ -1,0 +1,46 @@
+{% load ui %}
+{% if form %}
+  <form method="post" novalidate class="st-form">
+    {% csrf_token %}
+    {% if editing %}<input type="hidden" name="pk" value="{{ editing.pk }}">{% endif %}
+    <div class="st-body">
+      {% if form.non_field_errors %}<div class="ui-alert ui-alert-danger" role="alert">{% icon "error" "w-4 h-4" %}<div>{% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}</div></div>{% endif %}
+      <div class="st-grid cols-1">
+        {% for f in form %}{% ui "field" field=f %}{% endfor %}
+      </div>
+      <div class="st-hint">
+        <b>Placeholders you can use</b>
+        <div class="st-chips"><code>{% templatetag openvariable %} customer_name {% templatetag closevariable %}</code><code>{% templatetag openvariable %} reference {% templatetag closevariable %}</code><code>{% templatetag openvariable %} total {% templatetag closevariable %}</code><code>{% templatetag openvariable %} store_name {% templatetag closevariable %}</code></div>
+      </div>
+    </div>
+    <div class="st-foot">
+      <a href="{% url 'configuration:hub_section' 'email-templates' %}" class="ui-btn ui-btn-secondary">Cancel</a>
+      <button type="submit" class="ui-btn ui-btn-primary">{% icon "check-mark" "w-4 h-4" %}<span>Save template</span></button>
+    </div>
+  </form>
+{% else %}
+  <div class="st-body">
+    <div class="st-list">
+      {% for t in templates_list %}
+        <div class="st-row">
+          <span class="st-row-ico">{% icon "mail" "w-4 h-4" %}</span>
+          <div class="min-w-0"><b>{{ t.name }}</b><span class="dx-row-meta">{{ t.subject }}</span></div>
+          {% if t.is_default %}<span class="ui-badge ui-badge-success" style="margin-left:auto">In use</span>{% endif %}
+          <span class="st-row-actions"{% if not t.is_default %} style="margin-left:auto"{% endif %}>
+            <a href="?edit={{ t.pk }}" class="ui-btn ui-btn-secondary" style="height:34px">Edit</a>
+            {% if perms.documents.delete_emailtemplate %}
+              <form method="post" data-confirm="Delete this template?|“{{ t.name }}” will be removed. Invoice emails fall back to the standard wording.|Delete">
+                {% csrf_token %}<input type="hidden" name="action" value="delete"><input type="hidden" name="pk" value="{{ t.pk }}">
+                <button type="submit" class="ui-btn ui-btn-secondary" style="height:34px" aria-label="Delete {{ t.name }}">{% icon "trash" "w-4 h-4" %}</button>
+              </form>
+            {% endif %}
+          </span>
+        </div>
+      {% empty %}
+        <div class="dx-empty"><span class="dx-ico">{% icon "mail" "w-4 h-4" %}</span>No template yet — invoice emails use the standard wording.</div>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="st-foot"><span class="dx-cap">The template marked “In use” is sent with every invoice email.</span>
+    {% if perms.documents.add_emailtemplate %}<a href="?new=1" class="ui-btn ui-btn-primary">{% icon "plus" "w-4 h-4" %}<span>New template</span></a>{% endif %}</div>
+{% endif %}

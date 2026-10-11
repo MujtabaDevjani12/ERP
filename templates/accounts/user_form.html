@@ -1,0 +1,64 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{% if staff_user %}Edit user{% else %}New user{% endif %}{% endblock %}
+{% block content %}
+<div class="ui-form-wrap space-y-4" style="max-width:56rem">
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{% url 'accounts:staff_user_list' %}">Staff users</a><span class="sep">/</span><span>{% if staff_user %}{{ staff_user.username }}{% else %}New{% endif %}</span></nav>
+      <h1 class="page-title">{% if staff_user %}Edit user <span class="ui-muted" style="font-weight:500">{{ staff_user.username }}</span>{% else %}New user{% endif %}</h1>
+      <p class="page-subtitle">Sign-in details, which branch they work in and what they may do.</p>
+    </div>
+  </div>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="ui-alert ui-alert-danger" role="alert" style="margin-bottom:var(--sp-4)">{% icon "error" "w-4 h-4" %}<div>{% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}</div></div>{% endif %}
+
+    <section class="ui-form-section">
+      <header><h2>Account</h2><p>How this person signs in.</p></header>
+      <div class="body ui-grid ui-grid-2">
+        {% ui "field" field=form.username %}
+        {% ui "field" field=form.password %}
+      </div>
+    </section>
+
+    <section class="ui-form-section">
+      <header><h2>Profile</h2></header>
+      <div class="body ui-grid ui-grid-2">
+        {% ui "field" field=form.first_name %}
+        {% ui "field" field=form.last_name %}
+        {% ui "field" field=form.email %}
+        {% ui "field" field=form.phone %}
+        {% ui "field" field=form.store %}
+      </div>
+    </section>
+
+    <section class="ui-form-section">
+      <header><h2>Access</h2><p>What they appear as and what they may open.</p></header>
+      <div class="body space-y-4">
+        <div class="ui-grid ui-grid-3">
+          {% ui "field" field=form.is_biller %}
+          {% ui "field" field=form.is_staff %}
+          {% ui "field" field=form.is_active %}
+        </div>
+        <div>
+          <div class="ui-label">Roles</div>
+          <div class="flex flex-wrap gap-2" style="margin-top:6px">
+            {% for choice in form.groups %}
+            <label class="ui-chip-check">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>
+            {% empty %}
+            <p class="ui-help">No roles created yet - <a href="{% url 'accounts:role_add' %}" style="text-decoration:underline">create one first</a>.</p>
+            {% endfor %}
+          </div>
+          {% for e in form.groups.errors %}<p class="ui-error">{{ e }}</p>{% endfor %}
+        </div>
+      </div>
+    </section>
+
+    <div class="ui-sticky-actions">
+      <a href="{% url 'accounts:staff_user_list' %}" class="ui-btn ui-btn-secondary">Cancel</a>
+      <button type="submit" class="ui-btn ui-btn-primary">{% icon "check-mark" "w-4 h-4" %}<span>Save user</span></button>
+    </div>
+  </form>
+</div>
+{% endblock %}

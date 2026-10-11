@@ -1,0 +1,21 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Confirm delete{% endblock %}
+{% block content %}
+<div style="max-width:30rem;margin:var(--sp-8) auto 0">
+  <div class="ui-card">
+    <div class="ui-card-body text-center space-y-4">
+      <div class="ui-empty-icon" style="background:var(--ui-danger-soft);color:var(--ui-danger);margin-bottom:0">{% icon "trash" "w-6 h-6" %}</div>
+      <div>
+        <h1 class="page-title" style="font-size:18px">Delete this record?</h1>
+        <p class="page-subtitle">This permanently removes the entry. Records that other documents depend on may be refused.</p>
+      </div>
+      <div class="ui-card" style="box-shadow:none;background:var(--ui-surface-2)"><div class="ui-card-body" style="padding:var(--sp-3)"><div class="ui-cell-sub" style="text-transform:uppercase;letter-spacing:.05em;font-weight:700">Record</div><div class="ui-cell-title" style="word-break:break-word">{{ object }}</div></div></div>
+      <form method="post" class="flex gap-2">
+        {% csrf_token %}
+        <a href="{{ success_url }}" class="ui-btn ui-btn-secondary" style="flex:1">Cancel</a>
+        <button type="submit" class="ui-btn ui-btn-danger" style="flex:1">{% icon "trash" "w-4 h-4" %}<span>Delete</span></button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

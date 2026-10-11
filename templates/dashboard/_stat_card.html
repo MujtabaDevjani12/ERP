@@ -1,0 +1,26 @@
+{% comment %}
+KPI tile for the dashboard's top row (look: static/css/fx-skin.css, section 8).
+Params: label, value (a number), change (a %, or None to hide the badge — no prior-month baseline to compare against),
+caption, icon (sales / purchases / due / expenses), accent (optional; any value makes it the brand-coloured tile).
+{% endcomment %}
+<div class="dx-tile{% if accent %} accent{% endif %}">
+  <div class="dx-tile-top">
+    <span class="dx-ico">
+      {% if icon == "sales" %}
+        <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 14l6-6m-5.5-.5h.01m4.99 5.99h.01M19 9V6a2 2 0 00-2-2H7a2 2 0 00-2 2v3m14 0v9a2 2 0 01-2 2H7a2 2 0 01-2-2V9m14 0H5"/></svg>
+      {% elif icon == "purchases" %}
+        <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+      {% elif icon == "due" %}
+        <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      {% elif icon == "expenses" %}
+        <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V8.25A2.25 2.25 0 0018.75 6H5.25A2.25 2.25 0 003 8.25v9.75A2.25 2.25 0 005.25 21z"/></svg>
+      {% endif %}
+    </span>
+    {% if change is not None %}
+      <span class="dx-delta {% if change >= 0 %}up{% else %}down{% endif %}">{% if change >= 0 %}▲{% else %}▼{% endif %} {{ change|floatformat:1 }}%</span>
+    {% endif %}
+  </div>
+  <p class="dx-label">{{ label }}</p>
+  <p class="dx-value"><small>{{ current_store.currency_symbol }}</small>{{ value|floatformat:"0g" }}</p>
+  <p class="dx-cap">{{ caption }}</p>
+</div>

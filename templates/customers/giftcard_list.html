@@ -1,0 +1,64 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Gift cards{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <h1 class="page-title">Gift cards <span class="ui-badge ui-badge-neutral no-dot" style="vertical-align:middle;margin-left:6px">{{ result_count }}</span></h1>
+      <p class="page-subtitle">Prepaid cards customers can spend at the POS. Every change to a balance is recorded.</p>
+    </div>
+    <div class="page-actions">
+      {% if perms.customers.add_giftcard %}<a class="ui-btn ui-btn-primary" href="{% url 'customers:giftcard_add' %}">{% icon "plus" "w-4 h-4" %}<span>New gift card</span></a>{% endif %}
+    </div>
+  </div>
+
+  <div class="ui-kpi-grid">
+    {% ui "kpi" label="Usable cards" icon="gift" value=n_live foot="with money on them" %}
+    {% ui "kpi" label="Money held on cards" icon="cash" value=owed|floatformat:"2g" foot="what customers can still spend" %}
+  </div>
+
+  <form method="get" class="ui-toolbar">
+    <div class="ui-search"><label class="ui-label" for="g-q">Search</label>{% icon "search" "w-4 h-4" %}
+      <input type="search" id="g-q" name="q" value="{{ request.GET.q }}" placeholder="Card number, customer name or phone" autocomplete="off"></div>
+    <div style="min-width:9rem"><label class="ui-label" for="g-st">Status</label>
+      <select id="g-st" name="status"><option value="">All</option>{% for k, l in status_choices %}<option value="{{ k }}" {% if request.GET.status == k %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+    <div style="width:6rem"><label class="ui-label" for="g-per">Per page</label>
+      <select id="g-per" name="per">{% for n in page_sizes %}<option value="{{ n }}" {% if n == per %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></div>
+    <div class="flex gap-2"><button type="submit" class="ui-btn ui-btn-primary">{% icon "filter" "w-4 h-4" %}<span>Apply</span></button>{% if has_filters %}<a class="ui-btn ui-btn-secondary" href="{% url 'customers:giftcard_list' %}">Reset</a>{% endif %}</div>
+  </form>
+
+  {% if cards %}
+  <div class="ui-table-wrap">
+    <table class="ui-table ui-table-cards">
+      <thead><tr><th>Card</th><th>Customer</th><th class="num">Value</th><th class="num">Balance</th><th>Expires</th><th>Status</th><th class="col-actions"><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody>
+      {% for c in cards %}
+      <tr>
+        <td data-label="Card"><a class="erp-link ui-cell-title" href="{% url 'customers:giftcard_history' c.pk %}">{{ c.code }}</a><div class="ui-cell-sub">{{ c.created_at|date:"d M Y" }}</div></td>
+        <td data-label="Customer">{{ c.customer.name|default:"—" }}</td>
+        <td data-label="Value" class="num">{{ c.initial_balance|floatformat:"2g" }}</td>
+        <td data-label="Balance" class="num"><strong>{{ c.current_balance|floatformat:"2g" }}</strong></td>
+        <td data-label="Expires">{% if c.expires_on %}{{ c.expires_on|date:"d M Y" }}{% else %}<span class="ui-muted">Never</span>{% endif %}</td>
+        <td data-label="Status">
+          {% if not c.is_active %}{% badge "off" label="Switched off" tone="neutral" %}
+          {% elif c.expires_on and c.expires_on < today %}{% badge "expired" label="Expired" tone="danger" %}
+          {% elif c.current_balance <= 0 %}{% badge "used" label="Used up" tone="neutral" %}
+          {% else %}{% badge "ok" label="Usable" tone="success" %}{% endif %}
+        </td>
+        <td class="col-actions" style="white-space:nowrap">
+          {% if perms.customers.change_giftcard and c.is_active %}<button type="button" class="ui-btn ui-btn-secondary ui-btn-sm" data-drawer-url="{% url 'customers:giftcard_topup' c.pk %}" data-drawer-title="Add money to {{ c.code }}">Top up</button>{% endif %}
+          <a class="ui-btn ui-btn-secondary ui-btn-sm" href="{% url 'customers:giftcard_history' c.pk %}">History</a>
+          {% if perms.customers.change_giftcard %}<a class="icon-btn" href="{% url 'customers:giftcard_edit' c.pk %}" aria-label="Edit" data-tip="Edit" data-tip-pos="bottom">{% icon "pencil" "w-4 h-4" %}</a>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% ui "pagination" page_obj=page_obj %}
+  {% else %}
+  {% url 'customers:giftcard_add' as add_url %}
+  <div class="ui-card">{% if has_filters %}{% ui "empty_state" icon="search" title="No gift cards match" text="Try another number or status." %}{% else %}{% ui "empty_state" icon="gift" title="No gift cards yet" text="Create a card, then customers can pay with it at the POS." action_url=add_url action_label="New gift card" %}{% endif %}</div>
+  {% endif %}
+</div>
+{% endblock %}

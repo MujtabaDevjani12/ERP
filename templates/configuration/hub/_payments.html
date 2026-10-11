@@ -1,0 +1,16 @@
+{% load ui %}
+<div class="st-body">
+  <div class="st-list">
+    {% for m in methods %}
+      <div class="st-row">
+        <span class="st-row-ico">{% icon "credit-card" "w-4 h-4" %}</span>
+        <div class="min-w-0"><b>{{ m.name }}</b><span class="dx-row-meta">{% if m.requires_reference %}Asks for a reference / transaction ID{% else %}No reference needed{% endif %}</span></div>
+        <span class="ui-badge {% if m.is_active %}ui-badge-success{% else %}ui-badge-neutral{% endif %}" style="margin-left:auto">{% if m.is_active %}Active{% else %}Off{% endif %}</span>
+      </div>
+    {% empty %}
+      <div class="dx-empty">No payment methods yet.</div>
+    {% endfor %}
+  </div>
+</div>
+<div class="st-foot"><span class="dx-cap">Rename, switch on/off and re-order them on the management page.</span>
+  <a href="{% url 'payments:method_list' %}" class="ui-btn ui-btn-primary">{% icon "sliders" "w-4 h-4" %}<span>Manage payment methods</span></a></div>

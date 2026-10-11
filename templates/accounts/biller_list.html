@@ -1,0 +1,73 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Billers{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <h1 class="page-title">Billers <span class="ui-badge ui-badge-neutral no-dot" style="vertical-align:middle;margin-left:6px">{{ total }}</span></h1>
+      <p class="page-subtitle">The people who can be picked as the seller on a sale. The default biller is pre-selected at the POS.</p>
+    </div>
+    <div class="page-actions">
+      {% if perms.accounts.add_user %}<a class="ui-btn ui-btn-primary" href="{% url 'accounts:staff_user_add' %}?biller=1">{% icon "plus" "w-4 h-4" %}<span>New biller</span></a>{% endif %}
+    </div>
+  </div>
+
+  <div class="ui-grid ui-grid-4 bl-kpis">
+    {% ui "kpi" label="Billers" icon="users" value=total %}
+    {% ui "kpi" label="Active" icon="success" value=active %}
+    {% ui "kpi" label="Sales, last 30 days" icon="receipt" value=count %}
+    {% ui "kpi" label="Value, last 30 days" icon="currency" value=sold|floatformat:2 foot=current_store.currency_symbol %}
+  </div>
+
+  <form method="get" class="ui-toolbar">
+    <div class="ui-search">
+      <label class="ui-label" for="b-q">Search</label>
+      {% icon "search" "w-4 h-4" %}
+      <input type="search" id="b-q" name="q" value="{{ request.GET.q }}" placeholder="Name, username, email or phone" autocomplete="off">
+    </div>
+    <div style="min-width:9rem">
+      <label class="ui-label" for="b-st">Status</label>
+      <select id="b-st" name="status"><option value="">All</option><option value="active" {% if request.GET.status == "active" %}selected{% endif %}>Active</option><option value="inactive" {% if request.GET.status == "inactive" %}selected{% endif %}>Inactive</option></select>
+    </div>
+    <div class="flex gap-2">
+      <button type="submit" class="ui-btn ui-btn-primary">{% icon "filter" "w-4 h-4" %}<span>Apply</span></button>
+      {% if has_filters %}<a class="ui-btn ui-btn-secondary" href="{% url 'accounts:biller_list' %}">Reset</a>{% endif %}
+    </div>
+  </form>
+
+  {% if billers %}
+  <div class="ui-table-wrap">
+    <table class="ui-table ui-table-cards">
+      <thead><tr><th>Biller</th><th>Branch</th><th>Phone</th><th class="num">Sales (30 d)</th><th class="num">Value (30 d)</th><th>Last sale</th><th>Status</th><th class="col-actions"><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody>
+        {% for b in billers %}
+        <tr {% if perms.accounts.add_user %}class="is-clickable" data-href="{% url 'accounts:staff_user_edit' b.pk %}"{% endif %}>
+          <td data-label="Biller"><div class="ui-cell"><span class="ui-avatar-sm">{{ b.get_full_name|default:b.username|slice:":2"|upper }}</span>
+            <div><div class="ui-cell-title">{{ b.get_full_name|default:b.username }}</div><div class="ui-cell-sub">{{ b.username }}{% if b.email %} · {{ b.email }}{% endif %}</div></div></div></td>
+          <td data-label="Branch">{{ b.store.name|default:"All branches" }}</td>
+          <td data-label="Phone">{{ b.phone|default:"—" }}</td>
+          <td data-label="Sales (30 d)" class="num">{{ b.n }}</td>
+          <td data-label="Value (30 d)" class="num">{% money b.value|default:0 %}</td>
+          <td data-label="Last sale" class="ui-nowrap">{% if b.last_sale %}{{ b.last_sale|date:"d M Y, H:i" }}{% else %}<span class="ui-muted">Never</span>{% endif %}</td>
+          <td data-label="Status">
+            {% if b.is_active %}<span class="ui-badge ui-badge-success">Active</span>{% else %}<span class="ui-badge ui-badge-neutral">Inactive</span>{% endif %}
+            {% if b.pk == default_biller_id %}<span class="ui-badge ui-badge-info no-dot">Default</span>{% endif %}
+          </td>
+          <td class="col-actions">
+            <div class="flex gap-1 justify-end">
+              {% if can_default and b.is_active and b.pk != default_biller_id %}
+              <form method="post" action="{% url 'accounts:biller_default' b.pk %}">{% csrf_token %}<button type="submit" class="ui-btn ui-btn-secondary ui-btn-sm" title="Pre-select this biller at the POS">Make default</button></form>
+              {% endif %}
+              {% if perms.accounts.add_user %}<a class="icon-btn" href="{% url 'accounts:staff_user_edit' b.pk %}" data-tip="Edit" aria-label="Edit {{ b }}">{% icon "pencil" "w-4 h-4" %}</a>{% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  {% ui "empty_state" title="No billers found" text="Billers are staff users marked as sellers. Add one, or tick “Seller (biller)” on an existing user." icon="users" %}
+  {% endif %}
+</div>
+{% endblock %}

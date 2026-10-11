@@ -1,0 +1,248 @@
+{% load static %}
+<nav class="flex-1 px-3 py-4 space-y-1.5 text-sm">
+
+  <!-- Core Overview -->
+  <div class="space-y-1">
+    <a href="{% url 'dashboard:home' %}"
+       class="flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-150 {% if request.resolver_match.view_name == 'dashboard:home' %}bg-gradient-to-r from-brand-600 to-brand-700 text-white shadow-md shadow-brand-600/30 font-semibold ring-1 ring-white/10{% else %}text-slate-300 hover:bg-white/[0.08] hover:text-white font-medium{% endif %}">
+      <div class="flex items-center gap-3 min-w-0">
+        <svg class="w-4 h-4 shrink-0 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        <span class="truncate">Dashboard</span>
+      </div>
+      {% if request.resolver_match.view_name == 'dashboard:home' %}
+        <span class="w-1.5 h-1.5 rounded-full bg-white shrink-0"></span>
+      {% endif %}
+    </a>
+
+    <a href="{% url 'register:session_list' %}"
+       class="flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-150 {% if request.resolver_match.app_name == 'register' %}bg-gradient-to-r from-brand-600 to-brand-700 text-white shadow-md shadow-brand-600/30 font-semibold ring-1 ring-white/10{% else %}text-slate-300 hover:bg-white/[0.08] hover:text-white font-medium{% endif %}">
+      <div class="flex items-center gap-3 min-w-0">
+        <svg class="w-4 h-4 shrink-0 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3v-3m-3 3v-3m9-4H3V6a2 2 0 012-2h14a2 2 0 012 2v7z"/></svg>
+        <span class="truncate">Registers</span>
+      </div>
+      {% if request.resolver_match.app_name == 'register' %}
+        <span class="w-1.5 h-1.5 rounded-full bg-white shrink-0"></span>
+      {% endif %}
+    </a>
+  </div>
+
+  <!-- Catalog Section -->
+  <div class="space-y-1 pt-3">
+    <p class="px-3 text-[10px] font-extrabold uppercase tracking-widest text-slate-400/80 mb-1.5 pt-2 border-t border-slate-800/80">Catalog</p>
+    <a href="{% url 'catalog:product_list' %}"
+       class="flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-150 {% if request.resolver_match.app_name == 'catalog' and request.resolver_match.url_name == 'product_list' %}bg-gradient-to-r from-brand-600 to-brand-700 text-white shadow-md shadow-brand-600/30 font-semibold ring-1 ring-white/10{% else %}text-slate-300 hover:bg-white/[0.08] hover:text-white font-medium{% endif %}">
+      <div class="flex items-center gap-3 min-w-0">
+        <svg class="w-4 h-4 shrink-0 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+        <span class="truncate">Products</span>
+      </div>
+      {% if request.resolver_match.app_name == 'catalog' and request.resolver_match.url_name == 'product_list' %}
+        <span class="w-1.5 h-1.5 rounded-full bg-white shrink-0"></span>
+      {% endif %}
+    </a>
+    <a href="{% url 'catalog:category_list' %}"
+       class="flex items-center gap-2.5 px-3 py-1.5 pl-8 rounded-lg transition-all duration-150 text-xs {% if request.resolver_match.url_name == 'category_list' %}bg-white/10 text-white font-semibold{% else %}text-slate-400 hover:text-white hover:bg-white/5{% endif %}">
+      <span class="w-1.5 h-1.5 rounded-full shrink-0 {% if request.resolver_match.url_name == 'category_list' %}bg-brand-400{% else %}bg-slate-600{% endif %}"></span>
+      <span class="truncate">Categories</span>
+    </a>
+    <a href="{% url 'catalog:brand_list' %}"
+       class="flex items-center gap-2.5 px-3 py-1.5 pl-8 rounded-lg transition-all duration-150 text-xs {% if request.resolver_match.url_name == 'brand_list' %}bg-white/10 text-white font-semibold{% else %}text-slate-400 hover:text-white hover:bg-white/5{% endif %}">
+      <span class="w-1.5 h-1.5 rounded-full shrink-0 {% if request.resolver_match.url_name == 'brand_list' %}bg-brand-400{% else %}bg-slate-600{% endif %}"></span>
+      <span class="truncate">Brands</span>
+    </a>
+    <a href="{% url 'catalog:unit_list' %}"
+       class="flex items-center gap-2.5 px-3 py-1.5 pl-8 rounded-lg transition-all duration-150 text-xs {% if request.resolver_match.url_name == 'unit_list' %}bg-white/10 text-white font-semibold{% else %}text-slate-400 hover:text-white hover:bg-white/5{% endif %}">
+      <span class="w-1.5 h-1.5 rounded-full shrink-0 {% if request.resolver_match.url_name == 'unit_list' %}bg-brand-400{% else %}bg-slate-600{% endif %}"></span>
+      <span class="truncate">Units</span>
+    </a>
+    <a href="{% url 'catalog:attribute_list' %}"
+       class="flex items-center gap-2.5 px-3 py-1.5 pl-8 rounded-lg transition-all duration-150 text-xs {% if request.resolver_match.url_name == 'attribute_list' %}bg-white/10 text-white font-semibold{% else %}text-slate-400 hover:text-white hover:bg-white/5{% endif %}">
+      <span class="w-1.5 h-1.5 rounded-full shrink-0 {% if request.resolver_match.url_name == 'attribute_list' %}bg-brand-400{% else %}bg-slate-600{% endif %}"></span>
+      <span class="truncate">Attributes</span>
+    </a>
+  </div>
+
+  <!-- Inventory Section -->
+  <div class="space-y-1 pt-3">
+    <p class="px-3 text-[10px] font-extrabold uppercase tracking-widest text-slate-400/80 mb-1.5 pt-2 border-t border-slate-800/80">Inventory</p>
+    <a href="{% url 'inventory:stock_list' %}"
+       class="flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-150 {% if request.resolver_match.url_name == 'stock_list' %}bg-gradient-to-r from-brand-600 to-brand-700 text-white shadow-md shadow-brand-600/30 font-semibold ring-1 ring-white/10{% else %}text-slate-300 hover:bg-white/[0.08] hover:text-white font-medium{% endif %}">
+      <div class="flex items-center gap-3 min-w-0">
+        <svg class="w-4 h-4 shrink-0 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4M4 12l6-6M4 12l6 6"/></svg>
+        <span class="truncate">Stock Levels</span>
+      </div>
+      {% if request.resolver_match.url_name == 'stock_list' %}
+        <span class="w-1.5 h-1.5 rounded-full bg-white shrink-0"></span>
+      {% endif %}
+    </a>
+    <a href="{% url 'inventory:quantity_adjustment' %}"
+       class="flex items-center gap-2.5 px-3 py-1.5 pl-8 rounded-lg transition-all duration-150 text-xs {% if request.resolver_match.url_name == 'quantity_adjustment' %}bg-white/10 text-white font-semibold{% else %}text-slate-400 hover:text-white hover:bg-white/5{% endif %}">
+      <span class="w-1.5 h-1.5 rounded-full shrink-0 {% if request.resolver_match.url_name == 'quantity_adjustment' %}bg-brand-400{% else %}bg-slate-600{% endif %}"></span>
+      <span class="truncate">Quick Scan Adjust</span>
+    </a>
+    <a href="{% url 'inventory:adjustment_list' %}"
+       class="flex items-center gap-2.5 px-3 py-1.5 pl-8 rounded-lg transition-all duration-150 text-xs {% if request.resolver_match.url_name == 'adjustment_list' %}bg-white/10 text-white font-semibold{% else %}text-slate-400 hover:text-white hover:bg-white/5{% endif %}">
+      <span class="w-1.5 h-1.5 rounded-full shrink-0 {% if request.resolver_match.url_name == 'adjustment_list' %}bg-brand-400{% else %}bg-slate-600{% endif %}"></span>
+      <span class="truncate">Adjustment History</span>
+    </a>
+    <a href="{% url 'inventory:rack_list' %}"
+       class="flex items-center gap-2.5 px-3 py-1.5 pl-8 rounded-lg transition-all duration-150 text-xs {% if request.resolver_match.url_name == 'rack_list' %}bg-white/10 text-white font-semibold{% else %}text-slate-400 hover:text-white hover:bg-white/5{% endif %}">
+      <span class="w-1.5 h-1.5 rounded-full shrink-0 {% if request.resolver_match.url_name == 'rack_list' %}bg-brand-400{% else %}bg-slate-600{% endif %}"></span>
+      <span class="truncate">Racks & Locations</span>
+    </a>
+  </div>
+
+  <!-- Purchasing Section -->
+  <div class="space-y-1 pt-3">
+    <p class="px-3 text-[10px] font-extrabold uppercase tracking-widest text-slate-400/80 mb-1.5 pt-2 border-t border-slate-800/80">Purchasing</p>
+    <a href="{% url 'suppliers:supplier_list' %}"
+       class="flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-150 {% if request.resolver_match.url_name == 'supplier_list' %}bg-gradient-to-r from-brand-600 to-brand-700 text-white shadow-md shadow-brand-600/30 font-semibold ring-1 ring-white/10{% else %}text-slate-300 hover:bg-white/[0.08] hover:text-white font-medium{% endif %}">
+      <div class="flex items-center gap-3 min-w-0">
+        <svg class="w-4 h-4 shrink-0 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m-10 0a2 2 0 100 4 2 2 0 000-4zm10 0a2 2 0 100 4 2 2 0 000-4z"/></svg>
+        <span class="truncate">Suppliers</span>
+      </div>
+      {% if request.resolver_match.url_name == 'supplier_list' %}
+        <span class="w-1.5 h-1.5 rounded-full bg-white shrink-0"></span>
+      {% endif %}
+    </a>
+    <a href="{% url 'suppliers:purchase_list' %}"
+       class="flex items-center gap-2.5 px-3 py-1.5 pl-8 rounded-lg transition-all duration-150 text-xs {% if request.resolver_match.app_name == 'suppliers' and request.resolver_match.url_name != 'supplier_list' %}bg-white/10 text-white font-semibold{% else %}text-slate-400 hover:text-white hover:bg-white/5{% endif %}">
+      <span class="w-1.5 h-1.5 rounded-full shrink-0 {% if request.resolver_match.app_name == 'suppliers' and request.resolver_match.url_name != 'supplier_list' %}bg-brand-400{% else %}bg-slate-600{% endif %}"></span>
+      <span class="truncate">Purchase Orders</span>
+    </a>
+  </div>
+
+  <!-- Sales Section -->
+  <div class="space-y-1 pt-3">
+    <p class="px-3 text-[10px] font-extrabold uppercase tracking-widest text-slate-400/80 mb-1.5 pt-2 border-t border-slate-800/80">Sales & CRM</p>
+    <a href="{% url 'sales:sale_list' %}"
+       class="flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-150 {% if request.resolver_match.app_name == 'sales' %}bg-gradient-to-r from-brand-600 to-brand-700 text-white shadow-md shadow-brand-600/30 font-semibold ring-1 ring-white/10{% else %}text-slate-300 hover:bg-white/[0.08] hover:text-white font-medium{% endif %}">
+      <div class="flex items-center gap-3 min-w-0">
+        <svg class="w-4 h-4 shrink-0 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5-.5h.01m4.99 5.99h.01M19 9V6a2 2 0 00-2-2H7a2 2 0 00-2 2v3m14 0v9a2 2 0 01-2 2H7a2 2 0 01-2-2V9m14 0H5"/></svg>
+        <span class="truncate">All Sales</span>
+      </div>
+      {% if request.resolver_match.app_name == 'sales' %}
+        <span class="w-1.5 h-1.5 rounded-full bg-white shrink-0"></span>
+      {% endif %}
+    </a>
+    <a href="{% url 'customers:customer_list' %}"
+       class="flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-150 {% if request.resolver_match.url_name == 'customer_list' %}bg-gradient-to-r from-brand-600 to-brand-700 text-white shadow-md shadow-brand-600/30 font-semibold ring-1 ring-white/10{% else %}text-slate-300 hover:bg-white/[0.08] hover:text-white font-medium{% endif %}">
+      <div class="flex items-center gap-3 min-w-0">
+        <svg class="w-4 h-4 shrink-0 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 100-8 4 4 0 000 8zm6 0a4 4 0 10-8 0"/></svg>
+        <span class="truncate">Customers</span>
+      </div>
+      {% if request.resolver_match.url_name == 'customer_list' %}
+        <span class="w-1.5 h-1.5 rounded-full bg-white shrink-0"></span>
+      {% endif %}
+    </a>
+    <a href="{% url 'customers:giftcard_list' %}"
+       class="flex items-center gap-2.5 px-3 py-1.5 pl-8 rounded-lg transition-all duration-150 text-xs {% if request.resolver_match.url_name == 'giftcard_list' %}bg-white/10 text-white font-semibold{% else %}text-slate-400 hover:text-white hover:bg-white/5{% endif %}">
+      <span class="w-1.5 h-1.5 rounded-full shrink-0 {% if request.resolver_match.url_name == 'giftcard_list' %}bg-brand-400{% else %}bg-slate-600{% endif %}"></span>
+      <span class="truncate">Gift Cards</span>
+    </a>
+    <a href="{% url 'documents:document_log_list' %}"
+       class="flex items-center gap-2.5 px-3 py-1.5 pl-8 rounded-lg transition-all duration-150 text-xs {% if request.resolver_match.app_name == 'documents' %}bg-white/10 text-white font-semibold{% else %}text-slate-400 hover:text-white hover:bg-white/5{% endif %}">
+      <span class="w-1.5 h-1.5 rounded-full shrink-0 {% if request.resolver_match.app_name == 'documents' %}bg-brand-400{% else %}bg-slate-600{% endif %}"></span>
+      <span class="truncate">Document Logs</span>
+    </a>
+    <a href="{% url 'reports:dashboard' %}"
+       class="flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-150 {% if request.resolver_match.app_name == 'reports' %}bg-gradient-to-r from-brand-600 to-brand-700 text-white shadow-md shadow-brand-600/30 font-semibold ring-1 ring-white/10{% else %}text-slate-300 hover:bg-white/[0.08] hover:text-white font-medium{% endif %}">
+      <div class="flex items-center gap-3 min-w-0">
+        <svg class="w-4 h-4 shrink-0 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2"/></svg>
+        <span class="truncate">Reports & Analytics</span>
+      </div>
+      {% if request.resolver_match.app_name == 'reports' %}
+        <span class="w-1.5 h-1.5 rounded-full bg-white shrink-0"></span>
+      {% endif %}
+    </a>
+  </div>
+
+  <!-- Money & Expenses Section -->
+  <div class="space-y-1 pt-3">
+    <p class="px-3 text-[10px] font-extrabold uppercase tracking-widest text-slate-400/80 mb-1.5 pt-2 border-t border-slate-800/80">Finance & Pricing</p>
+    <a href="{% url 'expenses:expense_list' %}"
+       class="flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-150 {% if request.resolver_match.app_name == 'expenses' and request.resolver_match.url_name != 'category_list' %}bg-gradient-to-r from-brand-600 to-brand-700 text-white shadow-md shadow-brand-600/30 font-semibold ring-1 ring-white/10{% else %}text-slate-300 hover:bg-white/[0.08] hover:text-white font-medium{% endif %}">
+      <div class="flex items-center gap-3 min-w-0">
+        <svg class="w-4 h-4 shrink-0 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .672-3 1.5S10.343 11 12 11s3 .672 3 1.5-1.343 1.5-3 1.5m0-6c1.11 0 2.08.402 2.599 1M12 8V6.5M12 15.5V17m0-9a9 9 0 100 18 9 9 0 000-18z"/></svg>
+        <span class="truncate">Expenses</span>
+      </div>
+      {% if request.resolver_match.app_name == 'expenses' and request.resolver_match.url_name != 'category_list' %}
+        <span class="w-1.5 h-1.5 rounded-full bg-white shrink-0"></span>
+      {% endif %}
+    </a>
+    <a href="{% url 'expenses:category_list' %}"
+       class="flex items-center gap-2.5 px-3 py-1.5 pl-8 rounded-lg transition-all duration-150 text-xs {% if request.resolver_match.url_name == 'category_list' and request.resolver_match.app_name == 'expenses' %}bg-white/10 text-white font-semibold{% else %}text-slate-400 hover:text-white hover:bg-white/5{% endif %}">
+      <span class="w-1.5 h-1.5 rounded-full shrink-0 {% if request.resolver_match.url_name == 'category_list' and request.resolver_match.app_name == 'expenses' %}bg-brand-400{% else %}bg-slate-600{% endif %}"></span>
+      <span class="truncate">Expense Categories</span>
+    </a>
+    <a href="{% url 'pricing:tax_list' %}"
+       class="flex items-center gap-2.5 px-3 py-1.5 pl-8 rounded-lg transition-all duration-150 text-xs {% if request.resolver_match.url_name == 'tax_list' %}bg-white/10 text-white font-semibold{% else %}text-slate-400 hover:text-white hover:bg-white/5{% endif %}">
+      <span class="w-1.5 h-1.5 rounded-full shrink-0 {% if request.resolver_match.url_name == 'tax_list' %}bg-brand-400{% else %}bg-slate-600{% endif %}"></span>
+      <span class="truncate">Taxes</span>
+    </a>
+    <a href="{% url 'pricing:discount_list' %}"
+       class="flex items-center gap-2.5 px-3 py-1.5 pl-8 rounded-lg transition-all duration-150 text-xs {% if request.resolver_match.url_name == 'discount_list' %}bg-white/10 text-white font-semibold{% else %}text-slate-400 hover:text-white hover:bg-white/5{% endif %}">
+      <span class="w-1.5 h-1.5 rounded-full shrink-0 {% if request.resolver_match.url_name == 'discount_list' %}bg-brand-400{% else %}bg-slate-600{% endif %}"></span>
+      <span class="truncate">Discounts</span>
+    </a>
+    <a href="{% url 'pricing:group_list' %}"
+       class="flex items-center gap-2.5 px-3 py-1.5 pl-8 rounded-lg transition-all duration-150 text-xs {% if request.resolver_match.url_name == 'group_list' %}bg-white/10 text-white font-semibold{% else %}text-slate-400 hover:text-white hover:bg-white/5{% endif %}">
+      <span class="w-1.5 h-1.5 rounded-full shrink-0 {% if request.resolver_match.url_name == 'group_list' %}bg-brand-400{% else %}bg-slate-600{% endif %}"></span>
+      <span class="truncate">Customer Price Groups</span>
+    </a>
+  </div>
+
+  <!-- ERP -->
+  {% url 'reports_erp:dashboard' as erp_home_url %}
+  {% if erp_home_url %}
+  <div class="space-y-1 pt-3">
+    <p class="px-3 text-[10px] font-extrabold uppercase tracking-widest text-slate-400/80 mb-1.5 pt-2 border-t border-slate-800/80">ERP</p>
+    <a href="{{ erp_home_url }}" class="flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-150 text-slate-300 hover:bg-white/[0.08] hover:text-white font-medium">
+      <svg class="w-4 h-4 shrink-0 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+      <span class="truncate">ERP Control Center</span>
+    </a>
+  </div>
+  {% endif %}
+
+  <!-- Settings Section -->
+  <div class="space-y-1 pt-3 pb-4">
+    <p class="px-3 text-[10px] font-extrabold uppercase tracking-widest text-slate-400/80 mb-1.5 pt-2 border-t border-slate-800/80">Settings & Admin</p>
+    <a href="{% url 'configuration:pos_settings' %}"
+       class="flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-150 {% if request.resolver_match.url_name == 'pos_settings' %}bg-gradient-to-r from-brand-600 to-brand-700 text-white shadow-md shadow-brand-600/30 font-semibold ring-1 ring-white/10{% else %}text-slate-300 hover:bg-white/[0.08] hover:text-white font-medium{% endif %}">
+      <div class="flex items-center gap-3 min-w-0">
+        <svg class="w-4 h-4 shrink-0 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3" stroke-width="2"/></svg>
+        <span class="truncate">POS Configuration</span>
+      </div>
+      {% if request.resolver_match.url_name == 'pos_settings' %}
+        <span class="w-1.5 h-1.5 rounded-full bg-white shrink-0"></span>
+      {% endif %}
+    </a>
+    <a href="{% url 'configuration:system_settings' %}"
+       class="flex items-center gap-2.5 px-3 py-1.5 pl-8 rounded-lg transition-all duration-150 text-xs {% if request.resolver_match.url_name == 'system_settings' %}bg-white/10 text-white font-semibold{% else %}text-slate-400 hover:text-white hover:bg-white/5{% endif %}">
+      <span class="w-1.5 h-1.5 rounded-full shrink-0 {% if request.resolver_match.url_name == 'system_settings' %}bg-brand-400{% else %}bg-slate-600{% endif %}"></span>
+      <span class="truncate">System & Branding</span>
+    </a>
+    <a href="{% url 'configuration:numbering_prefixes' %}"
+       class="flex items-center gap-2.5 px-3 py-1.5 pl-8 rounded-lg transition-all duration-150 text-xs {% if request.resolver_match.url_name == 'numbering_prefixes' %}bg-white/10 text-white font-semibold{% else %}text-slate-400 hover:text-white hover:bg-white/5{% endif %}">
+      <span class="w-1.5 h-1.5 rounded-full shrink-0 {% if request.resolver_match.url_name == 'numbering_prefixes' %}bg-brand-400{% else %}bg-slate-600{% endif %}"></span>
+      <span class="truncate">Number Prefixes</span>
+    </a>
+    <a href="{% url 'devices:device_list' %}"
+       class="flex items-center gap-2.5 px-3 py-1.5 pl-8 rounded-lg transition-all duration-150 text-xs {% if request.resolver_match.app_name == 'devices' %}bg-white/10 text-white font-semibold{% else %}text-slate-400 hover:text-white hover:bg-white/5{% endif %}">
+      <span class="w-1.5 h-1.5 rounded-full shrink-0 {% if request.resolver_match.app_name == 'devices' %}bg-brand-400{% else %}bg-slate-600{% endif %}"></span>
+      <span class="truncate">Printers & Devices</span>
+    </a>
+    {% if user.is_staff %}
+    <a href="{% url 'accounts:role_list' %}"
+       class="flex items-center gap-2.5 px-3 py-1.5 pl-8 rounded-lg transition-all duration-150 text-xs {% if request.resolver_match.app_name == 'accounts' and 'role' in request.resolver_match.url_name %}bg-white/10 text-white font-semibold{% else %}text-slate-400 hover:text-white hover:bg-white/5{% endif %}">
+      <span class="w-1.5 h-1.5 rounded-full shrink-0 {% if request.resolver_match.app_name == 'accounts' and 'role' in request.resolver_match.url_name %}bg-brand-400{% else %}bg-slate-600{% endif %}"></span>
+      <span class="truncate">Roles & Permissions</span>
+    </a>
+    <a href="{% url 'accounts:staff_user_list' %}"
+       class="flex items-center gap-2.5 px-3 py-1.5 pl-8 rounded-lg transition-all duration-150 text-xs {% if request.resolver_match.app_name == 'accounts' and 'user' in request.resolver_match.url_name %}bg-white/10 text-white font-semibold{% else %}text-slate-400 hover:text-white hover:bg-white/5{% endif %}">
+      <span class="w-1.5 h-1.5 rounded-full shrink-0 {% if request.resolver_match.app_name == 'accounts' and 'user' in request.resolver_match.url_name %}bg-brand-400{% else %}bg-slate-600{% endif %}"></span>
+      <span class="truncate">Staff Users</span>
+    </a>
+    {% endif %}
+  </div>
+</nav>
+

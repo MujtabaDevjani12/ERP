@@ -1,0 +1,101 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{{ title }} · {{ title_plural }}{% endblock %}
+{% block extra_head %}{% include "erp_ui/_head.html" %}{% endblock %}
+{% block content %}
+<div class="ui-form-wrap" x-data="{ tab: 'details' }">
+
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="{{ module_url }}">{{ module_title }}</a><span class="sep">/</span>
+        <a href="{{ list_url }}">{{ title_plural }}</a><span class="sep">/</span>
+        <span>{% if add %}New{% else %}{{ obj }}{% endif %}</span>
+      </nav>
+      <h1 class="page-title" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">{{ title }} {% if status_pill %}{{ status_pill }}{% endif %}</h1>
+      {% if not add and not can_change %}<p class="page-subtitle">View only &mdash; this record can no longer be edited{% if actions %}; use <strong>Actions</strong> for the next step{% endif %}.</p>{% endif %}
+    </div>
+
+    {% if not add %}
+    <div class="page-actions">
+      {% if actions %}
+      {% component "dropdown" label="Actions" icon="bolt" variant="primary" %}
+        <div class="ui-menu-label">Workflow</div>
+        {% for name, label in actions %}
+        <form method="post" action="{% url 'erp_ui:action' app_label model_name obj.pk %}" data-confirm="{{ label }}|Run &ldquo;{{ label }}&rdquo; on this record?|Run">
+          {% csrf_token %}<input type="hidden" name="action" value="{{ name }}"><button type="submit" class="ui-menu-item">{{ label }}</button>
+        </form>
+        {% endfor %}
+      {% endcomponent %}
+      {% endif %}
+      {% if can_delete %}<a class="ui-btn ui-btn-danger-soft" href="{% url 'erp_ui:delete' app_label model_name obj.pk %}">{% icon "trash" "w-4 h-4" %}<span class="hidden sm:inline">Delete</span></a>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  {% if steps %}
+  <div class="ui-card" style="margin-bottom:16px"><div class="ui-card-body" style="padding-top:14px;padding-bottom:14px">{% ui "stepper" steps=steps %}</div></div>
+  {% endif %}
+
+  {% if timeline %}
+  <div class="ui-tabs" role="tablist">
+    <button type="button" class="ui-tab" :class="{ 'is-active': tab === 'details' }" @click="tab = 'details'" role="tab">Details</button>
+    <button type="button" class="ui-tab" :class="{ 'is-active': tab === 'activity' }" @click="tab = 'activity'" role="tab">Activity <span class="ui-badge ui-badge-neutral no-dot" style="margin-left:6px">{{ timeline|length }}</span></button>
+  </div>
+  {% endif %}
+
+  <div x-show="tab === 'details'">
+  {% if form %}
+  <form method="post" enctype="multipart/form-data" novalidate data-ctrl-s>
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+    <div style="margin-bottom:16px">{% for e in form.non_field_errors %}{% ui "alert" tone="danger" message=e %}{% endfor %}</div>
+    {% endif %}
+
+    {% for s in sections %}
+    <section class="ui-form-section">
+      {% if s.title %}<header><h2>{{ s.title }}</h2>{% if s.description %}<p>{{ s.description }}</p>{% endif %}</header>{% endif %}
+      <div class="body ui-grid ui-grid-2">
+        {% for it in s.items %}
+          {% if it.kind == "input" %}
+            {% if it.wide %}{% ui "field" field=it.bound css="ui-span-all" %}{% else %}{% ui "field" field=it.bound %}{% endif %}
+          {% else %}
+          <div><div class="ui-label">{{ it.label }}</div><div style="min-height:1.5rem;color:var(--ui-text)">{{ it.cell.html }}</div></div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </section>
+    {% endfor %}
+
+    {% for block in inline_blocks %}{% include "erp_ui/_inline.html" %}{% endfor %}
+
+    <div class="ui-sticky-actions">
+      <a class="ui-btn ui-btn-ghost" href="{% if add %}{{ list_url }}{% else %}{{ edit_url }}{% endif %}">Cancel</a>
+      {% if add %}<button type="submit" name="_addanother" value="1" class="ui-btn ui-btn-secondary">Save &amp; add another</button>{% endif %}
+      <button type="submit" name="_tolist" value="1" class="ui-btn ui-btn-secondary">Save &amp; back to list</button>
+      <button type="submit" class="ui-btn ui-btn-primary">{% icon "check-mark" "w-4 h-4" %}<span>Save</span></button>
+    </div>
+  </form>
+
+  {% else %}
+    {% for s in sections %}
+    <section class="ui-form-section">
+      {% if s.title %}<header><h2>{{ s.title }}</h2></header>{% endif %}
+      <div class="body ui-grid ui-grid-2">
+        {% for it in s.items %}
+        <div><div class="ui-label">{{ it.label }}</div><div style="min-height:1.5rem;color:var(--ui-text)">{{ it.cell.html }}</div></div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endfor %}
+    {% for block in inline_blocks %}{% include "erp_ui/_inline.html" %}{% endfor %}
+    <p style="margin-top:16px"><a class="ui-btn ui-btn-ghost" href="{{ list_url }}">{% icon "arrow-left" "w-4 h-4" %}<span>Back to {{ title_plural|lower }}</span></a></p>
+  {% endif %}
+  </div>
+
+  {% if timeline %}
+  <div x-show="tab === 'activity'" x-cloak>
+    <section class="ui-form-section"><header><h2>Activity</h2><p>Who did what to this record, newest first (from the audit trail).</p></header><div class="body">{% ui "timeline" items=timeline %}</div></section>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

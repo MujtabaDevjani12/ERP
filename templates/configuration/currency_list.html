@@ -1,0 +1,43 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Currencies{% endblock %}
+{% block content %}
+{% url 'configuration:currency_add' as add_url %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <h1 class="page-title">Currencies</h1>
+      <p class="page-subtitle">Your own currency is the base. Add other currencies with an exchange rate to show prices in them, for example on barcode labels.</p>
+    </div>
+    <div class="page-actions"><a class="ui-btn ui-btn-primary" href="{{ add_url }}">{% icon "plus" "w-4 h-4" %}<span>Add currency</span></a></div>
+  </div>
+
+  <div class="ui-table-wrap">
+    <table class="ui-table">
+      <thead><tr><th>Currency</th><th>Symbol</th><th class="num">Exchange rate</th><th>Status</th><th class="col-actions"><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody>
+        <tr>
+          <td><div class="ui-cell-title">{{ current_store.currency_code }} <span class="ui-badge ui-badge-info no-dot" style="margin-left:6px">Base</span></div><div class="ui-cell-sub">Your main currency, used for all prices in the system</div></td>
+          <td>{{ current_store.currency_symbol }}</td>
+          <td class="num">1.00</td>
+          <td>{% badge "active" label="Always on" %}</td>
+          <td class="col-actions"></td>
+        </tr>
+        {% for c in rows %}
+        <tr>
+          <td><div class="ui-cell-title">{{ c.code }}</div><div class="ui-cell-sub">{{ c.name|default:"—" }}</div></td>
+          <td>{{ c.symbol }}</td>
+          <td class="num ui-nowrap">1 {{ c.code }} = {{ c.rate|floatformat:"-4" }} {{ current_store.currency_code }}</td>
+          <td>{% if c.is_active %}{% badge "active" label="Active" %}{% else %}{% badge "inactive" label="Inactive" tone="neutral" %}{% endif %}</td>
+          <td class="col-actions"><div class="ui-row-actions">
+            <a class="icon-btn" href="{% url 'configuration:currency_edit' c.pk %}" data-tip="Edit" data-tip-pos="bottom" aria-label="Edit">{% icon "pencil" "w-4 h-4" %}</a>
+            <a class="icon-btn" href="{% url 'configuration:currency_delete' c.pk %}" data-tip="Delete" data-tip-pos="bottom" aria-label="Delete" style="color:var(--ui-danger)">{% icon "trash" "w-4 h-4" %}</a>
+          </div></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if not rows %}<p class="ui-help">No extra currencies yet. Add one, for example USD with its rate, then choose it on the <a class="erp-link" href="{% url 'catalog:barcode_print' %}">Print barcodes</a> page.</p>{% endif %}
+  <p class="ui-help">Exchange rates are typed by you and are not updated automatically. Prices stay stored in {{ current_store.currency_code }}; other currencies are converted only when displayed.</p>
+</div>
+{% endblock %}

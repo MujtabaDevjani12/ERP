@@ -1,0 +1,49 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Transfer {{ transfer.reference }}{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{% url 'inventory:transfer_list' %}">Stock transfers</a><span class="sep">/</span><span>{{ transfer.reference }}</span></nav>
+      <h1 class="page-title">{{ transfer.reference }}
+        {% if transfer.status == "draft" %}{% badge transfer.status label=transfer.get_status_display tone="warning" %}{% elif transfer.status == "in_transit" %}{% badge transfer.status label=transfer.get_status_display tone="info" %}{% else %}{% badge transfer.status label=transfer.get_status_display %}{% endif %}</h1>
+      <p class="page-subtitle">{{ transfer.from_warehouse.name }} → {{ transfer.to_warehouse.name }} · created {{ transfer.created_at|date:"d M Y, H:i" }}{% if transfer.created_by %} by {{ transfer.created_by.get_full_name|default:transfer.created_by.username }}{% endif %}</p>
+    </div>
+    <div class="page-actions">
+      {% if can_change %}
+        {% if transfer.status == "draft" %}<form method="post" action="{% url 'inventory:transfer_send' transfer.pk %}" data-confirm="Send this transfer?|The stock will leave {{ transfer.from_warehouse.name }} and be held in transit.|Send">{% csrf_token %}<button class="ui-btn ui-btn-primary">{% icon "truck" "w-4 h-4" %}<span>Send</span></button></form>{% endif %}
+        {% if transfer.status == "in_transit" %}<form method="post" action="{% url 'inventory:transfer_receive' transfer.pk %}" data-confirm="Mark as received?|The stock will be added to {{ transfer.to_warehouse.name }}.|Receive">{% csrf_token %}<button class="ui-btn ui-btn-primary">{% icon "check" "w-4 h-4" %}<span>Mark received</span></button></form>{% endif %}
+        {% if transfer.status == "draft" or transfer.status == "in_transit" %}<form method="post" action="{% url 'inventory:transfer_cancel' transfer.pk %}" data-confirm="Cancel this transfer?|{% if transfer.status == 'in_transit' %}The stock that is on its way goes back to {{ transfer.from_warehouse.name }}.{% else %}Nothing has moved yet.{% endif %}|Cancel transfer">{% csrf_token %}<button class="ui-btn ui-btn-danger-soft">Cancel</button></form>{% endif %}
+      {% endif %}
+      {% if can_delete %}<form method="post" action="{% url 'inventory:transfer_delete' transfer.pk %}" data-confirm="Delete this transfer?|This removes the record.|Delete">{% csrf_token %}<button class="ui-btn ui-btn-secondary" aria-label="Delete">{% icon "trash" "w-4 h-4" %}</button></form>{% endif %}
+    </div>
+  </div>
+
+  {% component "card" title="Progress" %}{% ui "stepper" steps=steps %}{% endcomponent %}
+
+  <div class="ui-grid ui-grid-2" style="align-items:start;grid-template-columns:minmax(0,2fr) minmax(0,1fr)">
+    {% component "card" title="Products" subtitle=total_label flush=True %}
+    <div class="ui-table-wrap" style="border:0;box-shadow:none"><table class="ui-table">
+      <thead><tr><th>Product</th>{% if transfer.status == "draft" %}<th class="num">In source now</th>{% endif %}<th class="num">Quantity</th></tr></thead>
+      <tbody>{% for it in items %}<tr>
+        <td><div class="ui-cell-title">{{ it.variant.product.name }}</div><div class="ui-cell-sub">{% if it.variant.name %}{{ it.variant.name }} · {% endif %}{{ it.variant.sku }}</div></td>
+        {% if transfer.status == "draft" %}<td class="num {% if it.short %}ui-neg{% endif %}">{{ it.available|floatformat:"-3" }}{% if it.short %} <span class="ui-badge ui-badge-danger no-dot">short</span>{% endif %}</td>{% endif %}
+        <td class="num"><strong>{{ it.quantity|floatformat:"-3" }}</strong></td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
+    {% endcomponent %}
+
+    <div class="space-y-4">
+      {% component "card" title="Details" %}
+      <dl class="ui-dl" style="grid-template-columns:minmax(90px,120px) 1fr">
+        <dt>From</dt><dd>{{ transfer.from_warehouse.name }}</dd>
+        <dt>To</dt><dd>{{ transfer.to_warehouse.name }}</dd>
+        {% if transfer.sent_at %}<dt>Sent</dt><dd>{{ transfer.sent_at|date:"d M Y, H:i" }}</dd>{% endif %}
+        {% if transfer.received_at %}<dt>Received</dt><dd>{{ transfer.received_at|date:"d M Y, H:i" }}</dd>{% endif %}
+        {% if transfer.note %}<dt>Note</dt><dd>{{ transfer.note|linebreaksbr }}</dd>{% endif %}
+      </dl>
+      {% endcomponent %}
+    </div>
+  </div>
+</div>
+{% endblock %}

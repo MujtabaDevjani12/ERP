@@ -1,0 +1,48 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Counters{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb"><a href="{% url 'register:session_list' %}">Registers &amp; shifts</a><span class="sep">/</span><span>Counters</span></nav>
+      <h1 class="page-title">Counters <span class="ui-badge ui-badge-neutral no-dot" style="vertical-align:middle;margin-left:6px">{{ counters|length }}</span></h1>
+      <p class="page-subtitle">A counter is a physical POS terminal. Each time it is opened it starts a new register session.</p>
+    </div>
+    <div class="page-actions">
+      {% if perms.register.add_register %}<button type="button" class="ui-btn ui-btn-primary" data-drawer-url="{% url 'register:counter_add' %}" data-drawer-title="New counter">{% icon "plus" "w-4 h-4" %}<span>New counter</span></button>{% endif %}
+    </div>
+  </div>
+
+  {% if counters %}
+  <div class="ui-table-wrap ui-scroll-y">
+    <table class="ui-table">
+      <thead><tr><th>Counter</th><th>Code</th><th>Warehouse</th><th>Assigned users</th><th>Default payment</th><th>Status</th><th class="num">Shifts</th><th class="col-actions"><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody>
+      {% for c in counters %}
+      <tr>
+        <td style="font-weight:600">{{ c.name }}</td>
+        <td>{{ c.code|default:"—" }}</td>
+        <td>{{ c.warehouse.name }}</td>
+        <td>{% for u in c.assigned_users.all %}{{ u.get_full_name|default:u.username }}{% if not forloop.last %}, {% endif %}{% empty %}<span class="ui-help" style="margin:0">Everyone</span>{% endfor %}</td>
+        <td>{{ c.default_method_name|default:"—" }}</td>
+        <td>
+          {% if c.open_now %}<span class="ui-badge ui-badge-success">Open now</span>{% elif c.is_active %}<span class="ui-badge ui-badge-neutral">Active</span>{% else %}<span class="ui-badge ui-badge-danger">Inactive</span>{% endif %}
+        </td>
+        <td class="num">{{ c.shifts }}</td>
+        <td class="col-actions" style="white-space:nowrap">
+          {% if perms.register.change_register %}
+          <button type="button" class="ui-btn ui-btn-secondary ui-btn-sm" data-drawer-url="{% url 'register:counter_edit' c.pk %}" data-drawer-title="Edit counter">Edit</button>
+          <form method="post" action="{% url 'register:counter_toggle' c.pk %}" style="display:inline">{% csrf_token %}
+            <button type="submit" class="ui-btn ui-btn-secondary ui-btn-sm">{% if c.is_active %}Deactivate{% else %}Activate{% endif %}</button></form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="ui-card">{% ui "empty_state" icon="inbox" title="No counters yet" text="Create your first counter to start billing." %}</div>
+  {% endif %}
+</div>
+{% endblock %}

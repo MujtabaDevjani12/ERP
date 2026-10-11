@@ -1,0 +1,88 @@
+{% load ui %}{# Global layers: toasts, confirmation dialog, side drawer, command palette, shortcut help. Included once by base.html. #}
+
+<div class="ui-toasts" aria-live="polite" aria-atomic="false" x-data>
+  <template x-for="t in $store.toasts.items" :key="t.id">
+    <div class="ui-toast" :class="t.type" role="status" x-transition:enter="ui-anim-pop" x-transition:enter-start="from">
+      <span x-show="t.type === 'success'" class="contents">{% icon "success" "ico" %}</span><span x-show="t.type === 'error'" class="contents">{% icon "error" "ico" %}</span><span x-show="t.type === 'warning'" class="contents">{% icon "warning" "ico" %}</span><span x-show="t.type === 'info'" class="contents">{% icon "info" "ico" %}</span>
+      <div class="flex-1 min-w-0" x-text="t.message"></div>
+      <button type="button" class="icon-btn" style="width:24px;height:24px;margin:-2px -4px 0 0" @click="$store.toasts.remove(t.id)" aria-label="Dismiss">{% icon "x" "w-4 h-4" %}</button>
+    </div>
+  </template>
+</div>
+
+<div x-data x-cloak x-show="$store.confirm.open" class="ui-modal" style="z-index:110" @keydown.escape.window="$store.confirm.open && $store.confirm.answer(false)">
+  <div class="ui-overlay" style="position:absolute;z-index:0" x-show="$store.confirm.open" x-transition.opacity @click="$store.confirm.answer(false)"></div>
+  <div class="ui-modal-panel" style="position:relative;z-index:1" role="alertdialog" aria-modal="true" aria-labelledby="ui-confirm-title"
+       x-show="$store.confirm.open" x-transition:enter="ui-anim-pop" x-transition:enter-start="from" x-transition:leave="ui-anim-pop" x-transition:leave-end="from">
+    <h3 class="ui-modal-title" id="ui-confirm-title" x-text="$store.confirm.title"></h3>
+    <p class="ui-modal-text" x-show="$store.confirm.message" x-text="$store.confirm.message"></p>
+    <div class="ui-modal-foot">
+      <button type="button" class="ui-btn ui-btn-secondary" @click="$store.confirm.answer(false)" x-text="$store.confirm.cancelLabel"></button>
+      <button type="button" class="ui-btn" :class="$store.confirm.tone === 'danger' ? 'ui-btn-danger' : 'ui-btn-primary'" @click="$store.confirm.answer(true)"
+              x-text="$store.confirm.confirmLabel" x-effect="if ($store.confirm.open) $nextTick(() => $el.focus())"></button>
+    </div>
+  </div>
+</div>
+
+<div x-data x-cloak x-show="$store.drawer.open" @keydown.escape.window="$store.drawer.open && $store.drawer.close()">
+  <div class="ui-overlay" x-show="$store.drawer.open" x-transition.opacity @click="$store.drawer.close()"></div>
+  <aside class="ui-drawer" role="dialog" aria-modal="true" :aria-label="$store.drawer.title" x-show="$store.drawer.open"
+         x-transition:enter="ui-drawer-slide" x-transition:enter-start="from" x-transition:leave="ui-drawer-slide" x-transition:leave-end="from">
+    <div class="ui-drawer-head">
+      <h3 class="ui-card-title" x-text="$store.drawer.title"></h3>
+      <button type="button" class="icon-btn" @click="$store.drawer.close()" aria-label="Close panel">{% icon "x" "w-5 h-5" %}</button>
+    </div>
+    <div class="ui-drawer-body" data-drawer-body>
+      <div x-show="$store.drawer.loading" class="space-y-3" aria-busy="true">
+        <div class="ui-skeleton" style="height:18px;width:45%"></div><div class="ui-skeleton" style="height:40px"></div>
+        <div class="ui-skeleton" style="height:40px"></div><div class="ui-skeleton" style="height:40px"></div>
+      </div>
+      <div x-show="$store.drawer.error" class="ui-alert ui-alert-danger" x-text="$store.drawer.error"></div>
+      <div x-show="!$store.drawer.loading" x-html="$store.drawer.html"></div>
+    </div>
+  </aside>
+</div>
+
+{% if user.is_authenticated %}
+<div x-data="palette" x-cloak x-show="open" @keydown.escape.window="close()">
+  <div class="ui-overlay" style="z-index:99" x-show="open" x-transition.opacity @click="close()"></div>
+  <div class="ui-palette" role="dialog" aria-modal="true" aria-label="Search" x-show="open" x-transition:enter="ui-anim-pop" x-transition:enter-start="from"
+       @keydown.arrow-down.prevent="move(1)" @keydown.arrow-up.prevent="move(-1)" @keydown.enter.prevent="choose()">
+    <div class="ui-palette-input">
+      {% icon "search" "w-5 h-5 shrink-0" %}
+      <input x-ref="input" x-model="q" @input="onInput()" type="text" placeholder="Search pages, records and actions…" autocomplete="off" spellcheck="false" aria-label="Search">
+      <span class="ui-kbd">Esc</span>
+    </div>
+    <div class="ui-palette-list">
+      <template x-for="(it, i) in items" :key="it.key">
+        <div>
+          <div class="ui-palette-group" x-show="i === 0 || items[i - 1].section !== it.section" x-text="it.section"></div>
+          <a class="ui-palette-item" :class="{ 'is-active': i === index }" :data-idx="i" :href="it.url || '#'" @click.prevent="choose(it)" @mousemove="index = i">
+            <span class="truncate" x-text="it.title"></span><small class="truncate" x-text="it.hint"></small>
+          </a>
+        </div>
+      </template>
+      <p x-show="loading" class="ui-help" style="padding:12px 14px">Searching…</p>
+      <div x-show="!loading && q.trim().length >= 2 && items.length === 0" class="ui-empty" style="padding:28px 16px">
+        <h3>No results</h3><p>Nothing matches “<span x-text="q"></span>”. Try a product name, SKU, customer, reference or page title.</p>
+      </div>
+    </div>
+    <div class="ui-palette-foot"><span><span class="ui-kbd">↑</span> <span class="ui-kbd">↓</span> navigate</span><span><span class="ui-kbd">Enter</span> open</span><span><span class="ui-kbd">Esc</span> close</span></div>
+  </div>
+</div>
+
+<div x-data="{ open: false }" x-cloak x-show="open" class="ui-modal" style="z-index:110" @ui-shortcuts.window="open = true" @keydown.escape.window="open = false">
+  <div class="ui-overlay" style="position:absolute;z-index:0" x-show="open" x-transition.opacity @click="open = false"></div>
+  <div class="ui-modal-panel" style="position:relative;z-index:1" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" x-show="open" x-transition:enter="ui-anim-pop" x-transition:enter-start="from">
+    <div class="flex items-start justify-between gap-3"><h3 class="ui-modal-title">Keyboard shortcuts</h3><button type="button" class="icon-btn" style="margin:-6px -8px 0 0" @click="open = false" aria-label="Close">{% icon "x" "w-5 h-5" %}</button></div>
+    <dl class="text-sm" style="margin-top:12px;display:grid;grid-template-columns:auto 1fr;gap:10px 18px;align-items:center">
+      <dt><span class="ui-kbd">Ctrl</span> + <span class="ui-kbd">K</span></dt><dd>Search everything / jump to any page</dd>
+      <dt><span class="ui-kbd">F2</span> / <span class="ui-kbd">F5</span></dt><dd>Open the POS terminal (use <span class="ui-kbd">Ctrl</span> + <span class="ui-kbd">R</span> to reload a page)</dd>
+      <dt><span class="ui-kbd">Ctrl</span> + <span class="ui-kbd">S</span></dt><dd>Save the form you are editing</dd>
+      <dt><span class="ui-kbd">Esc</span></dt><dd>Close a dialog, drawer or the search box</dd>
+      <dt><span class="ui-kbd">?</span></dt><dd>Show this list</dd>
+    </dl>
+    <p class="ui-help" style="margin-top:14px">On a Mac use <span class="ui-kbd">⌘</span> instead of <span class="ui-kbd">Ctrl</span>.</p>
+  </div>
+</div>
+{% endif %}

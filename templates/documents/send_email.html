@@ -1,0 +1,28 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Email invoice{% endblock %}
+{% block content %}
+<div class="ui-form-wrap space-y-4" style="max-width:36rem">
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{% url 'sales:sale_detail' sale.pk %}">{{ sale.reference }}</a><span class="sep">/</span><span>Email</span></nav>
+      <h1 class="page-title">Email invoice {{ sale.reference }}</h1>
+      <p class="page-subtitle">The PDF invoice is attached and sent to the address below.</p>
+    </div>
+  </div>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <section class="ui-form-section">
+      <header><h2>Send to</h2></header>
+      <div class="body space-y-4">
+        <div class="ui-field"><label class="ui-label" for="em-to">Email address <span style="color:var(--ui-danger)">*</span></label>
+          <input type="email" id="em-to" name="email" value="{{ default_email }}" required autofocus placeholder="customer@example.com"></div>
+        <div class="ui-alert ui-alert-info" role="note">{% icon "info" "w-4 h-4" %}<div>While developing, mail is written to the console until the <code>EMAIL_HOST</code> settings are added to the .env file.</div></div>
+      </div>
+    </section>
+    <div class="ui-sticky-actions">
+      <a href="{% url 'sales:sale_detail' sale.pk %}" class="ui-btn ui-btn-secondary">Cancel</a>
+      <button type="submit" class="ui-btn ui-btn-primary">{% icon "mail" "w-4 h-4" %}<span>Send email</span></button>
+    </div>
+  </form>
+</div>
+{% endblock %}

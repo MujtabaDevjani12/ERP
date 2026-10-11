@@ -1,0 +1,18 @@
+{% load ui %}{# Register-session figures. `summary` = services.session_summary() (Decimals) or the frozen closing_summary (strings). #}
+{% with cs=current_store.currency_symbol|default:"Rs" %}
+<div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+  <div class="ui-card" style="padding:12px"><div class="ui-help" style="margin:0">Opening cash</div><div class="font-semibold tabular-nums">{% money summary.opening_cash cs %}</div></div>
+  <div class="ui-card" style="padding:12px"><div class="ui-help" style="margin:0">Cash sales</div><div class="font-semibold tabular-nums">{% money summary.cash_sales cs %}</div></div>
+  <div class="ui-card" style="padding:12px"><div class="ui-help" style="margin:0">Card sales</div><div class="font-semibold tabular-nums">{% money summary.card_sales cs %}</div></div>
+  <div class="ui-card" style="padding:12px"><div class="ui-help" style="margin:0">Bank transfer</div><div class="font-semibold tabular-nums">{% money summary.bank_sales cs %}</div></div>
+  <div class="ui-card" style="padding:12px"><div class="ui-help" style="margin:0">Other payments</div><div class="font-semibold tabular-nums">{% money summary.other_payments cs %}</div></div>
+  <div class="ui-card" style="padding:12px"><div class="ui-help" style="margin:0">Refunds</div><div class="font-semibold tabular-nums">{% money summary.refunds cs %}</div></div>
+  <div class="ui-card" style="padding:12px"><div class="ui-help" style="margin:0">Cash expenses</div><div class="font-semibold tabular-nums">{% money summary.expenses cs %}</div></div>
+  <div class="ui-card" style="padding:12px"><div class="ui-help" style="margin:0">Total sales</div><div class="font-semibold tabular-nums">{% money summary.total_sales cs %}</div></div>
+  <div class="ui-card" style="padding:12px"><div class="ui-help" style="margin:0">Transactions</div><div class="font-semibold tabular-nums">{{ summary.transactions }}</div></div>
+</div>
+<div class="ui-card" style="padding:14px;margin-top:12px;background:var(--ui-primary-soft)">
+  <div class="flex items-center justify-between"><span class="font-semibold">Expected cash in drawer</span><span class="font-bold tabular-nums text-lg">{% money summary.expected_cash cs %}</span></div>
+  <div class="ui-help" style="margin:4px 0 0">Opening cash + cash sales − cash refunds − cash drops − cash expenses</div>
+</div>
+{% endwith %}

@@ -1,0 +1,10 @@
+{% comment %}Accent colour, menu colours, text colour and font from Settings, plus the favicon. Included in <head> after app.css.{% endcomment %}
+<style id="brand-style">
+:root{--app-primary:{{ app.palette.primary }};--app-primary-hover:{{ app.palette.hover }};--app-primary-soft:{{ app.palette.soft }};--app-primary-rgb:{{ app.palette.primary_rgb }};--app-font:{{ app.font_stack|safe }};--app-accent-on-dark:{{ app.palette.dark_primary }};
+--app-sidebar-bg:{{ app.sidebar.bg }};--app-sidebar-text:{{ app.sidebar.text }};--app-sidebar-strong:{{ app.sidebar.strong }};--app-sidebar-muted:{{ app.sidebar.muted }};--app-sidebar-hover:{{ app.sidebar.hover }};--app-sidebar-active:{{ app.sidebar.active }};--app-sidebar-active-text:{{ app.sidebar.active_text }};--app-sidebar-accent:{{ app.sidebar.accent }};--app-sidebar-line:{{ app.sidebar.line }}}
+[data-bs-theme="dark"]{--app-primary:{{ app.palette.dark_primary }};--app-primary-hover:{{ app.palette.dark_hover }};--app-primary-soft:{{ app.palette.dark_soft }};--app-primary-rgb:{{ app.palette.dark_rgb }};
+--app-sidebar-bg:{{ app.sidebar_dark.bg }};--app-sidebar-text:{{ app.sidebar_dark.text }};--app-sidebar-strong:{{ app.sidebar_dark.strong }};--app-sidebar-muted:{{ app.sidebar_dark.muted }};--app-sidebar-hover:{{ app.sidebar_dark.hover }};--app-sidebar-active:{{ app.sidebar_dark.active }};--app-sidebar-active-text:{{ app.sidebar_dark.active_text }};--app-sidebar-accent:{{ app.sidebar_dark.accent }};--app-sidebar-line:{{ app.sidebar_dark.line }}}
+{% if app.text_color %}[data-bs-theme="light"]{--app-text:{{ app.text_color }}}
+{% endif %}{% if app.font_pct != 100 %}html{font-size:{{ app.font_pct|floatformat:"-2" }}%}
+{% endif %}</style>
+{% if app.logo_url %}<link rel="icon" href="{{ app.logo_url }}">{% endif %}

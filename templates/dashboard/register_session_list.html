@@ -1,0 +1,63 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Register sessions{% endblock %}
+{% block content %}
+{% url 'register:open' as open_url %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <h1 class="page-title">Register sessions <span class="ui-badge ui-badge-neutral no-dot" style="vertical-align:middle;margin-left:6px">{{ result_count }}</span></h1>
+      <p class="page-subtitle">Every shift at every counter: opening cash, expected cash, counted cash and the difference.</p>
+    </div>
+    <div class="page-actions">
+      {% if perms.register.view_register %}<a class="ui-btn ui-btn-secondary" href="{% url 'reports:pack_report' 'registers' %}" title="Shift report with cash difference, Excel and PDF">{% icon "chart" "w-4 h-4" %}<span class="hidden sm:inline">Shift report</span></a>{% endif %}
+      {% if perms.register.view_register %}<a class="ui-btn ui-btn-secondary" href="{% url 'register:counter_list' %}">{% icon "register" "w-4 h-4" %}<span class="hidden sm:inline">Counters</span></a>{% endif %}
+      <a class="ui-btn ui-btn-primary" href="{% url 'register:open' %}?switch=1">{% icon "plus" "w-4 h-4" %}<span>Open register</span></a>
+    </div>
+  </div>
+
+  <form method="get" class="ui-toolbar">
+    <div style="min-width:11rem">
+      <label class="ui-label" for="r-c">Counter</label>
+      <select id="r-c" name="register"><option value="">All counters</option>{% for c in counters %}<option value="{{ c.pk }}" {% if request.GET.register == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select>
+    </div>
+    <div style="min-width:9rem">
+      <label class="ui-label" for="r-s">Status</label>
+      <select id="r-s" name="status"><option value="">All</option><option value="open" {% if request.GET.status == "open" %}selected{% endif %}>Open</option><option value="closed" {% if request.GET.status == "closed" %}selected{% endif %}>Closed</option></select>
+    </div>
+    <div style="width:6rem">
+      <label class="ui-label" for="r-per">Per page</label>
+      <select id="r-per" name="per">{% for n in page_sizes %}<option value="{{ n }}" {% if n == per %}selected{% endif %}>{{ n }}</option>{% endfor %}</select>
+    </div>
+    <div class="flex gap-2">
+      <button type="submit" class="ui-btn ui-btn-primary">{% icon "filter" "w-4 h-4" %}<span>Apply</span></button>
+      {% if has_filters %}<a class="ui-btn ui-btn-secondary" href="{% url 'register:session_list' %}">Reset</a>{% endif %}
+    </div>
+  </form>
+
+  {% if sessions %}
+  <div class="ui-table-wrap">
+    <table class="ui-table ui-table-cards">
+      <thead><tr><th>Session</th><th>Opened by</th><th>Closed</th><th class="num">Opening</th><th class="num">Expected</th><th class="num">Counted</th><th class="num">Difference</th><th>Status</th><th class="col-actions"><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody>
+        {% for s in sessions %}
+        <tr class="is-clickable" data-href="{% url 'register:session_detail' s.pk %}">
+          <td data-label="Session"><div class="ui-cell-title"><a class="erp-link" href="{% url 'register:session_detail' s.pk %}">{{ s.register.name }} {{ s.number }}</a></div><div class="ui-cell-sub">Opened {{ s.opened_at|date:"d M Y, H:i" }}</div></td>
+          <td data-label="Opened by">{{ s.opened_by.get_full_name|default:s.opened_by.username }}</td>
+          <td data-label="Closed" class="ui-nowrap ui-muted">{% if s.closed_at %}{{ s.closed_at|date:"d M Y, H:i" }}{% else %}—{% endif %}</td>
+          <td data-label="Opening" class="num">{{ s.opening_cash }}</td>
+          <td data-label="Expected" class="num">{% if s.expected_cash_at_close is not None %}{{ s.expected_cash_at_close }}{% else %}{{ s.expected_cash }}{% endif %}</td>
+          <td data-label="Counted" class="num">{% if s.closing_cash_counted is not None %}{{ s.closing_cash_counted }}{% else %}—{% endif %}</td>
+          <td data-label="Difference" class="num {% if s.variance and s.variance < 0 %}ui-neg{% elif s.variance and s.variance > 0 %}ui-pos{% endif %}">{% if s.variance is not None %}{{ s.variance }}{% else %}—{% endif %}</td>
+          <td data-label="Status">{% if s.status == "open" %}{% badge "open" label="Open" tone="success" %}{% else %}{% badge "closed" label="Closed" tone="neutral" %}{% endif %}</td>
+          <td class="col-actions"><div class="ui-row-actions"><a class="icon-btn" href="{% url 'register:session_detail' s.pk %}" data-tip="View summary" data-tip-pos="bottom" aria-label="View summary">{% icon "eye" "w-4 h-4" %}</a></div></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% ui "pagination" page_obj=page_obj %}
+  {% else %}
+  <div class="ui-card">{% if has_filters %}{% ui "empty_state" icon="search" title="No sessions match these filters" %}{% else %}{% ui "empty_state" icon="register" title="No register sessions yet" text="Open a register at a counter to start your first shift." action_url=open_url action_label="Open register" %}{% endif %}</div>
+  {% endif %}
+</div>
+{% endblock %}

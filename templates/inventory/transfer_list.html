@@ -1,0 +1,62 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Stock transfers{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <h1 class="page-title">Stock transfers <span class="ui-badge ui-badge-neutral no-dot" style="vertical-align:middle;margin-left:6px">{{ result_count }}</span></h1>
+      <p class="page-subtitle">Move stock between your warehouses and follow it from pending to received.</p>
+    </div>
+    <div class="page-actions">
+      {% if perms.inventory.add_stocktransfer %}<a class="ui-btn ui-btn-primary" href="{% url 'inventory:transfer_add' %}">{% icon "plus" "w-4 h-4" %}<span>New transfer</span></a>{% endif %}
+    </div>
+  </div>
+
+  <div class="ui-kpi-grid">
+    {% ui "kpi" label="Pending" icon="clipboard" value=n_pending foot="not sent yet" %}
+    {% ui "kpi" label="In transit" icon="truck" value=n_transit foot="on the way" %}
+    {% ui "kpi" label="Completed" icon="check" value=n_done foot="received" %}
+  </div>
+
+  <form method="get" class="ui-toolbar">
+    <div class="ui-search">
+      <label class="ui-label" for="t-q">Search</label>
+      {% icon "search" "w-4 h-4" %}
+      <input type="search" id="t-q" name="q" value="{{ request.GET.q }}" placeholder="Reference or note" autocomplete="off">
+    </div>
+    <div style="min-width:9rem"><label class="ui-label" for="t-status">Status</label>
+      <select id="t-status" name="status"><option value="">All</option>{% for k, l in status_choices %}<option value="{{ k }}" {% if request.GET.status == k %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+    <div style="min-width:9rem"><label class="ui-label" for="t-from">From</label>
+      <select id="t-from" name="from"><option value="">Any</option>{% for w in warehouses %}<option value="{{ w.pk }}" {% if request.GET.from == w.pk|stringformat:"s" %}selected{% endif %}>{{ w.name }}</option>{% endfor %}</select></div>
+    <div style="min-width:9rem"><label class="ui-label" for="t-to">To</label>
+      <select id="t-to" name="to"><option value="">Any</option>{% for w in warehouses %}<option value="{{ w.pk }}" {% if request.GET.to == w.pk|stringformat:"s" %}selected{% endif %}>{{ w.name }}</option>{% endfor %}</select></div>
+    <div style="width:6rem"><label class="ui-label" for="t-per">Per page</label>
+      <select id="t-per" name="per">{% for n in page_sizes %}<option value="{{ n }}" {% if n == per %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></div>
+    <div class="flex gap-2"><button type="submit" class="ui-btn ui-btn-primary">{% icon "filter" "w-4 h-4" %}<span>Apply</span></button>{% if has_filters %}<a class="ui-btn ui-btn-secondary" href="{% url 'inventory:transfer_list' %}">Reset</a>{% endif %}</div>
+  </form>
+
+  {% if transfers %}
+  <div class="ui-table-wrap">
+    <table class="ui-table ui-table-cards">
+      <thead><tr><th>Reference</th><th>Route</th><th class="num">Products</th><th class="num">Units</th><th>Status</th><th class="col-actions"><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody>
+        {% for t in transfers %}
+        <tr class="is-clickable" data-href="{% url 'inventory:transfer_detail' t.pk %}">
+          <td data-label="Reference"><div class="ui-cell-title"><a class="erp-link" href="{% url 'inventory:transfer_detail' t.pk %}">{{ t.reference }}</a></div><div class="ui-cell-sub">{{ t.created_at|date:"d M Y, H:i" }}</div></td>
+          <td data-label="Route">{{ t.from_warehouse.name }} <span class="ui-muted">→</span> {{ t.to_warehouse.name }}</td>
+          <td data-label="Products" class="num">{{ t.n_items }}</td>
+          <td data-label="Units" class="num">{{ t.n_qty|floatformat:"-3" }}</td>
+          <td data-label="Status">{% if t.status == "draft" %}{% badge t.status label=t.get_status_display tone="warning" %}{% elif t.status == "in_transit" %}{% badge t.status label=t.get_status_display tone="info" %}{% else %}{% badge t.status label=t.get_status_display %}{% endif %}</td>
+          <td class="col-actions"><div class="ui-row-actions"><a class="icon-btn" href="{% url 'inventory:transfer_detail' t.pk %}" data-tip="View" data-tip-pos="bottom" aria-label="View">{% icon "eye" "w-4 h-4" %}</a></div></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% ui "pagination" page_obj=page_obj %}
+  {% else %}
+  {% url 'inventory:transfer_add' as add_url %}
+  <div class="ui-card">{% if has_filters %}{% ui "empty_state" icon="search" title="No transfers match these filters" text="Try another reference, status or warehouse." %}{% else %}{% ui "empty_state" icon="switch" title="No transfers yet" text="Move stock between your warehouses." action_url=add_url action_label="New transfer" %}{% endif %}</div>
+  {% endif %}
+</div>
+{% endblock %}

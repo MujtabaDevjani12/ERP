@@ -1,0 +1,58 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Return · {{ sale.reference }}{% endblock %}
+{% block content %}
+<div class="ui-form-wrap space-y-4" x-data="returnForm()">
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb"><a href="{% url 'sales:sale_list' %}">Sales</a><span class="sep">/</span><a href="{% url 'sales:sale_detail' sale.pk %}">{{ sale.reference }}</a><span class="sep">/</span><span>{% if exchange %}Exchange{% else %}Return{% endif %}</span></nav>
+      <h1 class="page-title">{% if exchange %}Exchange{% else %}Return items{% endif %} · {{ sale.reference }}</h1>
+      <p class="page-subtitle">{% if exchange %}Choose what the customer is bringing back. After saving you go straight to the POS to ring up the new items. {% endif %}Customer: {{ sale.customer.name|default:"Walk-in" }} · refundable (paid, not yet refunded): {% money balance %}</p>
+    </div>
+  </div>
+
+  <form method="post" class="space-y-4">
+    {% csrf_token %}
+    {% if exchange %}<input type="hidden" name="exchange" value="1">{% endif %}
+    <div class="ui-table-wrap ui-scroll-y">
+      <table class="ui-table">
+        <thead><tr><th>Product</th><th class="num">Sold</th><th class="num">Can return</th><th class="num">Unit refund</th><th style="width:130px">Return qty</th></tr></thead>
+        <tbody>
+        {% for l in lines %}
+        <tr>
+          <td><b>{{ l.item.variant.product.name }}</b>{% if l.item.variant.name %}<div class="ui-help" style="margin:0">{{ l.item.variant.name }}</div>{% endif %}</td>
+          <td class="num">{{ l.item.quantity|floatformat:"-3" }}</td>
+          <td class="num">{{ l.left|floatformat:"-3" }}</td>
+          <td class="num">{{ l.unit_refund|floatformat:2 }}</td>
+          <td>{% if l.left > 0 %}<input type="number" name="qty_{{ l.item.pk }}" min="0" max="{{ l.left }}" step="any" inputmode="decimal" value="{% for k, v in form.qty.items %}{% if k == l.item.pk %}{{ v }}{% endif %}{% endfor %}"
+                  data-unit="{{ l.unit_refund|stringformat:'f' }}" @input="recalc()" aria-label="Quantity to return">{% else %}<span class="ui-help">Fully returned</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="ui-card"><div class="ui-card-body grid gap-4" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
+      <div><label class="ui-label" for="reason">Reason <span style="color:var(--ui-danger)">*</span></label>
+        <input id="reason" type="text" name="reason" maxlength="255" required value="{{ form.reason }}" placeholder="e.g. damaged, wrong size, customer changed mind"></div>
+      <div><label class="ui-label" for="rm">Refund by</label>
+        <select id="rm" name="refund_method">{% for m in methods %}<option value="{{ m.code }}" {% if m.code == form.method %}selected{% endif %}>{{ m.name }}</option>{% endfor %}</select></div>
+      <div class="ui-field"><label class="flex items-center gap-2.5 cursor-pointer"><input type="checkbox" name="restock" {% if form.restock %}checked{% endif %}><span class="text-sm font-medium">Put returned items back into stock</span></label>
+        <p class="ui-help">Untick for damaged goods that cannot be resold.</p></div>
+    </div></div>
+
+    <div class="ui-card" style="padding:14px"><div class="flex items-center justify-between"><span class="font-semibold">Refund total</span><span class="font-bold tabular-nums text-lg"><span x-text="window.appMoney ? window.appMoney(total) : total.toFixed(2)"></span></span></div></div>
+
+    <div class="flex justify-end gap-2">
+      <a class="ui-btn ui-btn-ghost" href="{% url 'sales:sale_detail' sale.pk %}">Cancel</a>
+      <button type="submit" class="ui-btn ui-btn-primary" :disabled="total <= 0">Process return &amp; refund</button>
+    </div>
+  </form>
+</div>
+<script>
+function returnForm() {
+  return { total: 0,
+    init() { this.recalc(); },
+    recalc() { var t = 0; document.querySelectorAll('input[name^=qty_]').forEach(function (i) { t += (parseFloat(i.value) || 0) * (parseFloat(i.dataset.unit) || 0); }); this.total = Math.round(t * 100) / 100; } };
+}
+</script>
+{% endblock %}

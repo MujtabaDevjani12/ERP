@@ -1,0 +1,15 @@
+{% load ui %}{# Quick-create panel body, loaded into the side drawer. Submitted with fetch; JSON {ok:true} closes it. #}
+<form method="post" action="{{ request.get_full_path }}" enctype="multipart/form-data" novalidate>
+  {% csrf_token %}<input type="hidden" name="_drawer" value="1">
+  {% if form.non_field_errors %}<div style="margin-bottom:12px">{% for e in form.non_field_errors %}{% ui "alert" tone="danger" message=e %}{% endfor %}</div>{% endif %}
+  <div class="ui-grid" style="grid-template-columns:minmax(0,1fr)">
+    {% for s in sections %}{% for it in s.items %}
+      {% if it.kind == "input" %}{% ui "field" field=it.bound %}
+      {% else %}<div><div class="ui-label">{{ it.label }}</div><div>{{ it.cell.html }}</div></div>{% endif %}
+    {% endfor %}{% endfor %}
+  </div>
+  <div class="ui-modal-foot" style="position:sticky;bottom:0;background:var(--ui-surface);padding-top:12px;margin-top:20px">
+    <button type="button" class="ui-btn ui-btn-ghost" @click="$store.drawer.close()">Cancel</button>
+    <button type="submit" class="ui-btn ui-btn-primary">{% icon "check-mark" "w-4 h-4" %}<span>Save</span></button>
+  </div>
+</form>

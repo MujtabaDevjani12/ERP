@@ -1,0 +1,7 @@
+{# Row "more" menu that is never clipped by the table: {% component "row_menu" %}<a class="ui-menu-item" href="…">{% icon "pencil" %}Edit</a>{% endcomponent %} #}
+{% load ui %}<div class="inline-block" x-data="rowMenu" @keydown.escape.window="open = false" @scroll.window.passive="open = false" @resize.window="open = false">
+  <button type="button" class="icon-btn" @click="toggle($el)" aria-haspopup="menu" :aria-expanded="open" aria-label="{{ label|default:'More actions' }}" data-tip="{{ label|default:'More actions' }}" data-tip-pos="bottom">{% icon "dots-h" "w-4 h-4" %}</button>
+  <template x-teleport="body">
+    <div x-cloak x-show="open" x-transition.opacity.duration.120ms class="ui-menu ui-menu-fixed" :style="pos" role="menu" @click.outside="away($event)" @click="open = false">{{ body }}</div>
+  </template>
+</div>

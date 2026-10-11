@@ -1,0 +1,60 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="ui-form-wrap space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{% url 'sales:delivery_list' %}">Deliveries</a><span class="sep">/</span><span>{% if delivery %}{{ delivery.reference }}{% else %}New{% endif %}</span></nav>
+      <h1 class="page-title">{{ title }}</h1>
+      <p class="page-subtitle">Fields marked <span style="color:var(--ui-danger)">*</span> are required.</p>
+    </div>
+  </div>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="ui-alert ui-alert-danger" role="alert">{% icon "error" "w-4 h-4" %}<div>{% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}</div></div>{% endif %}
+
+    <section class="ui-form-section">
+      <header><h2>Sale</h2><p>The completed sale that is being delivered.</p></header>
+      <div class="body">
+        {% if sale %}
+        <dl class="ui-dl">
+          <dt>Invoice</dt><dd><a class="erp-link" href="{% url 'sales:sale_detail' sale.pk %}"><strong>{{ sale.reference }}</strong></a></dd>
+          <dt>Customer</dt><dd>{{ sale.customer.name|default:"Walk-in customer" }}</dd>
+          <dt>Total</dt><dd>{% money sale.total_amount %}</dd>
+        </dl>
+        {% else %}
+        {% ui "field" field=form.sale_ref %}
+        {% if sales_hint %}<p class="ui-help" style="margin-top:8px">Recent sales without a delivery: {% for r in sales_hint|slice:":8" %}<code>{{ r }}</code>{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="ui-form-section">
+      <header><h2>Deliver to</h2><p>Who receives the parcel and where it goes.</p></header>
+      <div class="body ui-grid ui-grid-2">
+        {% ui "field" field=form.recipient_name %}
+        {% ui "field" field=form.phone %}
+        {% ui "field" field=form.address css="ui-span-2" %}
+        {% ui "field" field=form.city %}
+        {% ui "field" field=form.scheduled_date %}
+      </div>
+    </section>
+
+    <section class="ui-form-section">
+      <header><h2>Carrier</h2><p>Who is taking it, and how to follow it.</p></header>
+      <div class="body ui-grid ui-grid-2">
+        {% ui "field" field=form.delivery_person %}
+        {% ui "field" field=form.rider %}
+        {% ui "field" field=form.tracking_no %}
+        {% ui "field" field=form.note css="ui-span-2" %}
+      </div>
+    </section>
+
+    <div class="ui-sticky-actions">
+      <a href="{% if delivery %}{% url 'sales:delivery_detail' delivery.pk %}{% else %}{% url 'sales:delivery_list' %}{% endif %}" class="ui-btn ui-btn-secondary">Cancel</a>
+      <button type="submit" class="ui-btn ui-btn-primary">{% icon "check-mark" "w-4 h-4" %}<span>{% if delivery %}Save changes{% else %}Create delivery{% endif %}</span></button>
+    </div>
+  </form>
+</div>
+{% endblock %}

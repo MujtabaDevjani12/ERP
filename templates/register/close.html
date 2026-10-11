@@ -1,0 +1,60 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Close register{% endblock %}
+{% block content %}
+<div class="ui-form-wrap space-y-4" style="max-width:48rem" x-data="closeRegister()">
+  <div class="page-header">
+    <div class="min-w-0">
+      <h1 class="page-title">Close {{ session.register.name }}</h1>
+      <p class="page-subtitle">Session {{ session.number }} · opened {{ session.opened_at|date:"d M Y, H:i" }} by {{ session.opened_by.get_full_name|default:session.opened_by.username }}</p>
+    </div>
+    <div class="page-actions"><a class="ui-btn ui-btn-secondary" href="{% url 'dashboard:pos' %}">Back to POS</a></div>
+  </div>
+
+  {% include "register/_summary.html" %}
+
+  <form method="post" class="ui-card" @submit.prevent="confirmClose($event)">
+    {% csrf_token %}
+    <div class="ui-card-body space-y-4">
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <label class="ui-label" style="margin:0">Cash denomination count</label>
+          <button type="button" class="ui-btn ui-btn-ghost ui-btn-sm" @click="showDenom = !showDenom" x-text="showDenom ? 'Hide' : 'Count notes'"></button>
+        </div>
+        <div x-show="showDenom" x-cloak class="space-y-2 mb-3">
+          <template x-for="d in denominations" :key="d.value">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-medium w-16" x-text="d.value"></span><span class="text-xs">×</span>
+              <input type="number" min="0" style="width:90px" x-model.number="d.qty" @input="recalc()">
+              <span class="text-xs ml-auto tabular-nums" x-text="(d.value * (d.qty||0)).toFixed(2)"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+      <div>
+        <label class="ui-label" for="counted">Actual cash counted <span style="color:var(--ui-danger)">*</span></label>
+        <input id="counted" type="number" name="closing_cash_counted" x-model="counted" step="0.01" min="0" inputmode="decimal" required>
+        <p class="ui-help" x-show="counted !== ''" :style="diff() == 0 ? '' : 'font-weight:600'">Difference vs expected: <span x-text="diff().toFixed(2)"></span></p>
+      </div>
+      <div>
+        <label class="ui-label" for="note">Closing note</label>
+        <textarea id="note" name="note" rows="2" maxlength="2000"></textarea>
+      </div>
+      <button type="submit" class="ui-btn ui-btn-danger" style="width:100%">Close register</button>
+    </div>
+  </form>
+</div>
+<script>
+function closeRegister() {
+  return {
+    showDenom: false, counted: '', expected: {{ summary.expected_cash|stringformat:"s" }},
+    denominations: [5000, 1000, 500, 100, 50, 20, 10, 5, 2, 1].map(v => ({ value: v, qty: null })),
+    recalc() { this.counted = this.denominations.reduce((s, d) => s + d.value * (parseFloat(d.qty) || 0), 0).toFixed(2); },
+    diff() { return (parseFloat(this.counted) || 0) - this.expected; },
+    async confirmClose(ev) {
+      const ok = await window.confirmDialog({ title: 'Close this register?', message: 'Sales will be blocked on this counter until it is opened again. This cannot be undone.', confirmLabel: 'Close register', tone: 'danger' });
+      if (ok) ev.target.submit();
+    },
+  };
+}
+</script>
+{% endblock %}

@@ -1,0 +1,77 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Staff users{% endblock %}
+{% block content %}
+{% url 'accounts:staff_user_add' as add_url %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <h1 class="page-title">Staff users <span class="ui-badge ui-badge-neutral no-dot" style="vertical-align:middle;margin-left:6px">{{ result_count }}</span></h1>
+      <p class="page-subtitle">Everyone who can log in: owners, managers, cashiers and inventory clerks. A role controls what each person can open.</p>
+    </div>
+    <div class="page-actions">
+      <a class="ui-btn ui-btn-secondary" href="{% url 'accounts:role_list' %}">{% icon "shield" "w-4 h-4" %}<span class="hidden sm:inline">Roles &amp; permissions</span></a>
+      <a class="ui-btn ui-btn-primary" href="{{ add_url }}">{% icon "plus" "w-4 h-4" %}<span>New user</span></a>
+    </div>
+  </div>
+
+  <form method="get" class="ui-toolbar">
+    <div class="ui-search">
+      <label class="ui-label" for="u-q">Search</label>
+      {% icon "search" "w-4 h-4" %}
+      <input type="search" id="u-q" name="q" value="{{ request.GET.q }}" placeholder="Name, username or email" autocomplete="off">
+    </div>
+    <div style="min-width:9rem">
+      <label class="ui-label" for="u-st">Status</label>
+      <select id="u-st" name="status"><option value="">All</option><option value="active" {% if request.GET.status == "active" %}selected{% endif %}>Active</option><option value="inactive" {% if request.GET.status == "inactive" %}selected{% endif %}>Inactive</option></select>
+    </div>
+    <div style="min-width:9rem">
+      <label class="ui-label" for="u-bl">Seller (biller)</label>
+      <select id="u-bl" name="biller"><option value="">Everyone</option><option value="1" {% if request.GET.biller == "1" %}selected{% endif %}>Billers only</option><option value="0" {% if request.GET.biller == "0" %}selected{% endif %}>Not billers</option></select>
+    </div>
+    <div style="width:6rem">
+      <label class="ui-label" for="u-per">Per page</label>
+      <select id="u-per" name="per">{% for n in page_sizes %}<option value="{{ n }}" {% if n == per %}selected{% endif %}>{{ n }}</option>{% endfor %}</select>
+    </div>
+    <div class="flex gap-2">
+      <button type="submit" class="ui-btn ui-btn-primary">{% icon "filter" "w-4 h-4" %}<span>Apply</span></button>
+      {% if has_filters %}<a class="ui-btn ui-btn-secondary" href="{% url 'accounts:staff_user_list' %}">Reset</a>{% endif %}
+    </div>
+  </form>
+
+  {% if staff_users %}
+  <div class="ui-table-wrap">
+    <table class="ui-table ui-table-cards">
+      <thead><tr><th>User</th><th>Store</th><th>Roles</th><th>Flags</th><th class="col-actions"><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody>
+        {% for u in staff_users %}
+        <tr class="is-clickable" data-href="{% url 'accounts:staff_user_edit' u.pk %}">
+          <td data-label="User">
+            <div class="ui-cell">
+              <span class="ui-avatar-sm">{{ u.get_full_name|default:u.username|slice:":2"|upper }}</span>
+              <div class="min-w-0"><div class="ui-cell-title">{{ u.get_full_name|default:u.username }}</div><div class="ui-cell-sub">{{ u.username }}{% if u.email %} · {{ u.email }}{% endif %}</div></div>
+            </div>
+          </td>
+          <td data-label="Store">{{ u.store.name|default:"—" }}</td>
+          <td data-label="Roles"><div class="ui-chips">{% for g in u.groups.all %}<span class="ui-badge ui-badge-brand no-dot">{{ g.name }}</span>{% empty %}<span class="ui-muted">No role</span>{% endfor %}</div></td>
+          <td data-label="Flags"><div class="ui-chips">
+            {% if u.is_superuser %}<span class="ui-badge ui-badge-info no-dot">Superuser</span>{% endif %}
+            {% if u.is_biller %}<span class="ui-badge ui-badge-success no-dot">Cashier</span>{% endif %}
+            {% if not u.is_active %}<span class="ui-badge ui-badge-neutral no-dot">Inactive</span>{% endif %}
+          </div></td>
+          <td class="col-actions">
+            <div class="ui-row-actions">
+              <a class="icon-btn" href="{% url 'accounts:staff_user_edit' u.pk %}" data-tip="Edit user" data-tip-pos="bottom" aria-label="Edit user">{% icon "pencil" "w-4 h-4" %}</a>
+              <a class="icon-btn" href="{% url 'accounts:staff_user_delete' u.pk %}" data-tip="Delete user" data-tip-pos="bottom" aria-label="Delete user" style="color:var(--ui-danger)">{% icon "trash" "w-4 h-4" %}</a>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% ui "pagination" page_obj=page_obj %}
+  {% else %}
+  <div class="ui-card">{% if has_filters %}{% ui "empty_state" icon="search" title="No users match your search" %}{% else %}{% ui "empty_state" icon="users" title="No staff users yet" action_url=add_url action_label="New user" %}{% endif %}</div>
+  {% endif %}
+</div>
+{% endblock %}

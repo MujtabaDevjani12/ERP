@@ -1,0 +1,51 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Adjustment history{% endblock %}
+{% block content %}
+{% url 'inventory:quantity_adjustment' as add_url %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <h1 class="page-title">Adjustment history <span class="ui-badge ui-badge-neutral no-dot" style="vertical-align:middle;margin-left:6px">{{ result_count }}</span></h1>
+      <p class="page-subtitle">Every manual stock correction: who made it, where and why.</p>
+    </div>
+    <div class="page-actions">
+      <a class="ui-btn ui-btn-primary" href="{{ add_url }}">{% icon "plus" "w-4 h-4" %}<span>New adjustment</span></a>
+    </div>
+  </div>
+
+  <form method="get" class="ui-toolbar">
+    <div class="ui-search">
+      <label class="ui-label" for="a-q">Search</label>
+      {% icon "search" "w-4 h-4" %}
+      <input type="search" id="a-q" name="q" value="{{ request.GET.q }}" placeholder="Reference or warehouse" autocomplete="off">
+    </div>
+    <div class="flex gap-2">
+      <button type="submit" class="ui-btn ui-btn-primary">{% icon "filter" "w-4 h-4" %}<span>Apply</span></button>
+      {% if has_filters %}<a class="ui-btn ui-btn-secondary" href="{% url 'inventory:adjustment_list' %}">Reset</a>{% endif %}
+    </div>
+  </form>
+
+  {% if adjustments %}
+  <div class="ui-table-wrap">
+    <table class="ui-table ui-table-cards">
+      <thead><tr><th>Reference</th><th>Warehouse</th><th>Reason</th><th>By</th><th class="num">Items</th><th class="num">When</th></tr></thead>
+      <tbody>
+        {% for a in adjustments %}
+        <tr>
+          <td data-label="Reference"><div class="ui-cell-title">{{ a.reference }}</div></td>
+          <td data-label="Warehouse">{{ a.warehouse.name }}</td>
+          <td data-label="Reason">{% badge a.reason label=a.get_reason_display tone="neutral" %}</td>
+          <td data-label="By">{% if a.created_by %}{{ a.created_by.get_full_name|default:a.created_by.username }}{% else %}—{% endif %}</td>
+          <td data-label="Items" class="num">{{ a.item_count }}</td>
+          <td data-label="When" class="num ui-nowrap ui-muted">{{ a.created_at|date:"d M Y, H:i" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% ui "pagination" page_obj=page_obj %}
+  {% else %}
+  <div class="ui-card">{% if has_filters %}{% ui "empty_state" icon="search" title="No adjustments match your search" %}{% else %}{% ui "empty_state" icon="sliders" title="No adjustments yet" text="Corrections you make to stock quantities are recorded here." action_url=add_url action_label="New adjustment" %}{% endif %}</div>
+  {% endif %}
+</div>
+{% endblock %}

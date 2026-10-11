@@ -1,0 +1,66 @@
+{% load ui %}
+<section class="ui-form-section erp-inline" {% if block.editable %}x-data="erpInline('{{ block.prefix }}', '{% url 'catalog:api_variant_lookup' %}')"{% endif %}>
+  <header class="flex items-center justify-between gap-3">
+    <h2>{{ block.title }}</h2>
+    {% if block.editable and block.can_add %}
+    <button type="button" class="ui-btn ui-btn-secondary ui-btn-sm" @click="add()">{% icon "plus" "w-4 h-4" %}<span>Add row</span></button>
+    {% endif %}
+  </header>
+
+  {% if block.editable %}
+    {{ block.formset.management_form }}
+    {% if block.formset.non_form_errors %}
+    <div style="margin:12px 20px 0">{% for e in block.formset.non_form_errors %}{% ui "alert" tone="danger" message=e %}{% endfor %}</div>
+    {% endif %}
+  {% endif %}
+
+  {% if block.editable and block.can_add %}
+  <div class="lp-bar" x-show="hasVariant" x-cloak>
+    <div class="lp-box">
+      <div class="ui-search" style="max-width:none">
+        {% icon "scan" "w-4 h-4" %}
+        <input type="search" x-ref="scan" x-model="query" @input.debounce.180ms="search()"
+               @keydown.enter.prevent="enter()" @keydown.arrow-down.prevent="move(1)" @keydown.arrow-up.prevent="move(-1)" @keydown.escape="clear()"
+               placeholder="Scan a barcode or type a product name / SKU to add it…" autocomplete="off" aria-label="Scan or search products to add" role="combobox" :aria-expanded="results.length > 0">
+        <span class="lp-spin" x-show="busy" x-cloak aria-hidden="true"></span>
+      </div>
+      <div class="lp-list" x-show="results.length" x-cloak role="listbox">
+        <template x-for="(r, i) in results" :key="r.id">
+          <button type="button" class="lp-item" :class="{ 'is-hi': i === hi }" role="option" :aria-selected="i === hi" @mouseenter="hi = i" @click="pick(r)">
+            <span class="lp-thumb"><img x-show="r.image" :src="r.image" alt="" loading="lazy"><span x-show="!r.image" x-text="(r.product || '?').slice(0, 1).toUpperCase()"></span></span>
+            <span class="min-w-0 lp-main"><span class="ui-cell-title" x-text="r.name"></span><span class="ui-cell-sub" x-text="[r.sku, r.barcode].filter(Boolean).join(' · ')"></span></span>
+            <span class="lp-side"><span class="tabular lp-cost" x-text="r.cost"></span><span class="ui-muted lp-stock" x-text="'on hand ' + r.stock"></span></span>
+          </button>
+        </template>
+      </div>
+      <p class="ui-error" x-show="miss" x-cloak style="margin-top:6px">No product found for “<span x-text="miss"></span>”.</p>
+      <p class="ui-error" x-show="failed" x-cloak style="margin-top:6px">Could not reach the server to search. Try again.</p>
+    </div>
+  </div>
+  {% endif %}
+
+  <div style="overflow-x:auto">
+    <table class="ui-table" style="min-width:640px">
+      <thead>
+        <tr>
+          {% for h in block.headers %}<th class="whitespace-nowrap">{{ h.label }}{% if h.required %}<span style="color:var(--ui-danger)"> *</span>{% endif %}</th>{% endfor %}
+          {% if block.editable and block.can_delete %}<th style="text-align:center">Remove</th>{% endif %}
+        </tr>
+      </thead>
+      {% if block.editable %}
+      <tbody x-ref="body">
+        {% for row in block.rows %}{% include "erp_ui/_inline_row.html" %}{% endfor %}
+        <template x-ref="tpl">{% include "erp_ui/_inline_row.html" with row=block.empty_row %}</template>
+      </tbody>
+      {% else %}
+      <tbody>
+        {% for row in block.rows %}
+        <tr>{% for c in row.cells %}<td{% if c.numeric %} class="num"{% endif %}>{{ c.html }}</td>{% endfor %}</tr>
+        {% empty %}
+        <tr><td colspan="{{ block.headers|length|add:1 }}" style="text-align:center;color:var(--ui-text-3);padding:24px 12px">Nothing here yet.</td></tr>
+        {% endfor %}
+      </tbody>
+      {% endif %}
+    </table>
+  </div>
+</section>

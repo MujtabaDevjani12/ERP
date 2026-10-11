@@ -1,0 +1,34 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Gift card {{ card.code }}{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{% url 'customers:giftcard_list' %}">Gift cards</a><span class="sep">/</span><span>{{ card.code }}</span></nav>
+      <h1 class="page-title">{{ card.code }}</h1>
+      <p class="page-subtitle">{% if card.customer %}Belongs to {{ card.customer.name }} · {% endif %}{% if card.expires_on %}expires {{ card.expires_on|date:"d M Y" }}{% else %}never expires{% endif %}{% if not card.is_active %} · switched off{% endif %}</p>
+    </div>
+    <div class="page-actions">
+      {% if can_topup and card.is_active %}<button type="button" class="ui-btn ui-btn-primary" data-drawer-url="{% url 'customers:giftcard_topup' card.pk %}" data-drawer-title="Add money to {{ card.code }}">{% icon "plus" "w-4 h-4" %}<span>Top up</span></button>{% endif %}
+    </div>
+  </div>
+  <div class="ui-kpi-grid">
+    {% ui "kpi" label="Balance" icon="cash" value=card.current_balance|floatformat:"2g" %}
+    {% ui "kpi" label="Card value" icon="gift" value=card.initial_balance|floatformat:"2g" foot="when it was created" %}
+  </div>
+  {% if transactions %}
+  <div class="ui-table-wrap"><table class="ui-table ui-table-cards">
+    <thead><tr><th>When</th><th>What</th><th class="num">Amount</th><th class="num">Balance after</th><th>Sale</th><th>By</th></tr></thead>
+    <tbody>{% for t in transactions %}<tr>
+      <td data-label="When">{{ t.created_at|date:"d M Y, H:i" }}</td>
+      <td data-label="What">{{ t.get_kind_display }}{% if t.note %}<div class="ui-cell-sub">{{ t.note }}</div>{% endif %}</td>
+      <td data-label="Amount" class="num {% if t.amount < 0 %}ui-neg{% endif %}">{% if t.amount > 0 %}+{% endif %}{{ t.amount|floatformat:"2g" }}</td>
+      <td data-label="Balance after" class="num">{{ t.balance_after|floatformat:"2g" }}</td>
+      <td data-label="Sale">{% if t.sale %}<a class="erp-link" href="{% url 'sales:sale_detail' t.sale.pk %}">{{ t.sale.reference }}</a>{% else %}—{% endif %}</td>
+      <td data-label="By">{{ t.user.get_full_name|default:t.user.username|default:"—" }}</td>
+    </tr>{% endfor %}</tbody></table></div>
+  {% else %}
+  <div class="ui-card">{% ui "empty_state" icon="clock" title="No activity yet" text="Top-ups and POS payments will show up here." %}</div>
+  {% endif %}
+</div>
+{% endblock %}

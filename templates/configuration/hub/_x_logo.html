@@ -1,0 +1,10 @@
+{% load ui %}
+<div class="st-body">
+  <div class="st-preview">
+    {% if cfg.site_logo %}<img src="{{ cfg.site_logo.url }}" alt="Current logo" class="st-logo">
+    {% else %}<span class="st-logo st-logo-letter">{{ cfg.site_name|default:"P"|slice:":1"|upper }}</span>{% endif %}
+    <div><b>{{ cfg.site_name }}</b><span class="dx-row-meta">{% if cfg.site_logo %}This logo is shown in the sidebar, the sign-in page and on receipts.{% else %}No logo uploaded — the first letter of your business name is used.{% endif %}</span></div>
+    <span class="st-swatch" style="background:{{ cfg.primary_color }}" title="{{ cfg.primary_color }}"></span>
+  </div>
+  <p class="ui-help" style="margin-top:10px">Use a square image (PNG or JPG) smaller than 2 MB. Colour changes apply to the whole application after saving.</p>
+</div>

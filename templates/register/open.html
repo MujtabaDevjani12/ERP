@@ -1,0 +1,63 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Select counter{% endblock %}
+{% block content %}
+<div class="ui-form-wrap space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <h1 class="page-title">Select a counter</h1>
+      <p class="page-subtitle">Choose the counter you are working at. Each counter has its own cash drawer and register session.</p>
+    </div>
+    <div class="page-actions">
+      {% if current_session %}<a class="ui-btn ui-btn-secondary" href="{% url 'dashboard:pos' %}">Back to POS ({{ current_session.register.name }})</a>{% endif %}
+      {% if can_manage_counters %}<a class="ui-btn ui-btn-secondary" href="{% url 'register:counter_list' %}">Manage counters</a>{% endif %}
+    </div>
+  </div>
+
+  {% if not counters %}
+  <div class="ui-card">
+    {% ui "empty_state" icon="inbox" title="No counter available for you" text="Ask a manager to create a counter or assign you to one." %}
+    {% if can_manage_counters %}<div style="text-align:center;padding-bottom:20px"><a class="ui-btn ui-btn-primary" href="{% url 'register:counter_list' %}">Create a counter</a></div>{% endif %}
+  </div>
+  {% endif %}
+
+  <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    {% for c in counters %}
+    <div class="ui-card" x-data="{ opening: {% if form_values.register == c.pk|stringformat:'s' %}true{% else %}false{% endif %} }">
+      <div class="ui-card-body space-y-3">
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0">
+            <div class="ui-card-title truncate">{{ c.name }}</div>
+            <div class="ui-help" style="margin:0">{% if c.code %}{{ c.code }} · {% endif %}{{ c.warehouse.name }}</div>
+          </div>
+          {% if c.open_session %}<span class="ui-badge ui-badge-success">Open</span>{% else %}<span class="ui-badge ui-badge-neutral">Closed</span>{% endif %}
+        </div>
+
+        {% if c.open_session %}
+          <p class="ui-help" style="margin:0">Opened {{ c.open_session.opened_at|date:"d M, H:i" }} by <strong>{{ c.open_session.opened_by.get_full_name|default:c.open_session.opened_by.username }}</strong> · opening cash {% money c.open_session.opening_cash %}</p>
+          {% if c.can_resume %}
+          <form method="post">{% csrf_token %}<input type="hidden" name="action" value="resume"><input type="hidden" name="register" value="{{ c.pk }}">
+            <button class="ui-btn ui-btn-primary w-full" style="width:100%" type="submit">Continue billing</button></form>
+          {% else %}
+          <p class="ui-help" style="margin:0">This shift belongs to another cashier. A manager can continue it.</p>
+          {% endif %}
+        {% else %}
+          <button type="button" class="ui-btn ui-btn-primary" style="width:100%" x-show="!opening" @click="opening = true">Open register</button>
+          <form method="post" x-show="opening" x-cloak class="space-y-3">
+            {% csrf_token %}<input type="hidden" name="action" value="open"><input type="hidden" name="register" value="{{ c.pk }}">
+            <div>
+              <label class="ui-label" for="oc-{{ c.pk }}">Opening cash</label>
+              <input id="oc-{{ c.pk }}" type="number" name="opening_cash" step="0.01" min="0" inputmode="decimal" required value="{% if form_values.register == c.pk|stringformat:'s' %}{{ form_values.opening_cash }}{% else %}0{% endif %}">
+            </div>
+            <div>
+              <label class="ui-label" for="on-{{ c.pk }}">Opening note <span class="ui-help" style="display:inline">(optional)</span></label>
+              <input id="on-{{ c.pk }}" type="text" name="note" maxlength="255" value="{% if form_values.register == c.pk|stringformat:'s' %}{{ form_values.note }}{% endif %}">
+            </div>
+            <button class="ui-btn ui-btn-primary" style="width:100%" type="submit">Open &amp; start billing</button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

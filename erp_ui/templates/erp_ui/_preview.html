@@ -1,0 +1,12 @@
+{% load ui %}{# Read-only record summary shown in the side drawer from list pages. #}
+<div class="flex items-center gap-2 flex-wrap" style="margin-bottom:14px"><span class="text-base font-semibold" style="color:var(--ui-text)">{{ title }}</span>{% if status_pill %}{{ status_pill }}{% endif %}</div>
+{% for s in sections %}
+  {% if s.title %}<div class="ui-section-title" style="margin:16px 0 8px">{{ s.title }}</div>{% endif %}
+  <dl class="ui-dl">
+    {% for it in s.items %}<dt>{{ it.label }}</dt><dd>{{ it.cell.html }}</dd>{% endfor %}
+  </dl>
+{% endfor %}
+<div class="ui-modal-foot" style="margin-top:24px">
+  <button type="button" class="ui-btn ui-btn-ghost" @click="$store.drawer.close()">Close</button>
+  <a class="ui-btn ui-btn-primary" href="{{ edit_url }}"><span>Open full record</span>{% icon "arrow-right" "w-4 h-4" %}</a>
+</div>

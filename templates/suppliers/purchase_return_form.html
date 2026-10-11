@@ -1,0 +1,40 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Return to supplier · {{ order.reference }}{% endblock %}
+{% block content %}
+<div class="ui-form-wrap space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{% url 'suppliers:purchase_list' %}">Purchase orders</a><span class="sep">/</span><a href="{% url 'suppliers:purchase_detail' order.pk %}">{{ order.reference }}</a><span class="sep">/</span><span>Return</span></nav>
+      <h1 class="page-title">Return to supplier · {{ order.reference }}</h1>
+      <p class="page-subtitle">{{ order.supplier.name }} · stock leaves {{ order.warehouse.name }} and the amount you owe the supplier goes down.</p>
+    </div>
+  </div>
+  <form method="post" novalidate class="space-y-4">
+    {% csrf_token %}
+    <div class="ui-table-wrap">
+      <table class="ui-table">
+        <thead><tr><th>Product</th><th class="num">Received</th><th class="num">Already sent back</th><th class="num">In {{ order.warehouse.name }} now</th><th class="num">Unit cost</th><th style="width:9rem">Send back</th></tr></thead>
+        <tbody>
+        {% for l in lines %}
+        <tr>
+          <td><div class="ui-cell-title">{{ l.variant.product.name }}</div><div class="ui-cell-sub">{% if l.variant.name %}{{ l.variant.name }} · {% endif %}{{ l.variant.sku }}</div></td>
+          <td class="num">{{ l.received|floatformat:"-3" }}</td>
+          <td class="num">{{ l.returned|floatformat:"-3" }}</td>
+          <td class="num">{{ l.on_hand|floatformat:"-3" }}</td>
+          <td class="num">{{ l.cost|floatformat:"2g" }}</td>
+          <td>{% if l.can_send > 0 %}<input type="number" name="qty_{{ l.variant_id }}" min="0" max="{{ l.can_send|stringformat:'f' }}" step="any" inputmode="decimal" value="{% for k, v in posted.items %}{% if k == l.variant_id %}{{ v }}{% endif %}{% endfor %}" aria-label="Quantity of {{ l.variant }} to send back" style="text-align:right">
+              {% else %}<span class="ui-help" style="margin:0">{% if l.left <= 0 %}All returned{% else %}Nothing in stock{% endif %}</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="ui-card" style="padding:16px"><div class="ui-field"><label class="ui-label" for="pr-reason">Reason <span style="color:var(--ui-danger)">*</span></label>
+      <input type="text" id="pr-reason" name="reason" maxlength="255" required value="{{ reason }}" placeholder="e.g. damaged on arrival, wrong item, expired"></div></div>
+    <div class="ui-sticky-actions">
+      <a href="{% url 'suppliers:purchase_detail' order.pk %}" class="ui-btn ui-btn-secondary" style="margin-left:auto">Cancel</a>
+      <button type="submit" class="ui-btn ui-btn-primary" data-confirm="Send these goods back?|The stock leaves {{ order.warehouse.name }} straight away.|Send back">{% icon "check" "w-4 h-4" %}<span>Save return</span></button>
+    </div>
+  </form>
+</div>
+{% endblock %}

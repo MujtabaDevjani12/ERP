@@ -1,0 +1,2 @@
+{# Activity timeline: {% ui "timeline" items=events %}  items = [{"text": "...", "time": "...", "actor": "...", "state": "done|current"}] #}
+{% if items %}<ol class="ui-timeline">{% for e in items %}<li class="ui-timeline-item{% if e.state %} is-{{ e.state }}{% endif %}"><div class="ui-timeline-text">{{ e.text }}</div><div class="ui-timeline-time">{% if e.actor %}{{ e.actor }} · {% endif %}{{ e.time }}</div></li>{% endfor %}</ol>{% else %}<p class="ui-help">No activity recorded yet.</p>{% endif %}

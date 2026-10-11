@@ -1,0 +1,19 @@
+{% load ui %}{# Gift card top-up panel (side drawer; JSON {ok:true} closes it). #}
+<form method="post" action="{{ request.get_full_path }}" novalidate>
+  {% csrf_token %}
+  {% if error %}<div style="margin-bottom:12px">{% ui "alert" tone="danger" message=error %}</div>{% endif %}
+  <dl class="ui-dl" style="grid-template-columns:minmax(90px,120px) 1fr;margin-bottom:14px">
+    <dt>Card</dt><dd>{{ card.code }}</dd>
+    <dt>Balance now</dt><dd><strong>{{ card.current_balance }}</strong></dd>
+  </dl>
+  <div class="ui-grid" style="grid-template-columns:minmax(0,1fr)">
+    <div class="ui-field"><label class="ui-label" for="gt-amt">Amount to add <span style="color:var(--ui-danger)">*</span></label>
+      <input type="number" id="gt-amt" name="amount" step="0.01" min="0.01" inputmode="decimal" value="{{ posted.amount }}" required autofocus></div>
+    <div class="ui-field"><label class="ui-label" for="gt-note">Note</label>
+      <input type="text" id="gt-note" name="note" maxlength="200" value="{{ posted.note }}" placeholder="Optional - e.g. paid in cash"></div>
+  </div>
+  <div class="ui-modal-foot" style="position:sticky;bottom:0;background:var(--ui-surface);padding-top:12px;margin-top:20px">
+    <button type="button" class="ui-btn ui-btn-ghost" @click="$store.drawer.close()">Cancel</button>
+    <button type="submit" class="ui-btn ui-btn-primary"><span>Add money</span></button>
+  </div>
+</form>

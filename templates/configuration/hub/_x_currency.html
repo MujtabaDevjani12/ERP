@@ -1,0 +1,19 @@
+{% load ui %}
+<div class="st-foot st-foot-soft" style="flex-wrap:wrap">
+  <span class="dx-cap">Preview: <b id="cur-preview" aria-live="polite">—</b></span>
+  <a href="{% url 'configuration:currency_list' %}" class="ui-btn ui-btn-secondary">{% icon "currency" "w-4 h-4" %}<span>Extra currencies</span></a></div>
+<script>
+(function () {
+  var f = document.querySelector('.st-form'), out = document.getElementById('cur-preview');
+  if (!f || !out) return;
+  function el(n) { return f.querySelector('[name="' + n + '"]'); }
+  function show() {
+    var d = Math.max(0, Math.min(4, parseInt(el('decimals').value, 10) || 0)), ds = el('decimal_separator').value || '.', ts = el('thousands_separator').value;
+    var parts = (1234567.891).toFixed(d).split('.'); parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ts);
+    var text = parts[0] + (d ? ds + parts[1] : ''), sym = el('default_currency_symbol').value;
+    if (el('display_currency_symbol').checked && sym) text = el('currency_position').value === 'after' ? text + ' ' + sym : sym + ' ' + text;
+    out.textContent = text;
+  }
+  f.addEventListener('input', show); f.addEventListener('change', show); show();
+})();
+</script>

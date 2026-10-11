@@ -1,0 +1,227 @@
+{% extends "base.html" %}{% load static ui %}
+{% block title %}Dashboard{% endblock %}
+{% block extra_head %}
+<script src="{% static 'vendor/chart.umd.js' %}"></script>
+{% endblock %}
+{% block content %}
+{# Look: static/css/fx-skin.css section 8 (.dx-*). Every number below comes from dashboard/views.py::home_view (real aggregates only). #}
+<div class="dx-head">
+  <div>
+    <h1 class="dx-hello">Welcome back, {{ user.get_full_name|default:user.username }}</h1>
+    <p class="dx-sub">{{ current_store.name }} — {{ current_store.get_business_type_display }}. Numbers refresh every time you open this page.</p>
+  </div>
+  <div class="dx-head-actions">
+    {% if active_session %}
+      <span class="dx-chip"><i></i>{{ active_session.register.name }} open</span>
+    {% else %}
+      <a href="{% url 'register:open' %}" class="ui-btn ui-btn-secondary">Open a register</a>
+    {% endif %}
+    <a href="{% url 'dashboard:pos' %}" class="ui-btn ui-btn-primary">{% icon "register" "w-4 h-4" %}<span>Open POS</span></a>
+  </div>
+</div>
+
+{# ---- row 1: today + this month's numbers ---- #}
+<div class="dx-top">
+  <section class="dx-card dx-hero" aria-labelledby="dx-today">
+    <div class="dx-card-head">
+      <h2 class="dx-card-title" id="dx-today">Today's sales</h2>
+      <span class="ui-badge ui-badge-neutral no-dot">{{ today_orders }} order{{ today_orders|pluralize }}</span>
+    </div>
+    <div class="dx-big"><small>{{ current_store.currency_symbol }}</small>{{ today_total|floatformat:"0g" }}</div>
+    <div class="dx-hero-delta">
+      {% if today_change is not None %}
+        <span class="dx-delta {% if today_change >= 0 %}up{% else %}down{% endif %}">{% if today_change >= 0 %}▲{% else %}▼{% endif %} {{ today_change|floatformat:1 }}%</span>
+        <span class="dx-cap">vs yesterday</span>
+      {% else %}
+        <span class="dx-cap">No sales yesterday to compare with.</span>
+      {% endif %}
+    </div>
+    <div class="dx-pay">
+      <div class="dx-pay-head"><span>Payment methods</span><small>this month</small></div>
+      {% for p in pay_methods %}
+        <div class="dx-pay-row"><span>{{ p.label }}</span><b>{% money p.total None 0 %}</b></div>
+      {% empty %}
+        <p class="dx-cap" style="padding:6px 0">No payments taken this month yet.</p>
+      {% endfor %}
+    </div>
+  </section>
+
+  <div class="dx-tiles">
+    {% include "dashboard/_stat_card.html" with accent=True label="Total Sales" value=stat_sales_total change=stat_sales_change caption="Completed sales this month" icon="sales" %}
+    {% include "dashboard/_stat_card.html" with label="Total Purchases" value=stat_purchases_total change=stat_purchases_change caption="Ordered this month" icon="purchases" %}
+    {% include "dashboard/_stat_card.html" with label="Total Due" value=stat_due_total change=stat_due_change caption="Outstanding on this month's sales" icon="due" %}
+    {% include "dashboard/_stat_card.html" with label="Total Expenses" value=stat_expenses_total change=stat_expenses_change caption="Paid out this month" icon="expenses" %}
+  </div>
+</div>
+
+{# ---- row 2: monthly chart + quick actions / low stock ---- #}
+<div class="dx-grid">
+  <section class="dx-card" aria-labelledby="dx-ov">
+    <div class="dx-card-head">
+      <div>
+        <h2 class="dx-card-title" id="dx-ov">Sales vs purchases</h2>
+        <p class="dx-card-sub">Last 12 months</p>
+      </div>
+      <div class="dx-legend"><span><i></i>Sales</span><span><i class="line"></i>Purchases</span></div>
+    </div>
+    <div class="dx-chart" style="height:340px"><canvas id="overviewChart" role="img" aria-label="Monthly sales and purchases"></canvas></div>
+  </section>
+
+  <div class="dx-stack">
+    <section class="dx-card" aria-labelledby="dx-qa">
+      <h2 class="dx-card-title" id="dx-qa" style="margin-bottom:14px">Quick actions</h2>
+      <div class="dx-quick">
+        {% for a in quick_actions %}
+          <a href="{{ a.url }}" class="dx-quick-item"><span class="dx-ico">{% icon a.icon "w-5 h-5" %}</span><span>{{ a.label }}</span></a>
+        {% endfor %}
+      </div>
+    </section>
+    <section class="dx-card" aria-labelledby="dx-low" style="flex:1">
+      <div class="dx-card-head" style="margin-bottom:8px">
+        <h2 class="dx-card-title" id="dx-low">Low stock {% if low_count %}<span class="ui-badge ui-badge-danger no-dot" style="margin-left:6px">{{ low_count }}</span>{% endif %}</h2>
+        <a href="{% url 'inventory:stock_list' %}" class="dx-link">View all</a>
+      </div>
+      {% for it in low_stock %}
+        <div class="dx-low-row">
+          <span class="dx-row-main"><span class="min-w-0"><span class="dx-row-ref">{{ it.variant.product.name }}{% if it.variant.name != "Default" %} · {{ it.variant.name }}{% endif %}</span><span class="dx-row-meta">{{ it.warehouse.name }}</span></span></span>
+          <span class="ui-badge {% if it.quantity <= 0 %}ui-badge-danger{% else %}ui-badge-warning{% endif %} no-dot">{{ it.quantity|floatformat:"-3" }} left</span>
+        </div>
+      {% empty %}
+        <div class="dx-empty" style="padding:22px 8px">Nothing is running low.</div>
+      {% endfor %}
+    </section>
+  </div>
+</div>
+
+{# ---- row 3: recent sales + top products ---- #}
+<div class="dx-grid">
+  <section class="dx-card" aria-labelledby="dx-rs">
+    <div class="dx-card-head">
+      <h2 class="dx-card-title" id="dx-rs">Recent sales</h2>
+      <a href="{% url 'sales:sale_list' %}" class="dx-link">View all</a>
+    </div>
+    <div class="dx-list">
+      {% for sale in recent_sales %}
+        <a href="{% url 'sales:sale_detail' sale.pk %}" class="dx-row">
+          <span class="dx-row-main">
+            <span class="dx-row-ico">{% icon "receipt" "w-4 h-4" %}</span>
+            <span class="min-w-0">
+              <span class="dx-row-ref">{{ sale.reference }}</span>
+              <span class="dx-row-meta">{{ sale.biller.get_full_name|default:sale.biller.username }} · {{ sale.created_at|date:"d M, H:i" }}</span>
+            </span>
+          </span>
+          <span class="dx-row-end">
+            <span class="dx-row-amt">{% money sale.total_amount None 0 %}</span>
+            <span class="dx-st {% if sale.payment_status == 'paid' %}paid{% elif sale.payment_status == 'partial' %}partial{% else %}due{% endif %}">{{ sale.payment_status|title }}</span>
+          </span>
+        </a>
+      {% empty %}
+        <div class="dx-empty"><span class="dx-ico">{% icon "receipt" "w-4 h-4" %}</span>No sales yet.</div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="dx-card" aria-labelledby="dx-top">
+    <div class="dx-card-head"><h2 class="dx-card-title" id="dx-top">Top products</h2><span class="dx-cap">30 days</span></div>
+    {% for p in top_products %}
+      <div class="dx-top-row">
+        <div class="dx-top-line"><span class="dx-row-ref">{{ p.variant__product__name }}</span><b>{% money p.revenue None 0 %}</b></div>
+        <div class="dx-bar"><i style="width:{{ p.pct }}%"></i></div>
+        <span class="dx-row-meta">{{ p.qty|floatformat:"-2" }} sold</span>
+      </div>
+    {% empty %}
+      <div class="dx-empty">No sales in the last 30 days.</div>
+    {% endfor %}
+  </section>
+</div>
+
+{# ---- row 4: daily sales + payment status ---- #}
+<div class="dx-grid">
+  <section class="dx-card" aria-labelledby="dx-30">
+    <div class="dx-card-head">
+      <div><h2 class="dx-card-title" id="dx-30">Sales, last 30 days</h2><p class="dx-card-sub">Daily takings</p></div>
+      <span class="ui-badge ui-badge-neutral no-dot">{% money d30_total None 0 %}</span>
+    </div>
+    <div class="dx-chart" style="height:240px"><canvas id="dailyChart" role="img" aria-label="Daily sales for the last 30 days"></canvas></div>
+  </section>
+
+  <section class="dx-card" aria-labelledby="dx-st">
+    <div class="dx-card-head"><div><h2 class="dx-card-title" id="dx-st">This month's sales</h2><p class="dx-card-sub">By payment status</p></div></div>
+    <div class="dx-donut"><canvas id="statusChart" role="img" aria-label="Sales by payment status"></canvas></div>
+    <div class="dx-split">
+      <div><span><i style="background:#10b981"></i>Paid</span><b style="color:var(--ui-success)">{{ status_paid }}</b></div>
+      <div><span><i style="background:#f59e0b"></i>Partial</span><b style="color:var(--ui-warning)">{{ status_partial }}</b></div>
+      <div><span><i style="background:#f43f5e"></i>Due</span><b style="color:var(--ui-danger)">{{ status_due }}</b></div>
+    </div>
+  </section>
+</div>
+
+<script>
+// Each chart is wrapped in its own try/catch on purpose: a mistake in one chart's config must never take the others down.
+// Colours come from the design tokens, so light/dark mode and the chosen brand colour apply; charts are rebuilt on theme toggle.
+(function () {
+  var charts = [];
+  var DATA = {
+    labels: {{ chart_labels_json|safe }}, sales: {{ chart_sales_json|safe }}, purchases: {{ chart_purchases_json|safe }}, tax: {{ chart_tax_json|safe }},
+    dLabels: {{ d30_labels_json|safe }}, dValues: {{ d30_values_json|safe }},
+    status: [{{ status_paid }}, {{ status_partial }}, {{ status_due }}]
+  };
+  function css(name, fallback) { var v = getComputedStyle(document.documentElement).getPropertyValue(name); return (v && v.trim()) || fallback; }
+  function hatch(color) {
+    var c = document.createElement('canvas'); c.width = c.height = 10;
+    var x = c.getContext('2d'); x.strokeStyle = color; x.lineWidth = 2;
+    [[-2, 12, 12, -2], [-2, 2, 2, -2], [8, 12, 12, 8]].forEach(function (l) { x.beginPath(); x.moveTo(l[0], l[1]); x.lineTo(l[2], l[3]); x.stroke(); });
+    return x.createPattern(c, 'repeat');
+  }
+  function build() {
+    charts.forEach(function (c) { try { c.destroy(); } catch (e) {} });
+    charts = [];
+    if (typeof Chart === 'undefined') { console.error('Chart.js did not load (static/vendor/chart.umd.js).'); return; }
+    var brand = css('--brand-600', '#4f46e5'), ink = css('--fx-ink', '#18181b'), text = css('--ui-text-3', '#85858f'),
+        grid = css('--ui-border', '#ebe8e1'), surface = css('--ui-surface', '#ffffff');
+    Chart.defaults.font.family = css('--font', 'Inter, system-ui, sans-serif');
+    Chart.defaults.color = text;
+    var tip = { backgroundColor: ink, titleColor: surface, bodyColor: surface, padding: 12, cornerRadius: 12, boxPadding: 4 };
+
+    try {
+      var max = DATA.sales.indexOf(Math.max.apply(null, DATA.sales.concat([0])));
+      var stripes = hatch(brand);
+      charts.push(new Chart(document.getElementById('overviewChart'), {
+        type: 'bar',
+        data: { labels: DATA.labels, datasets: [
+          { type: 'bar', label: 'Sales', data: DATA.sales, order: 2, borderRadius: 8, borderSkipped: false, maxBarThickness: 34, borderColor: brand, borderWidth: 1,
+            backgroundColor: DATA.sales.map(function (_, i) { return i === max && DATA.sales[i] > 0 ? brand : stripes; }) },
+          { type: 'line', label: 'Purchases', data: DATA.purchases, order: 1, borderColor: ink, backgroundColor: surface, borderWidth: 2.5, tension: 0.4,
+            pointRadius: 3.5, pointHoverRadius: 6, pointBackgroundColor: surface, pointBorderColor: ink, pointBorderWidth: 2 }
+        ] },
+        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+          plugins: { legend: { display: false }, tooltip: Object.assign({}, tip, { callbacks: { afterBody: function (items) {
+            var t = DATA.tax[items[0].dataIndex]; return t ? ['Sold product tax: ' + t.toLocaleString(undefined, { minimumFractionDigits: 2 })] : []; } } }) },
+          scales: { x: { grid: { display: false }, border: { display: false } }, y: { beginAtZero: true, grid: { color: grid }, border: { display: false } } } }
+      }));
+    } catch (err) { console.error('Overview chart failed to render:', err); }
+
+    try {
+      charts.push(new Chart(document.getElementById('dailyChart'), {
+        type: 'line',
+        data: { labels: DATA.dLabels, datasets: [{ label: 'Sales', data: DATA.dValues, borderColor: brand, borderWidth: 2.5, tension: 0.35, fill: true, pointRadius: 0, pointHoverRadius: 5,
+          backgroundColor: function (ctx) { var a = ctx.chart.chartArea; if (!a) return 'transparent'; var g = ctx.chart.ctx.createLinearGradient(0, a.top, 0, a.bottom); g.addColorStop(0, brand + '40'); g.addColorStop(1, brand + '00'); return g; } }] },
+        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+          plugins: { legend: { display: false }, tooltip: tip },
+          scales: { x: { grid: { display: false }, border: { display: false }, ticks: { maxTicksLimit: 8 } }, y: { beginAtZero: true, grid: { color: grid }, border: { display: false } } } }
+      }));
+    } catch (err) { console.error('Daily chart failed to render:', err); }
+
+    try {
+      charts.push(new Chart(document.getElementById('statusChart'), {
+        type: 'doughnut',
+        data: { labels: ['Paid', 'Partial', 'Due'], datasets: [{ data: DATA.status, backgroundColor: ['#10b981', '#f59e0b', '#f43f5e'], borderWidth: 4, borderColor: surface, borderRadius: 8, hoverOffset: 4 }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '72%', plugins: { legend: { display: false } } }
+      }));
+    } catch (err) { console.error('Status chart failed to render:', err); }
+  }
+  build();
+  window.addEventListener('ui-theme', function () { setTimeout(build, 30); });
+})();
+</script>
+{% endblock %}

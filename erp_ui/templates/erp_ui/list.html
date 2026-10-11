@@ -1,0 +1,148 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{{ title_plural }} · {{ module_title }}{% endblock %}
+{% block extra_head %}{% include "erp_ui/_head.html" %}{% endblock %}
+{% block content %}
+<div x-data="listTools" data-key="{{ app_label }}.{{ model_name }}" data-query="{{ query }}" data-list-url="{{ list_url }}" class="space-y-4">
+
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{{ module_url }}">{{ module_title }}</a><span class="sep">/</span><span>{{ title_plural }}</span></nav>
+      <h1 class="page-title">{{ title_plural }} <span class="ui-badge ui-badge-neutral no-dot" style="vertical-align:middle;margin-left:6px">{{ paginator.count }}</span></h1>
+    </div>
+    <div class="page-actions">
+      <div class="relative" @click.outside="colMenu = false">
+        <button type="button" class="ui-btn ui-btn-secondary" @click="colMenu = !colMenu; filtMenu = false" aria-haspopup="menu">{% icon "columns" "w-4 h-4" %}<span class="hidden sm:inline">Columns</span></button>
+        <div x-cloak x-show="colMenu" class="ui-menu" style="right:0;top:100%;margin-top:6px;min-width:230px;max-height:60vh;overflow:auto">
+          <div class="ui-menu-label">Show columns</div>
+          {% for c in columns %}{% if not forloop.first %}
+          <label class="ui-menu-item" style="cursor:pointer"><input type="checkbox" :checked="!isHidden({{ forloop.counter0 }})" @change="toggleCol({{ forloop.counter0 }})"><span>{{ c.label }}</span></label>
+          {% endif %}{% endfor %}
+          <div class="ui-menu-sep"></div>
+          <button type="button" class="ui-menu-item" @click="resetCols()">Show all columns</button>
+        </div>
+      </div>
+      <div class="relative" @click.outside="filtMenu = false">
+        <button type="button" class="ui-btn ui-btn-secondary" @click="filtMenu = !filtMenu; colMenu = false" aria-haspopup="menu">{% icon "filter" "w-4 h-4" %}<span class="hidden sm:inline">Saved views</span></button>
+        <div x-cloak x-show="filtMenu" class="ui-menu" style="right:0;top:100%;margin-top:6px;min-width:260px">
+          <div class="ui-menu-label">Saved views</div>
+          <template x-for="(f, i) in saved" :key="i">
+            <div class="flex items-center"><button type="button" class="ui-menu-item" @click="go(f)" x-text="f.name"></button><button type="button" class="icon-btn" style="width:28px;height:28px;flex:none" @click="removeSaved(i)" aria-label="Delete saved view">{% icon "x" "w-4 h-4" %}</button></div>
+          </template>
+          <p x-show="!saved.length" class="ui-help" style="padding:4px 10px 8px;margin:0">Nothing saved yet. Set up filters, then name and save them here.</p>
+          <div class="ui-menu-sep"></div>
+          <div class="flex gap-1.5 p-1.5"><input type="text" x-model="newName" placeholder="Name the current view…" @keydown.enter.prevent="saveCurrent()"><button type="button" class="ui-btn ui-btn-primary ui-btn-sm" @click="saveCurrent()">Save</button></div>
+        </div>
+      </div>
+      <a class="ui-btn ui-btn-secondary" href="?{% if query %}{{ query }}&{% endif %}export=csv" data-tip="Download as CSV" data-tip-pos="bottom">{% icon "download" "w-4 h-4" %}<span class="hidden sm:inline">Export</span></a>
+      <button type="button" class="ui-btn ui-btn-secondary" @click="window.print()" aria-label="Print" data-tip="Print this list" data-tip-pos="bottom">{% icon "printer" "w-4 h-4" %}</button>
+      {% if can_add %}<a class="ui-btn ui-btn-primary" href="{{ add_url }}">{% icon "plus" "w-4 h-4" %}<span>New {{ title_singular|lower }}</span></a>{% endif %}
+    </div>
+  </div>
+
+  {% if has_search or filters or date_range %}
+  <form method="get" class="ui-toolbar">
+    {% if order %}<input type="hidden" name="o" value="{{ order }}">{% endif %}
+    {% if has_search %}
+    <div style="flex:1;min-width:14rem">
+      <label class="ui-label" for="erp-q">Search</label>
+      <input type="search" id="erp-q" name="q" value="{{ q }}" placeholder="{{ search_hint|default:'Search' }}">
+    </div>
+    {% endif %}
+    {% for f in filters %}
+    <div style="min-width:9rem">
+      <label class="ui-label" for="erp-f-{{ forloop.counter }}">{{ f.label }}</label>
+      <select name="{{ f.param }}" id="erp-f-{{ forloop.counter }}">
+        <option value="">All</option>
+        {% for key, label in f.options %}<option value="{{ key }}" {% if key == f.selected %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    {% endfor %}
+    {% if date_range %}
+    <div><label class="ui-label" for="erp-df">{{ date_range.label }} from</label><input type="date" id="erp-df" name="df" value="{{ date_range.df }}"></div>
+    <div><label class="ui-label" for="erp-dt">to</label><input type="date" id="erp-dt" name="dt" value="{{ date_range.dt }}"></div>
+    {% endif %}
+    <div style="width:6rem">
+      <label class="ui-label" for="erp-per">Per page</label>
+      <select name="per" id="erp-per">{% for n in page_sizes %}<option value="{{ n }}" {% if n == per %}selected{% endif %}>{{ n }}</option>{% endfor %}</select>
+    </div>
+    <div class="flex gap-2">
+      <button type="submit" class="ui-btn ui-btn-primary">Apply</button>
+      {% if has_filters %}<a class="ui-btn ui-btn-secondary" href="{{ list_url }}">Reset</a>{% endif %}
+    </div>
+  </form>
+  {% endif %}
+
+  <form method="post" id="erp-list-form"{% if actions %} data-confirm="Run workflow action|Run this action on every ticked record? Records that cannot take it are skipped and reported.|Run action" data-confirm-tone="primary"{% endif %}>
+    {% csrf_token %}
+    {% if actions and rows %}
+    <div class="ui-bulkbar" data-bulkbar style="display:none;margin-bottom:12px">
+      <span><strong data-bulk-count>0</strong> selected</span>
+      <select name="action" required style="width:auto;min-width:16rem">
+        <option value="">Workflow action&hellip;</option>
+        {% for name, label in actions %}<option value="{{ name }}">{{ label }}</option>{% endfor %}
+      </select>
+      <button type="submit" class="ui-btn ui-btn-primary ui-btn-sm">Run</button>
+    </div>
+    {% endif %}
+
+    {% if rows %}
+    <div class="ui-table-wrap ui-scroll-y">
+      <table class="ui-table">
+        <thead>
+          <tr>
+            {% if actions %}<th class="col-check"><input type="checkbox" data-select-all aria-label="Select all rows on this page"></th>{% endif %}
+            {% for c in columns %}
+            <th data-col="{{ forloop.counter0 }}" class="whitespace-nowrap">
+              {% if c.sort %}<a class="inline-flex items-center gap-1" href="?{% if sort_query %}{{ sort_query }}&{% endif %}o={{ c.next }}">{{ c.label }}{% if c.state == 'asc' %} <span aria-label="sorted ascending">&uarr;</span>{% elif c.state == 'desc' %} <span aria-label="sorted descending">&darr;</span>{% endif %}</a>
+              {% else %}{{ c.label }}{% endif %}
+            </th>
+            {% endfor %}
+            <th class="col-actions"><span class="sr-only">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr class="is-clickable" data-href="{{ row.url }}">
+            {% if actions %}<td class="col-check"><input type="checkbox" name="_selected" value="{{ row.pk }}" data-select-row aria-label="Select this row"></td>{% endif %}
+            {% for c in row.cells %}
+            <td data-col="{{ forloop.counter0 }}"{% if c.numeric %} class="num"{% endif %}>
+              {% if forloop.first %}<a class="erp-link" style="font-weight:600" href="{{ row.url }}">{{ c.html }}</a>{% else %}{{ c.html }}{% endif %}
+            </td>
+            {% endfor %}
+            <td class="col-actions">
+              <button type="button" class="icon-btn" style="width:30px;height:30px;display:inline-flex" data-drawer-url="{% url 'erp_ui:preview' app_label model_name row.pk %}" data-drawer-title="Quick view" data-tip="Quick view" data-tip-pos="bottom" aria-label="Quick view">{% icon "eye" "w-4 h-4" %}</button>
+              <a class="icon-btn" style="width:30px;height:30px;display:inline-flex" href="{{ row.url }}" data-tip="Open" data-tip-pos="bottom" aria-label="Open record">{% icon "chevron-right" "w-4 h-4" %}</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="ui-card">
+      {% if has_filters %}
+        {% ui "empty_state" icon="search" title="Nothing matches these filters" text="Try a different search term or clear the filters." action_url=list_url action_label="Clear filters" %}
+      {% else %}
+        {% if can_add %}{% ui "empty_state" icon="inbox" title="No records yet" text="Create the first one to get started." action_url=add_url action_label="New record" %}
+        {% else %}{% ui "empty_state" icon="inbox" title="No records yet" text="There is nothing here for you to see at the moment." %}{% endif %}
+      {% endif %}
+    </div>
+    {% endif %}
+  </form>
+
+  {% if paginator.num_pages > 1 %}
+  <nav class="ui-pagination" aria-label="Pagination">
+    <div>Showing <strong>{{ page.start_index }}</strong>&ndash;<strong>{{ page.end_index }}</strong> of <strong>{{ paginator.count }}</strong></div>
+    <div class="flex items-center gap-1">
+      {% if page.has_previous %}<a class="ui-page-link" href="?{% if query %}{{ query }}&{% endif %}page={{ page.previous_page_number }}" aria-label="Previous page">{% icon "chevron-left" "w-4 h-4" %}</a>{% endif %}
+      {% for p in page_range %}
+        {% if p == ellipsis %}<span class="px-1" style="color:var(--ui-text-3)">&hellip;</span>
+        {% elif p == page.number %}<span class="ui-page-link is-current" aria-current="page">{{ p }}</span>
+        {% else %}<a class="ui-page-link" href="?{% if query %}{{ query }}&{% endif %}page={{ p }}">{{ p }}</a>{% endif %}
+      {% endfor %}
+      {% if page.has_next %}<a class="ui-page-link" href="?{% if query %}{{ query }}&{% endif %}page={{ page.next_page_number }}" aria-label="Next page">{% icon "chevron-right" "w-4 h-4" %}</a>{% endif %}
+    </div>
+  </nav>
+  {% endif %}
+</div>
+{% endblock %}

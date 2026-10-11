@@ -1,0 +1,46 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{{ report.title }}{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{% url 'reports_erp:dashboard' %}">ERP dashboard</a><span class="sep">/</span><span>{{ report.title }}</span></nav>
+      <h1 class="page-title">{{ report.title }}</h1>
+      {% if subtitle %}<p class="page-subtitle">{{ subtitle }}</p>{% endif %}
+    </div>
+    <div class="page-actions">
+      <a class="ui-btn ui-btn-secondary" href="?{{ query }}&format=xlsx">{% icon "table" "w-4 h-4" %}<span>Excel</span></a>
+      <a class="ui-btn ui-btn-secondary" href="?{{ query }}&format=pdf">{% icon "doc" "w-4 h-4" %}<span>PDF</span></a>
+      <button type="button" class="ui-btn ui-btn-secondary" onclick="window.print()" aria-label="Print">{% icon "printer" "w-4 h-4" %}<span>Print</span></button>
+    </div>
+  </div>
+
+  {% if report.uses != "none" %}
+  <form method="get" class="ui-toolbar print:hidden">
+    {% if report.uses == "range" %}
+      <div><label class="ui-label" for="re-from">From</label><input type="date" id="re-from" name="from" value="{{ params.date_from|date:'Y-m-d' }}"></div>
+      <div><label class="ui-label" for="re-to">To</label><input type="date" id="re-to" name="to" value="{{ params.date_to|date:'Y-m-d' }}"></div>
+    {% else %}
+      <div><label class="ui-label" for="re-asof">As of</label><input type="date" id="re-asof" name="as_of" value="{{ params.as_of|date:'Y-m-d' }}"></div>
+    {% endif %}
+    <label class="flex items-center gap-2 text-sm" style="padding-bottom:10px;cursor:pointer"><input type="checkbox" name="this_branch" value="1" {% if request.GET.this_branch %}checked{% endif %}><span>This branch only</span></label>
+    <div class="flex gap-2"><button type="submit" class="ui-btn ui-btn-primary">{% icon "filter" "w-4 h-4" %}<span>Show</span></button></div>
+  </form>
+  {% endif %}
+
+  {% if error %}
+    {% ui "alert" tone="danger" message=error %}
+  {% elif rows %}
+  <div class="ui-table-wrap">
+    <table class="ui-table">
+      <thead><tr>{% for h in headers %}<th>{{ h }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for row in rows %}<tr>{% for v in row %}<td>{{ v }}</td>{% endfor %}</tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  {% ui "empty_state" title="No data for this selection" message="Try a wider date range or remove the branch filter." %}
+  {% endif %}
+</div>
+{% endblock %}

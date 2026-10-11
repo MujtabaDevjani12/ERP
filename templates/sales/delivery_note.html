@@ -1,0 +1,25 @@
+{% load static %}<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Delivery note {{ delivery.reference }}</title>
+<style>
+*{box-sizing:border-box}body{font:14px/1.5 -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#111;margin:0;padding:28px;max-width:760px;margin-inline:auto}
+h1{font-size:22px;margin:0}h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#666;margin:22px 0 6px}
+.top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:12px}
+.muted{color:#666}.two{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+table{width:100%;border-collapse:collapse;margin-top:8px}th,td{padding:8px 10px;border-bottom:1px solid #ddd;text-align:left}th{font-size:12px;text-transform:uppercase;color:#666}td.n,th.n{text-align:right}
+.sign{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:56px}.sign div{border-top:1px solid #111;padding-top:6px;font-size:12px;color:#666}
+@media print{body{padding:0}}
+</style></head>
+<body onload="window.print()">
+<div class="top"><div><h1>{{ store.name }}</h1><div class="muted">Delivery note</div></div>
+<div style="text-align:right"><strong>{{ delivery.reference }}</strong><div class="muted">Invoice {{ sale.reference }}</div><div class="muted">{{ delivery.created_at|date:"d M Y" }}</div></div></div>
+<div class="two">
+<div><h2>Deliver to</h2><strong>{{ delivery.recipient_name }}</strong><br>{{ delivery.address }}{% if delivery.city %}, {{ delivery.city }}{% endif %}{% if delivery.phone %}<br>Phone: {{ delivery.phone }}{% endif %}</div>
+<div><h2>Dispatch</h2>{% if delivery.scheduled_date %}Promised: {{ delivery.scheduled_date|date:"d M Y" }}<br>{% endif %}{% if delivery.rider %}Rider: {{ delivery.rider }}<br>{% elif delivery.delivery_person %}Rider: {{ delivery.delivery_person.get_full_name|default:delivery.delivery_person.username }}<br>{% endif %}{% if delivery.tracking_no %}Tracking: {{ delivery.tracking_no }}{% endif %}</div>
+</div>
+<h2>Items</h2>
+<table><thead><tr><th>Item</th><th>Code</th><th class="n">Qty</th></tr></thead><tbody>
+{% for it in items %}<tr><td>{{ it.variant.product.name }}{% if it.variant.name %} <span class="muted">({{ it.variant.name }})</span>{% endif %}</td><td>{{ it.variant.barcode|default:it.variant.sku }}</td><td class="n">{{ it.quantity|floatformat:"-3" }}</td></tr>{% endfor %}
+</tbody></table>
+{% if delivery.note %}<h2>Note</h2><p>{{ delivery.note|linebreaksbr }}</p>{% endif %}
+<div class="sign"><div>Delivered by</div><div>Received by (name &amp; signature)</div></div>
+</body></html>

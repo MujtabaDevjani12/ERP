@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% load static ui %}{% block title %}Reports{% endblock %}
+{% block extra_head %}
+<script src="{% static 'vendor/chart.umd.js' %}"></script>
+{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <h1 class="page-title">Quick reports</h1>
+      <p class="page-subtitle">{{ date_from|date:"d M Y" }} – {{ date_to|date:"d M Y" }} · completed sales, purchases and expenses of this branch.</p>
+    </div>
+    <div class="page-actions">
+      <a class="ui-btn ui-btn-secondary" href="{% url 'reports:pack_index' %}">{% icon "chart" "w-4 h-4" %}<span>All reports</span></a>
+      <a class="ui-btn ui-btn-secondary" href="{% url 'reports:export_sales_csv' %}?from={{ date_from|date:'Y-m-d' }}&to={{ date_to|date:'Y-m-d' }}">{% icon "download" "w-4 h-4" %}<span>Sales CSV</span></a>
+      <a class="ui-btn ui-btn-secondary" href="{% url 'reports:export_products_csv' %}">{% icon "download" "w-4 h-4" %}<span>Products CSV</span></a>
+      <a class="ui-btn ui-btn-secondary" href="{% url 'reports:import_products_csv' %}">{% icon "upload" "w-4 h-4" %}<span>Import products</span></a>
+    </div>
+  </div>
+
+  <form method="get" class="ui-toolbar">
+    <div style="min-width:10rem"><label class="ui-label" for="rp-from">From</label><input type="date" id="rp-from" name="from" value="{{ date_from|date:'Y-m-d' }}"></div>
+    <div style="min-width:10rem"><label class="ui-label" for="rp-to">To</label><input type="date" id="rp-to" name="to" value="{{ date_to|date:'Y-m-d' }}"></div>
+    <div class="flex gap-2"><button type="submit" class="ui-btn ui-btn-primary">{% icon "filter" "w-4 h-4" %}<span>Apply</span></button></div>
+  </form>
+
+  <div class="ui-kpi-grid">
+    {% ui "kpi" label="Revenue" icon="cash" value=total_revenue|floatformat:"2g" foot=sale_count|stringformat:"s"|add:" sales" %}
+    {% ui "kpi" label="Outstanding due" icon="clock" value=total_due|floatformat:"2g" foot="Unpaid on completed sales" %}
+    {% ui "kpi" label="Purchases" icon="cart" value=purchases_total|floatformat:"2g" foot="Received orders" %}
+    {% ui "kpi" label="Expenses" icon="receipt" value=expenses_total|floatformat:"2g" foot="In this period" %}
+    {% ui "kpi" label="Est. net profit" icon="chart" value=net_profit_estimate|floatformat:"2g" foot="Revenue − expenses" %}
+  </div>
+
+  <div class="ui-grid" style="grid-template-columns:minmax(0,2fr) minmax(0,1fr)" id="rp-split">
+    {% component "card" title="Sales trend" %}
+      <div style="position:relative;height:260px"><canvas id="salesChart" aria-label="Daily revenue" role="img"></canvas></div>
+    {% endcomponent %}
+    {% component "card" title="Payment methods" %}
+      {% for pm in payment_methods %}{% if pm.payments__method %}
+      <div class="ui-list-row"><span class="ui-cell-title" style="font-weight:500;text-transform:capitalize">{{ pm.payments__method|cut:"_"|default:pm.payments__method }}</span><strong class="tabular">{% money pm.total %}</strong></div>
+      {% endif %}{% empty %}
+      <p class="ui-muted" style="margin:0;padding:12px 0">No payments found.</p>
+      {% endfor %}
+    {% endcomponent %}
+  </div>
+
+  <div class="ui-grid ui-grid-2">
+    {% component "card" title="Top selling products" flush=True %}
+      {% for p in top_products %}
+      <div class="ui-list-row" style="padding:12px 20px"><span class="ui-cell-title" style="font-weight:500">{{ p.variant__product__name }}</span><span class="ui-muted">{{ p.qty|floatformat:"-3" }} sold</span><strong class="tabular">{% money p.revenue %}</strong></div>
+      {% empty %}
+      <p class="ui-muted" style="margin:0;padding:28px 20px;text-align:center">No sales in this date range.</p>
+      {% endfor %}
+    {% endcomponent %}
+    {% component "card" title="Low stock alert" flush=True %}
+      {% for s in low_stock %}
+      <div class="ui-list-row" style="padding:12px 20px"><span class="min-w-0"><span class="ui-cell-title" style="font-weight:500">{{ s.variant.product.name }}</span><span class="ui-cell-sub">{{ s.warehouse.name }}</span></span><strong class="tabular ui-neg">{{ s.quantity|floatformat:"-3" }}</strong></div>
+      {% empty %}
+      <p class="ui-muted" style="margin:0;padding:28px 20px;text-align:center">Stock levels look good - no low-stock items.</p>
+      {% endfor %}
+    {% endcomponent %}
+  </div>
+</div>
+<style>@media (max-width: 900px) { #rp-split { grid-template-columns: minmax(0, 1fr) !important; } }</style>
+
+<script>
+(function () {
+if (typeof Chart === 'undefined') { console.error('Chart.js did not load (static/vendor/chart.umd.js).'); return; }
+new Chart(document.getElementById('salesChart'), {
+  type: 'line',
+  data: {
+    labels: {{ chart_labels_json|safe }},
+    datasets: [{
+      label: 'Revenue', data: {{ chart_values_json|safe }},
+      borderColor: '#4f46e5', backgroundColor: 'rgba(79,70,229,0.08)',
+      tension: 0.35, fill: true, pointRadius: 2,
+    }],
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: { y: { beginAtZero: true } },
+  },
+});
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,5 @@
+{# Menu button: {% component "dropdown" label="Actions" icon="dots-h" align="right" %}<a class="ui-menu-item" href="…">Edit</a>{% endcomponent %} #}
+{% load ui %}<div class="relative inline-block" x-data="{ open: false }" @keydown.escape="open = false" @click.outside="open = false">
+  <button type="button" class="ui-btn ui-btn-{{ variant|default:'secondary' }}{% if size %} ui-btn-{{ size }}{% endif %}{% if not label %} ui-btn-icon{% endif %}" @click="open = !open" aria-haspopup="menu" :aria-expanded="open">{% if icon %}{% icon icon "w-4 h-4" %}{% endif %}{% if label %}<span>{{ label }}</span>{% icon "chevron-down" "w-3.5 h-3.5" %}{% endif %}</button>
+  <div x-cloak x-show="open" x-transition:enter="ui-pop-enter" x-transition:enter-start="ui-pop-from" class="ui-menu" style="{% if align == 'left' %}left:0{% else %}right:0{% endif %};top:100%;margin-top:6px" role="menu" @click="open = false">{{ body }}</div>
+</div>

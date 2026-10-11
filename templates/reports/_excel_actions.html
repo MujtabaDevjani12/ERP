@@ -1,0 +1,4 @@
+{% load ui %}{% if show %}
+{% if export %}<a class="ui-btn ui-btn-secondary" href="{% url 'reports:data_export' key %}" title="Download {{ label|lower }} as an Excel file">{% icon "table" "w-4 h-4" %}<span class="hidden sm:inline">Excel</span></a>{% endif %}
+{% if import %}<a class="ui-btn ui-btn-secondary" href="{% url 'reports:data_hub' %}#card-{{ key }}" title="Import {{ label|lower }} from Excel">{% icon "download" "w-4 h-4" %}<span class="hidden sm:inline">Import</span></a>{% endif %}
+{% endif %}

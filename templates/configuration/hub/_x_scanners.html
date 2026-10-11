@@ -1,0 +1,13 @@
+{% load ui %}
+<div class="st-body">
+  <h3 class="st-subtitle">Registered scanners</h3>
+  <div class="st-list">
+    {% for d in devices %}
+      <div class="st-row"><span class="st-row-ico">{% icon "scan" "w-4 h-4" %}</span><div class="min-w-0"><b>{{ d.name }}</b><span class="dx-row-meta">{{ d.connection_info|default:"USB / keyboard-style scanner" }}</span></div>
+        <span class="ui-badge {% if d.is_active %}ui-badge-success{% else %}ui-badge-neutral{% endif %}" style="margin-left:auto">{% if d.is_active %}Active{% else %}Off{% endif %}</span></div>
+    {% empty %}
+      <div class="dx-empty" style="padding:22px 8px">No scanner registered. A USB scanner works without one — plug it in and scan into the POS search box.</div>
+    {% endfor %}
+  </div>
+  <div style="margin-top:12px">{% if perms.devices.add_device %}<a href="{% url 'devices:device_add' %}" class="ui-btn ui-btn-secondary">{% icon "plus" "w-4 h-4" %}<span>Add scanner</span></a>{% endif %}</div>
+</div>

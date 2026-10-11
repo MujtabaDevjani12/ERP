@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+{% load receipt ui %}{% if not d %}{% receipt_design sale.store as d %}{% endif %}<html>
+<head>
+<meta charset="UTF-8">
+<title>{{ sale.reference }} — {{ sale.store.name }}</title>
+<style>
+  :root { --accent: {{ d.accent }}; --fs: {{ d.font_px }}px; }
+  @page { size: {{ d.page_size }}; margin: {{ d.page_margin }}; }
+  * { box-sizing: border-box; }
+  body { font-family: {{ d.font_stack|safe }}; color: #111827; font-size: var(--fs); margin: 0; background: {% if preview %}#fff{% else %}#f3f4f6{% endif %}; }
+  .sheet { max-width: {% if d.is_thermal %}{{ d.width_px }}px{% else %}800px{% endif %}; margin: 0 auto; background: #fff; padding: {% if d.is_thermal %}14px 10px{% else %}28px 32px{% endif %}; }
+  .toolbar { max-width: {% if d.is_thermal %}{{ d.width_px }}px{% else %}800px{% endif %}; margin: 0 auto 12px; padding: 10px 0 0; display: flex; justify-content: flex-end; gap: 8px; }
+  .toolbar button { font-family: inherit; font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 8px; border: 1px solid #d1d5db; background: #fff; cursor: pointer; }
+  .toolbar button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .muted { color: #6b7280; } .num { text-align: right; } .strong { font-weight: 700; }
+  .store-name { font-size: 1.55em; font-weight: 800; color: #111827; line-height: 1.2; }
+  .store-meta { color: #6b7280; font-size: .85em; margin-top: 3px; line-height: 1.45; }
+  .logo { height: 40px; width: 40px; border-radius: 8px; object-fit: cover; margin-bottom: 8px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding-bottom: 14px; margin-bottom: 18px; }
+  .header.center { flex-direction: column; align-items: center; text-align: center; }
+  .header.center .invoice-title { text-align: center; }
+  .invoice-title { text-align: right; }
+  .invoice-title h1 { font-size: 1.7em; margin: 0; letter-spacing: 1px; }
+  .invoice-title p { margin: 2px 0 0; color: #6b7280; }
+  .classic .header { border-bottom: 3px solid var(--accent); } .classic .invoice-title h1 { color: var(--accent); }
+  .minimal .header { border-bottom: 1px solid #d1d5db; } .minimal .invoice-title h1 { color: #111827; }
+  .modern .header { background: var(--accent); color: #fff; padding: 18px 20px; border-radius: 10px; }
+  .modern .header .store-name, .modern .header .store-meta, .modern .header .invoice-title h1, .modern .header .invoice-title p { color: #fff; }
+  .modern .header .store-meta { opacity: .85; }
+  .meta-grid { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+  .meta-grid .box { width: 48%; }
+  .meta-grid h3 { font-size: .75em; text-transform: uppercase; letter-spacing: .5px; color: #9ca3af; margin: 0 0 4px; }
+  .meta-grid p { margin: 0; line-height: 1.5; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+  th { background: #f9fafb; text-align: left; font-size: .75em; text-transform: uppercase; color: #6b7280; padding: 8px 10px; border-bottom: 1px solid #e5e7eb; }
+  .modern th { background: color-mix(in srgb, var(--accent) 10%, #fff); }
+  th.num, td.num { text-align: right; }
+  td { padding: 8px 10px; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
+  td .sku { display: block; color: #9ca3af; font-size: .8em; }
+  .totals { width: 45%; margin-left: auto; }
+  .totals tr td { border: none; padding: 4px 10px; }
+  .totals tr.grand td { border-top: 2px solid #111827; font-weight: 800; font-size: 1.1em; padding-top: 8px; }
+  .totals tr.due td { font-weight: 800; color: #b91c1c; }
+  .pay td { padding: 3px 10px; border: 0; color: #374151; }
+  .footer { margin-top: 24px; padding-top: 14px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: .8em; text-align: center; }
+  .terms { color: #6b7280; font-size: .85em; white-space: pre-line; margin-top: 12px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: .75em; font-weight: 700; }
+  .badge-paid { background: #d1fae5; color: #065f46; } .badge-partial { background: #fef3c7; color: #92400e; } .badge-due { background: #fee2e2; color: #991b1b; }
+  /* receipt roll */
+  .roll { text-align: center; }
+  .roll .store-name { font-size: 1.35em; }
+  .roll hr { border: 0; border-top: 1px dashed #6b7280; margin: 8px 0; }
+  .roll .left { text-align: left; } .roll .row { display: flex; justify-content: space-between; gap: 8px; }
+  .roll .line { text-align: left; margin: 5px 0; } .roll .line .sub { display: flex; justify-content: space-between; color: #374151; }
+  .roll .tot .row { padding: 1px 0; } .roll .tot .grand { font-weight: 800; font-size: 1.15em; border-top: 1px solid #111827; margin-top: 3px; padding-top: 4px; }
+  .roll .foot { margin-top: 10px; font-size: .9em; }
+  .roll .terms { text-align: left; }
+  @media print { .toolbar, .no-print { display: none !important; } body { background: #fff; } .sheet { padding: 0; max-width: none; } .modern .header { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+</style>
+</head>
+<body class="{{ d.style }}{% if embed or preview %} embedded{% endif %}">
+  {% if not preview and not embed %}
+  <div class="toolbar no-print">
+    <button onclick="window.print()" class="primary">Print</button>
+    <button onclick="window.close()">Close</button>
+  </div>
+  {% endif %}
+
+  <div class="sheet{% if d.is_thermal %} roll{% endif %}">
+  {% if d.is_thermal %}
+    {# ---------------------------------------------------------------- receipt roll (58 / 80 mm) #}
+    {% if d.show_logo and system_settings.site_logo %}<img class="logo" src="{{ system_settings.site_logo.url }}" alt="">{% endif %}
+    <div class="store-name">{{ sale.store.name }}</div>
+    {% if system_settings.tagline %}<div class="store-meta" style="font-style:italic">{{ system_settings.tagline }}</div>{% endif %}
+    <div class="store-meta">
+      {% if d.show_address and sale.store.address %}{{ sale.store.address }}<br>{% endif %}
+      {% if d.show_contact %}{% if sale.store.phone %}{{ sale.store.phone }}{% endif %}{% if sale.store.phone and sale.store.email %}<br>{% endif %}{{ sale.store.email }}{% if system_settings.website %}<br>{{ system_settings.website }}{% endif %}{% endif %}
+      {% if d.show_tax_number and system_settings.tax_number %}<br>Tax / NTN: {{ system_settings.tax_number }}{% endif %}
+      {% if d.header_note %}<br>{{ d.header_note }}{% endif %}
+    </div>
+    <hr>
+    <div class="strong">{{ d.title }}</div>
+    <div class="left">
+      <div class="row"><span>No.</span><span>{{ sale.reference }}</span></div>
+      <div class="row"><span>Date</span><span>{{ sale.created_at|date:"d M Y, H:i" }}</span></div>
+      {% if not pos_settings or pos_settings.show_customer_details_on_receipt %}<div class="row"><span>Customer</span><span>{{ sale.customer.name|default:"Walk-in" }}</span></div>{% endif %}
+      {% if d.show_biller %}<div class="row"><span>Cashier</span><span>{{ sale.biller.get_full_name|default:sale.biller.username }}</span></div>{% endif %}
+      {% if d.show_warehouse %}<div class="row"><span>Warehouse</span><span>{{ sale.warehouse.name }}</span></div>{% endif %}
+    </div>
+    <hr>
+    {% for item in sale.items.all %}
+    <div class="line">
+      <div class="strong">{{ item.variant.product.name }}{% if item.variant.name != "Default" %} — {{ item.variant.name }}{% endif %}</div>
+      {% if d.show_item_sku and item.variant.sku %}<div class="muted" style="font-size:.85em">{{ item.variant.sku }}</div>{% endif %}
+      <div class="sub"><span>{{ item.quantity }} × {{ item.unit_price|floatformat:2 }}</span><span>{{ item.line_total|floatformat:2 }}</span></div>
+      {% if d.show_item_discount and item.discount_amount %}<div class="sub"><span>Discount</span><span>-{{ item.discount_amount|floatformat:2 }}</span></div>{% endif %}
+      {% if d.show_item_tax and item.tax_amount %}<div class="sub"><span>Tax</span><span>{{ item.tax_amount|floatformat:2 }}</span></div>{% endif %}
+    </div>
+    {% endfor %}
+    <hr>
+    <div class="tot">
+      <div class="row"><span>Subtotal</span><span>{% money sale.subtotal sale.store.currency_symbol %}</span></div>
+      {% if sale.discount_amount %}<div class="row"><span>Discount</span><span>-{% money sale.discount_amount sale.store.currency_symbol %}</span></div>{% endif %}
+      {% if sale.tax_amount %}<div class="row"><span>Tax</span><span>+{% money sale.tax_amount sale.store.currency_symbol %}</span></div>{% endif %}
+      {% if sale.shipping_amount %}<div class="row"><span>Shipping</span><span>+{% money sale.shipping_amount sale.store.currency_symbol %}</span></div>{% endif %}
+      {% if sale.rounding_amount %}<div class="row"><span>Rounding</span><span>{% if sale.rounding_amount > 0 %}+{% endif %}{% money sale.rounding_amount sale.store.currency_symbol %}</span></div>{% endif %}
+      <div class="row grand"><span>TOTAL</span><span>{% money sale.total_amount sale.store.currency_symbol %}</span></div>
+      {% if d.show_payments %}{% for p in sale.payments.all %}<div class="row"><span>{{ p.get_method_display }}</span><span>{% money p.amount sale.store.currency_symbol %}</span></div>{% endfor %}{% endif %}
+      <div class="row"><span>Paid</span><span>{% money sale.paid_amount sale.store.currency_symbol %}</span></div>
+      {% if sale.due_amount > 0 %}<div class="row strong"><span>Balance due</span><span>{% money sale.due_amount sale.store.currency_symbol %}</span></div>{% endif %}
+    </div>
+    {% if d.show_notes and sale.sale_note %}<p class="left muted">Note: {{ sale.sale_note }}</p>{% endif %}
+    {% if pos_settings.receipt_custom_field1_title and pos_settings.receipt_custom_field1_value %}<div class="left"><strong>{{ pos_settings.receipt_custom_field1_title }}:</strong> {{ pos_settings.receipt_custom_field1_value }}</div>{% endif %}
+    {% if pos_settings.receipt_custom_field2_title and pos_settings.receipt_custom_field2_value %}<div class="left"><strong>{{ pos_settings.receipt_custom_field2_title }}:</strong> {{ pos_settings.receipt_custom_field2_value }}</div>{% endif %}
+    {% if d.terms_and_conditions %}<div class="terms"><strong>Terms &amp; conditions</strong><br>{{ d.terms_and_conditions }}</div>{% endif %}
+    <div class="foot">{% if d.footer_text %}{{ d.footer_text }}{% else %}Thank you for shopping with {{ sale.store.name }}!{% endif %}</div>
+
+  {% else %}
+    {# ---------------------------------------------------------------- A4 invoice #}
+    <div class="header{% if d.header_align == 'center' %} center{% endif %}">
+      <div>
+        {% if d.show_logo and system_settings.site_logo %}<img class="logo" src="{{ system_settings.site_logo.url }}" alt="" />{% endif %}
+        <div class="store-name">{{ sale.store.name }}</div>
+        {% if system_settings.tagline %}<div class="store-meta" style="font-style:italic">{{ system_settings.tagline }}</div>{% endif %}
+        <div class="store-meta">
+          {% if d.show_address and sale.store.address %}{{ sale.store.address }}<br>{% endif %}
+          {% if d.show_contact %}{% if sale.store.phone %}{{ sale.store.phone }}{% endif %}{% if sale.store.phone and sale.store.email %} · {% endif %}{{ sale.store.email }}{% if system_settings.website %}<br>{{ system_settings.website }}{% endif %}{% endif %}
+          {% if d.show_tax_number and system_settings.tax_number %}<br>Tax / NTN: {{ system_settings.tax_number }}{% endif %}
+          {% if d.header_note %}<br>{{ d.header_note }}{% endif %}
+        </div>
+      </div>
+      <div class="invoice-title">
+        <h1>{{ d.title }}</h1>
+        <p>{{ sale.reference }}</p>
+        <p>{{ sale.created_at|date:"d M Y, H:i" }}</p>
+      </div>
+    </div>
+
+    <div class="meta-grid">
+      <div class="box">
+        <h3>Billed to</h3>
+        <p><strong>{{ sale.customer.name|default:"Walk-in customer" }}</strong></p>
+        {% if not pos_settings or pos_settings.show_customer_details_on_receipt %}
+          {% if sale.customer.phone %}<p>{{ sale.customer.phone }}</p>{% endif %}
+          {% if sale.customer.address %}<p>{{ sale.customer.address }}</p>{% endif %}
+        {% endif %}
+      </div>
+      <div class="box" style="text-align:right;">
+        <h3>Sale details</h3>
+        {% if d.show_biller %}<p>Biller: {{ sale.biller.get_full_name|default:sale.biller.username }}</p>{% endif %}
+        {% if d.show_warehouse %}<p>Warehouse: {{ sale.warehouse.name }}</p>{% endif %}
+        <p>
+          {% if sale.payment_status == "paid" %}<span class="badge badge-paid">PAID</span>
+          {% elif sale.payment_status == "partial" %}<span class="badge badge-partial">PARTIAL</span>
+          {% else %}<span class="badge badge-due">DUE</span>{% endif %}
+        </p>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>Item</th><th class="num">Qty</th><th class="num">Unit price</th>{% if d.show_item_discount %}<th class="num">Discount</th>{% endif %}{% if d.show_item_tax %}<th class="num">Tax</th>{% endif %}<th class="num">Total</th></tr>
+      </thead>
+      <tbody>
+        {% for item in sale.items.all %}
+        <tr>
+          <td>{{ item.variant.product.name }}{% if item.variant.name != "Default" %} — {{ item.variant.name }}{% endif %}{% if d.show_item_sku and item.variant.sku %}<span class="sku">{{ item.variant.sku }}</span>{% endif %}</td>
+          <td class="num">{{ item.quantity }}</td>
+          <td class="num">{{ item.unit_price|floatformat:2 }}</td>
+          {% if d.show_item_discount %}<td class="num">{{ item.discount_amount|floatformat:2 }}</td>{% endif %}
+          {% if d.show_item_tax %}<td class="num">{{ item.tax_amount|floatformat:2 }}</td>{% endif %}
+          <td class="num">{{ item.line_total|floatformat:2 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <table class="totals">
+      <tr><td>Subtotal</td><td class="num">{% money sale.subtotal sale.store.currency_symbol %}</td></tr>
+      <tr><td>Discount</td><td class="num">-{% money sale.discount_amount sale.store.currency_symbol %}</td></tr>
+      <tr><td>Tax</td><td class="num">+{% money sale.tax_amount sale.store.currency_symbol %}</td></tr>
+{% if sale.shipping_amount %}<tr><td>Shipping</td><td class="num">+{% money sale.shipping_amount sale.store.currency_symbol %}</td></tr>{% endif %}
+{% if sale.rounding_amount %}<tr><td>Rounding</td><td class="num">{% if sale.rounding_amount > 0 %}+{% endif %}{% money sale.rounding_amount sale.store.currency_symbol %}</td></tr>{% endif %}
+      <tr class="grand"><td>Total</td><td class="num">{% money sale.total_amount sale.store.currency_symbol %}</td></tr>
+      <tr><td>Paid</td><td class="num">{% money sale.paid_amount sale.store.currency_symbol %}</td></tr>
+      {% if sale.due_amount > 0 %}<tr class="due"><td>Balance due</td><td class="num">{% money sale.due_amount sale.store.currency_symbol %}</td></tr>{% endif %}
+    </table>
+
+    {% if d.show_payments and sale.payments.all %}
+    <table class="totals pay"><tr><td colspan="2" class="strong muted" style="font-size:.8em;text-transform:uppercase">Payments</td></tr>
+      {% for p in sale.payments.all %}<tr><td>{{ p.get_method_display }}</td><td class="num">{% money p.amount sale.store.currency_symbol %}</td></tr>{% endfor %}
+    </table>
+    {% endif %}
+
+    {% if d.show_notes and sale.sale_note %}<p style="color:#6b7280;">Note: {{ sale.sale_note }}</p>{% endif %}
+    {% if pos_settings.receipt_custom_field1_title and pos_settings.receipt_custom_field1_value %}<p style="color:#374151;margin:2px 0;"><strong>{{ pos_settings.receipt_custom_field1_title }}:</strong> {{ pos_settings.receipt_custom_field1_value }}</p>{% endif %}
+    {% if pos_settings.receipt_custom_field2_title and pos_settings.receipt_custom_field2_value %}<p style="color:#374151;margin:2px 0;"><strong>{{ pos_settings.receipt_custom_field2_title }}:</strong> {{ pos_settings.receipt_custom_field2_value }}</p>{% endif %}
+    {% if d.terms_and_conditions %}<p class="terms"><strong>Terms &amp; conditions</strong><br>{{ d.terms_and_conditions }}</p>{% endif %}
+
+    <div class="footer">
+      {% if d.footer_text %}{{ d.footer_text }}{% else %}Thank you for shopping with {{ sale.store.name }}!{% endif %}<br>
+      This is a computer-generated invoice.
+    </div>
+  {% endif %}
+  </div>
+
+  {% if not preview %}
+  <script>
+    // The print dialog opens by itself once the receipt is ready (what a real POS till does). The "Print" button is the fallback
+    // if a browser blocks it. Opened inside the POS (hidden frame) it prints without leaving the billing screen.
+    window.addEventListener("load", function () {
+      setTimeout(function () { try { window.focus(); window.print(); } catch (e) {} }, 250);
+    });
+  </script>
+  {% endif %}
+</body>
+</html>

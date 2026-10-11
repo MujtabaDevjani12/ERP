@@ -1,0 +1,33 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Delete {{ obj }}{% endblock %}
+{% block extra_head %}{% include "erp_ui/_head.html" %}{% endblock %}
+{% block content %}
+<div class="ui-form-wrap space-y-4" style="max-width:40rem">
+  <div class="page-header">
+    <div>
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="{{ module_url }}">{{ module_title }}</a><span class="sep">/</span><a href="{{ list_url }}">{{ title_plural }}</a><span class="sep">/</span><a href="{{ edit_url }}">{{ obj }}</a><span class="sep">/</span><span>Delete</span>
+      </nav>
+      <h1 class="page-title">Delete {{ title_singular|lower }}?</h1>
+    </div>
+  </div>
+
+  <div class="ui-card"><div class="ui-card-body" style="display:grid;gap:16px">
+    {% if blocked %}
+      {% ui "alert" tone="warning" title="This record cannot be deleted" message="Other records depend on it, or you do not have permission for them. Cancel or reverse it instead when the workflow allows it." %}
+      {% if protected %}<ul class="text-sm" style="list-style:disc;padding-left:20px;color:var(--ui-text-2)">{{ protected|unordered_list }}</ul>{% endif %}
+      {% if perms_needed %}<p class="text-sm" style="color:var(--ui-text-2)">Missing permission for: {{ perms_needed|join:", " }}</p>{% endif %}
+      <div><a class="ui-btn ui-btn-secondary" href="{{ edit_url }}">{% icon "arrow-left" "w-4 h-4" %}<span>Back</span></a></div>
+    {% else %}
+      {% ui "alert" tone="danger" title="This cannot be undone" message="The record and everything listed below will be removed permanently." %}
+      <p class="text-sm" style="color:var(--ui-text)">You are about to delete <strong>{{ obj }}</strong> together with:</p>
+      <ul class="text-sm" style="list-style:disc;padding-left:20px;color:var(--ui-text-2)">{{ to_delete|unordered_list }}</ul>
+      <form method="post" class="flex items-center gap-2">
+        {% csrf_token %}
+        <button type="submit" class="ui-btn ui-btn-danger">{% icon "trash" "w-4 h-4" %}<span>Yes, delete</span></button>
+        <a class="ui-btn ui-btn-secondary" href="{{ edit_url }}">Cancel</a>
+      </form>
+    {% endif %}
+  </div></div>
+</div>
+{% endblock %}

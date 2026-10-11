@@ -1,0 +1,30 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Register session {{ session.number }}{% endblock %}
+{% block content %}
+<div class="ui-form-wrap space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb"><a href="{% url 'register:session_list' %}">Registers &amp; shifts</a><span class="sep">/</span><span>{{ session.number }}</span></nav>
+      <h1 class="page-title">{{ session.register.name }} · {{ session.number }}
+        {% if session.status == 'open' %}<span class="ui-badge ui-badge-success" style="vertical-align:middle">Open</span>{% else %}<span class="ui-badge ui-badge-neutral" style="vertical-align:middle">Closed</span>{% endif %}</h1>
+      <p class="page-subtitle">Cashier {{ session.opened_by.get_full_name|default:session.opened_by.username }} · opened {{ session.opened_at|date:"d M Y, H:i" }}{% if session.closed_at %} · closed {{ session.closed_at|date:"d M Y, H:i" }}{% if session.closed_by %} by {{ session.closed_by.get_full_name|default:session.closed_by.username }}{% endif %}{% endif %}</p>
+    </div>
+    <div class="page-actions"><a class="ui-btn ui-btn-secondary" href="#" onclick="window.print();return false">Print</a><a class="ui-btn ui-btn-primary" href="{% url 'register:open' %}?switch=1">Select counter</a></div>
+  </div>
+  {% include "register/_summary.html" %}
+  {% if session.status == 'closed' %}
+  <div class="ui-card"><div class="ui-card-body grid grid-cols-3 gap-3 text-sm">
+    <div><div class="ui-help" style="margin:0">Counted cash</div><div class="font-semibold tabular-nums">{% money session.closing_cash_counted|default:0 %}</div></div>
+    <div><div class="ui-help" style="margin:0">Difference</div><div class="font-semibold tabular-nums {% if session.variance and session.variance < 0 %}text-rose-600{% elif session.variance and session.variance > 0 %}text-emerald-600{% endif %}">{{ session.variance|default:"0.00" }}</div></div>
+    <div><div class="ui-help" style="margin:0">Closing note</div><div>{{ session.note|default:"—" }}</div></div>
+  </div></div>
+  {% endif %}
+  {% if summary.by_method %}
+  <div class="ui-card"><div class="ui-card-header"><span class="ui-card-title">Payments by method</span></div>
+    <div class="ui-table-wrap"><table class="ui-table"><thead><tr><th>Method</th><th class="num">Payments</th><th class="num">Amount</th></tr></thead><tbody>
+      {% for m in summary.by_method %}<tr><td>{{ m.name }}</td><td class="num">{{ m.count }}</td><td class="num">{{ m.total }}</td></tr>{% endfor %}
+    </tbody></table></div></div>
+  {% endif %}
+  {% if frozen %}<p class="ui-help">These are the figures frozen when the register was closed.</p>{% endif %}
+</div>
+{% endblock %}

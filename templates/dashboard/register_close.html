@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% load ui %}{% block title %}Close register{% endblock %}
+{% block content %}
+<div class="min-h-[70vh] flex items-center justify-center py-6">
+  <div class="w-full max-w-md" x-data="denominationCalculator()">
+    <div class="text-center mb-6">
+      <h1 class="text-xl font-bold text-ink">Close {{ session.register.name }}</h1>
+      <p class="text-sm text-gray-500 mt-1">Opened {{ session.opened_at|date:"d M, H:i" }} by {{ session.opened_by.get_full_name|default:session.opened_by.username }}</p>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-gray-200 card-shadow p-6 space-y-4">
+      <div class="grid grid-cols-2 gap-3 text-sm">
+        <div class="bg-gray-50 rounded-lg p-3">
+          <p class="text-xs text-gray-500">Opening cash</p>
+          <p class="font-semibold tabular-nums mt-0.5">{% money session.opening_cash %}</p>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-3">
+          <p class="text-xs text-gray-500">Cash sales</p>
+          <p class="font-semibold tabular-nums mt-0.5">{% money session.cash_sales_total %}</p>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-3">
+          <p class="text-xs text-gray-500">Cash expenses</p>
+          <p class="font-semibold tabular-nums mt-0.5">- {% money session.cash_expenses_total %}</p>
+        </div>
+        <div class="bg-brand-50 rounded-lg p-3">
+          <p class="text-xs text-brand-700">Expected cash</p>
+          <p class="font-bold tabular-nums mt-0.5 text-brand-700">{% money session.expected_cash %}</p>
+        </div>
+      </div>
+
+      <div class="pt-2 border-t border-gray-100">
+        <div class="flex items-center justify-between mb-2">
+          <label class="text-sm font-medium text-gray-700">Cash denomination count</label>
+          <div class="flex items-center gap-2">
+            {% include "partials/calculator_widget.html" %}
+            <button type="button" @click="showDenom = !showDenom" class="text-xs text-brand-600 hover:underline font-medium" x-text="showDenom ? 'Hide' : 'Count notes'"></button>
+          </div>
+        </div>
+        <div x-show="showDenom" x-cloak class="bg-gray-50 rounded-lg p-3 mb-1 space-y-2">
+          <template x-for="d in denominations" :key="d.value">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-medium text-gray-600 w-16 shrink-0" x-text="fmt(d.value)"></span>
+              <span class="text-gray-400 text-xs">×</span>
+              <input type="number" min="0" x-model.number="d.qty" @input="recalc()" class="w-16 text-sm rounded-lg border-gray-300 py-1.5 px-2" />
+              <span class="text-xs text-gray-500 ml-auto tabular-nums" x-text="fmt(d.value * (d.qty||0))"></span>
+            </div>
+          </template>
+          <div class="flex items-center justify-between border-t border-gray-200 pt-2 mt-2 text-sm font-semibold text-ink">
+            <span>Denomination total</span>
+            <span x-text="fmt(denominationTotal)"></span>
+          </div>
+        </div>
+      </div>
+
+      <form method="post" class="space-y-4 pt-2 border-t border-gray-100">
+        {% csrf_token %}
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">Counted cash (actual)</label>
+          <input type="number" name="closing_cash_counted" x-model.number="countedCash" step="0.01" required class="w-full rounded-lg border-gray-300 focus:border-brand-500 focus:ring-brand-500 text-sm" />
+          <p class="text-xs text-gray-400 mt-1">Auto-filled from the denomination count above — adjust freely if it's counted differently.</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">Note (optional)</label>
+          <textarea name="note" rows="2" class="w-full rounded-lg border-gray-300 focus:border-brand-500 focus:ring-brand-500 text-sm"></textarea>
+        </div>
+        <button type="submit" class="w-full bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 text-white font-semibold text-sm py-3 rounded-lg shadow-sm shadow-rose-900/20 transition">Close register</button>
+      </form>
+    </div>
+  </div>
+</div>
+<script>
+function denominationCalculator() {
+  return {
+    showDenom: false,
+    // Standard Pakistani Rupee note/coin values — adjust here if your
+    // store's currency uses different denominations.
+    denominations: [5000, 1000, 500, 100, 50, 20, 10, 5].map(v => ({ value: v, qty: null })),
+    countedCash: null,
+    get denominationTotal() {
+      return this.denominations.reduce((sum, d) => sum + d.value * (parseFloat(d.qty) || 0), 0);
+    },
+    recalc() { this.countedCash = this.denominationTotal; },
+    fmt(n) { return window.appMoney ? window.appMoney(n) : '{{ current_store.currency_symbol|default:"Rs" }} ' + (parseFloat(n) || 0).toFixed(2); },
+  };
+}
+</script>
+{% endblock %}

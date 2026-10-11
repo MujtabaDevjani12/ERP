@@ -1,0 +1,97 @@
+{% extends "base.html" %}{% load ui xl %}
+{% block title %}Suppliers{% endblock %}
+{% block content %}
+{% url 'suppliers:supplier_add' as add_url %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <h1 class="page-title">Suppliers <span class="ui-badge ui-badge-neutral no-dot" style="vertical-align:middle;margin-left:6px">{{ result_count }}</span></h1>
+      <p class="page-subtitle">Who you buy stock from, how to reach them and what terms apply.</p>
+    </div>
+    <div class="page-actions">
+      {% excel_actions "suppliers" %}
+      {% if perms.suppliers.add_purchaseorder %}<a class="ui-btn ui-btn-secondary" href="{% url 'suppliers:purchase_add' %}">{% icon "cart" "w-4 h-4" %}<span>New purchase</span></a>{% endif %}
+      {% if perms.suppliers.add_supplier %}<a class="ui-btn ui-btn-primary" href="{{ add_url }}">{% icon "plus" "w-4 h-4" %}<span>Add supplier</span></a>{% endif %}
+    </div>
+  </div>
+
+  <form method="get" class="ui-toolbar">
+    <div class="ui-search">
+      <label class="ui-label" for="s-q">Search</label>
+      {% icon "search" "w-4 h-4" %}
+      <input type="search" id="s-q" name="q" value="{{ request.GET.q }}" placeholder="Name, company, contact, phone, city or tax no" autocomplete="off">
+    </div>
+    <div style="min-width:9rem">
+      <label class="ui-label" for="s-status">Status</label>
+      <select id="s-status" name="status">
+        <option value="">All</option>
+        <option value="active" {% if request.GET.status == "active" %}selected{% endif %}>Active</option>
+        <option value="inactive" {% if request.GET.status == "inactive" %}selected{% endif %}>Inactive</option>
+      </select>
+    </div>
+    {% if cities %}<div style="min-width:9rem">
+      <label class="ui-label" for="s-city">City</label>
+      <select id="s-city" name="city">
+        <option value="">All cities</option>
+        {% for c in cities %}<option value="{{ c }}" {% if request.GET.city == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
+      </select>
+    </div>{% endif %}
+    <div style="width:6rem">
+      <label class="ui-label" for="s-per">Per page</label>
+      <select id="s-per" name="per">{% for n in page_sizes %}<option value="{{ n }}" {% if n == per %}selected{% endif %}>{{ n }}</option>{% endfor %}</select>
+    </div>
+    <div class="flex gap-2">
+      <button type="submit" class="ui-btn ui-btn-primary">{% icon "filter" "w-4 h-4" %}<span>Apply</span></button>
+      {% if has_filters %}<a class="ui-btn ui-btn-secondary" href="{% url 'suppliers:supplier_list' %}">Reset</a>{% endif %}
+    </div>
+  </form>
+
+  {% if suppliers %}
+  <div class="ui-table-wrap">
+    <table class="ui-table ui-table-cards">
+      <thead>
+        <tr><th>Supplier</th><th>Contact</th><th>City</th><th>Tax no</th><th class="num">Terms</th><th class="num">Orders</th><th>Status</th><th class="col-actions"><span class="sr-only">Actions</span></th></tr>
+      </thead>
+      <tbody>
+        {% for s in suppliers %}
+        <tr class="is-clickable" data-href="{% url 'suppliers:supplier_edit' s.pk %}">
+          <td data-label="Supplier">
+            <div class="ui-cell">
+              <span class="ui-avatar-sm">{{ s.name|slice:":2"|upper }}</span>
+              <div class="min-w-0"><div class="ui-cell-title">{{ s.name }}</div><div class="ui-cell-sub">{{ s.company|default:s.email|default:"No company or email" }}</div></div>
+            </div>
+          </td>
+          <td data-label="Contact">
+            <div class="ui-cell-title" style="font-weight:500">{{ s.contact_person|default:"—" }}</div>
+            <div class="ui-cell-sub ui-nowrap">{{ s.phone|default:"" }}</div>
+          </td>
+          <td data-label="City">{{ s.city|default:"—" }}</td>
+          <td data-label="Tax no" class="ui-nowrap">{{ s.tax_no|default:"—" }}</td>
+          <td data-label="Terms" class="num ui-nowrap">{% if s.payment_term_days %}{{ s.payment_term_days }} days{% else %}<span class="ui-muted">On delivery</span>{% endif %}</td>
+          <td data-label="Orders" class="num">{{ s.order_count }}</td>
+          <td data-label="Status">{% if s.is_active %}{% badge "active" label="Active" %}{% else %}{% badge "inactive" label="Inactive" tone="neutral" %}{% endif %}</td>
+          <td class="col-actions">
+            <div class="ui-row-actions">
+              {% if s.phone %}<a class="icon-btn" href="tel:{{ s.phone }}" data-tip="Call" data-tip-pos="bottom" aria-label="Call {{ s.name }}">{% icon "phone" "w-4 h-4" %}</a>{% endif %}
+              {% if perms.suppliers.add_purchaseorder and s.is_active %}<a class="icon-btn" href="{% url 'suppliers:purchase_add' %}?supplier={{ s.pk }}" data-tip="New purchase" data-tip-pos="bottom" aria-label="New purchase from {{ s.name }}">{% icon "cart" "w-4 h-4" %}</a>{% endif %}
+              <a class="icon-btn" href="{% url 'suppliers:supplier_edit' s.pk %}" data-tip="Edit" data-tip-pos="bottom" aria-label="Edit supplier">{% icon "pencil" "w-4 h-4" %}</a>
+              {% component "row_menu" %}
+                <a class="ui-menu-item" href="{% url 'suppliers:supplier_edit' s.pk %}">{% icon "pencil" "w-4 h-4" %}Edit supplier</a>
+                <a class="ui-menu-item" href="{% url 'suppliers:purchase_list' %}?q={{ s.name|urlencode }}">{% icon "receipt" "w-4 h-4" %}Purchase orders</a>
+                {% if s.email %}<a class="ui-menu-item" href="mailto:{{ s.email }}">{% icon "mail" "w-4 h-4" %}Send email</a>{% endif %}
+                <div class="ui-menu-sep"></div>
+                <a class="ui-menu-item danger" href="{% url 'suppliers:supplier_delete' s.pk %}">{% icon "trash" "w-4 h-4" %}Delete supplier</a>
+              {% endcomponent %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% ui "pagination" page_obj=page_obj %}
+  {% else %}
+  <div class="ui-card">{% if has_filters %}{% ui "empty_state" icon="search" title="No suppliers match your search" text="Check the spelling or clear the filters." %}{% else %}{% ui "empty_state" icon="truck" title="No suppliers yet" text="Add the people you buy stock from, then raise purchase orders against them." action_url=add_url action_label="Add supplier" %}{% endif %}</div>
+  {% endif %}
+</div>
+{% endblock %}

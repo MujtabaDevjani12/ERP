@@ -1,0 +1,23 @@
+{% load ui %}
+<form id="st-main-form" method="post"{% if section.multipart %} enctype="multipart/form-data"{% endif %} novalidate class="st-form">
+  {% csrf_token %}
+  <div class="st-body">
+    {% if form.non_field_errors %}
+      <div class="ui-alert ui-alert-danger" role="alert">{% icon "error" "w-4 h-4" %}<div>{% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}</div></div>
+    {% endif %}
+    {% for g in groups %}
+      <fieldset class="st-group">
+        <legend>{{ g.title }}</legend>
+        <div class="st-grid cols-{{ g.cols }}">
+          {% for f in g.fields %}
+            {% if f.widget_type == "textarea" %}{% ui "field" field=f css="st-span" %}{% else %}{% ui "field" field=f %}{% endif %}
+          {% endfor %}
+        </div>
+      </fieldset>
+    {% endfor %}
+  </div>
+  <div class="st-foot">
+    <span class="dx-cap">Fields marked <b style="color:var(--ui-danger)">*</b> are required.</span>
+    <button type="submit" class="ui-btn ui-btn-primary">{% icon "check-mark" "w-4 h-4" %}<span>Save changes</span></button>
+  </div>
+</form>

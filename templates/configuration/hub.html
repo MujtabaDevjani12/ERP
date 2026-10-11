@@ -1,0 +1,48 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Settings · {{ section.label }}{% endblock %}
+{% block content %}
+{# Settings hub: section list on the left, the selected section's panel on the right. Look: static/css/fx-skin.css section 9 (.st-*). #}
+<div class="st-head">
+  <div class="min-w-0">
+    <h1 class="dx-hello">Settings</h1>
+    <p class="dx-sub">Shop details, numbering, stock method and POS behaviour</p>
+  </div>
+  {% if not needs_store and section.kind == "form" or not needs_store and section.kind == "numbering" %}
+    <button type="submit" form="st-main-form" class="ui-btn ui-btn-primary st-save">{% icon "check-mark" "w-4 h-4" %}<span>Save settings</span></button>
+  {% endif %}
+</div>
+
+<div class="st-layout">
+  <nav class="st-nav" aria-label="Settings sections">
+    {% for s in nav_sections %}
+      <a href="{{ s.url }}" class="st-nav-item{% if s.active %} is-active{% endif %}"{% if s.active %} aria-current="page"{% endif %}>
+        <span class="st-nav-ico">{% icon s.icon "w-4 h-4" %}</span><span class="st-nav-label">{{ s.label }}</span>
+      </a>
+    {% endfor %}
+  </nav>
+
+  <section class="st-panel" aria-labelledby="st-title">
+    <header class="st-panel-head">
+      <div class="min-w-0">
+        <h2 class="dx-card-title" id="st-title">{{ section.label }}</h2>
+        <p class="dx-card-sub">{{ section.desc }}</p>
+      </div>
+      {% if store and section.scope == "pos" or store and section.slug == "defaults" or section.kind == "payments" or section.kind == "devices" %}
+        <span class="ui-badge ui-badge-neutral no-dot" style="margin-left:auto">{{ store.name }}</span>
+      {% endif %}
+    </header>
+
+    {% if needs_store %}
+      <div class="st-body">
+        <div class="ui-alert ui-alert-warning" role="alert">{% icon "warning" "w-4 h-4" %}<div>This section is saved per branch, but your account is not attached to a branch yet. Ask an administrator to assign your user to a store.</div></div>
+      </div>
+    {% else %}
+      {% if section.extra == "receipt" %}<div class="st-split"><div class="st-split-main">{% endif %}
+      {% include "configuration/hub/_"|add:section.kind|add:".html" %}
+      {% if section.extra == "receipt" %}</div>{% endif %}
+      {% if section.extra %}{% include "configuration/hub/_x_"|add:section.extra|add:".html" %}{% endif %}
+      {% if section.extra == "receipt" %}</div>{% endif %}
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

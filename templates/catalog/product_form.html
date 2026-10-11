@@ -1,0 +1,298 @@
+{% extends "base.html" %}{% load ui static %}
+{% block title %}{% if instance %}Edit product{% else %}Add product{% endif %}{% endblock %}
+{% block content %}
+<div class="pf-page">
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{% url 'catalog:product_list' %}">Products</a><span class="sep">/</span><span>{% if instance %}{{ instance.name }}{% else %}New product{% endif %}</span></nav>
+      <h1 class="page-title">{% if instance %}Edit product{% else %}Add product{% endif %}</h1>
+      <p class="page-subtitle">{% if instance %}Update details, prices, pictures and variants.{% else %}Name it, set the price and, if you already have stock, enter the opening quantity so it shows up at the POS.{% endif %}</p>
+    </div>
+    <div class="page-actions">
+      <a class="ui-btn ui-btn-secondary" href="{% url 'catalog:product_list' %}">{% icon "arrow-left" "w-4 h-4" %}<span>Back to products</span></a>
+      {% if instance %}<a class="ui-btn ui-btn-secondary" href="{% url 'catalog:barcode_print' %}?product={{ instance.pk }}" target="_blank" rel="noopener">{% icon "tag" "w-4 h-4" %}<span>Print barcodes</span></a>{% endif %}
+    </div>
+  </div>
+
+  <div class="ui-alert ui-alert-danger" role="alert" id="pf-errors" {% if not form.errors and not formset.total_error_count %}hidden{% endif %}>{% icon "error" "w-4 h-4" %}<div>
+    <strong id="pf-errors-title">The product was not saved.</strong> <span id="pf-errors-text">Please fix the highlighted fields below.{% if form.gallery.errors or form.image.errors %} Pictures you chose have to be picked again.{% endif %}</span>
+    {% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}
+    {% for e in formset.non_form_errors %}<div>{{ e }}</div>{% endfor %}
+  </div></div>
+
+  <form method="post" enctype="multipart/form-data" novalidate id="pf" class="pf-form"
+        data-mode="{% if form.product_type.value == 'variant' %}variant{% else %}single{% endif %}"
+        data-new="{% if instance %}0{% else %}1{% endif %}"
+        data-preview-url="{% url 'catalog:barcode_preview' %}"
+        data-generate-url="{% url 'catalog:barcode_generate' %}"
+        data-gallery-max="{{ gallery_max }}"
+        data-lookup-url="{% url 'catalog:api_variant_lookup' %}"
+        data-cover="{% if instance and instance.image %}{{ instance.image.url }}{% endif %}">
+    {% csrf_token %}
+    {{ category_tree|json_script:"pf-cats" }}
+    <div class="pf-layout">
+      <div class="pf-stack">
+
+        {# ------------------------------------------------------------ Basic information #}
+        <section class="ui-form-section" id="pf-basic">
+          <header><h2>Basic information</h2></header>
+          <div class="body pf-fields">
+            <fieldset class="pf-types" id="pf-types">
+              <legend class="ui-label">Product type</legend>
+              <div class="pf-type-grid">
+                {% for value, label in form.fields.item_type.choices %}
+                <label class="pf-type"><input type="radio" name="{{ form.item_type.html_name }}" value="{{ value }}" {% if form.item_type.value == value or not form.item_type.value and value == "standard" %}checked{% endif %}>
+                  <span class="pf-type-box">{% if value == "standard" %}{% icon "cube" "w-4 h-4" %}{% elif value == "service" %}{% icon "cog" "w-4 h-4" %}{% elif value == "combo" %}{% icon "layers" "w-4 h-4" %}{% else %}{% icon "download" "w-4 h-4" %}{% endif %}<b>{{ label }}</b>
+                  <small>{% if value == "standard" %}Stocked goods{% elif value == "service" %}No stock to count{% elif value == "combo" %}Bundle of products{% else %}Download / licence{% endif %}</small></span></label>
+                {% endfor %}
+              </div>
+              {% for e in form.item_type.errors %}<p class="ui-error">{{ e }}</p>{% endfor %}
+              <p class="ui-help" id="pf-type-help"></p>
+            </fieldset>
+            {% ui "field" field=form.name %}
+            <div class="ui-grid ui-grid-2">
+              {% ui "field" field=form.sku %}
+              {% ui "field" field=form.barcode_symbology %}
+            </div>
+            <div class="ui-field" data-single-only id="pf-code-field">
+              <label class="ui-label" for="pf-code-input">Barcode</label>
+              <div class="pf-inline">
+                <div class="pf-slot" data-slot="barcode"></div>
+                <button type="button" class="ui-btn ui-btn-secondary" id="pf-generate" title="Make an unused barcode of the chosen type">{% icon "bolt" "w-4 h-4" %}<span>Generate</span></button>
+              </div>
+              <p class="ui-help">The value scanned at the till. Leave empty and one is made when you save.</p>
+            </div>
+            <div class="ui-grid ui-grid-2">
+              {% ui "field" field=form.unit %}
+              {% ui "field" field=form.brand %}
+            </div>
+            <div class="ui-grid ui-grid-2">
+              <div class="ui-field">
+                <label class="ui-label" for="pf-cat">Category</label>
+                <select id="pf-cat"></select>
+                {% for e in form.category.errors %}<p class="ui-error">{{ e }}</p>{% endfor %}
+              </div>
+              <div class="ui-field">
+                <label class="ui-label" for="pf-sub">Sub-category</label>
+                <select id="pf-sub" disabled></select>
+              </div>
+            </div>
+            <div hidden>{{ form.category }}{{ form.product_type }}</div>
+          </div>
+        </section>
+
+        {# ------------------------------------------------------------ Pricing & tax #}
+        <section class="ui-form-section" id="pf-pricing">
+          <header><h2>Pricing &amp; tax</h2></header>
+          <div class="body pf-fields">
+            <div class="ui-grid ui-grid-3">
+              <div class="ui-field" data-single-only>
+                <label class="ui-label" for="pf-cost-input">Cost price</label>
+                <div class="pf-slot" data-slot="cost_price"></div>
+              </div>
+              <div class="ui-field" data-single-only>
+                <label class="ui-label" for="pf-price-input">Selling price <span style="color:var(--ui-danger)">*</span></label>
+                <div class="pf-slot" data-slot="selling_price"></div>
+              </div>
+              {% ui "field" field=form.tax %}
+            </div>
+            <p class="pf-note" data-variants-only>Each variant has its own cost and selling price in the table below. Leave a price empty there to use the first variant’s.</p>
+            <div class="pf-promo" data-single-only>
+              <span class="ui-label">Promotion <span class="ui-help" style="font-weight:500">(optional) · a special price that the POS uses while it runs</span></span>
+              <div class="ui-grid ui-grid-3">
+                {% ui "field" field=form.promo_price %}
+                {% ui "field" field=form.promo_start %}
+                {% ui "field" field=form.promo_end %}
+              </div>
+              <p class="ui-help">Leave the dates empty to run the promotion until you clear the price.</p>
+            </div>
+            <p class="pf-note" data-variants-only>A promotion price is for single products. For a product with variants, change each variant’s selling price.</p>
+          </div>
+        </section>
+
+        {# ------------------------------------------------------------ Combo contents #}
+        <section class="ui-form-section" id="pf-combo" hidden>
+          <header><h2>Combo contents</h2><p>The products that leave the shelf each time this combo is sold. The selling price above is the price of the whole bundle.</p></header>
+          <div class="body pf-fields">
+            {{ form.combo_items }}
+            {{ combo_rows|json_script:"pf-combo-rows" }}
+            <div class="pf-combo-search">
+              <label class="ui-label" for="pf-combo-q">Add a product</label>
+              <input type="search" id="pf-combo-q" placeholder="Search by name, SKU or barcode" autocomplete="off" data-lookup-url="{% url 'catalog:api_variant_lookup' %}" aria-controls="pf-combo-results" aria-expanded="false">
+              <ul class="pf-combo-results" id="pf-combo-results" role="listbox" hidden></ul>
+            </div>
+            <div class="pf-table-wrap"><table class="pf-table" id="pf-combo-table">
+              <thead><tr><th>Product</th><th class="num" style="width:7rem">Quantity</th><th style="width:3rem"><span class="sr-only">Remove</span></th></tr></thead>
+              <tbody id="pf-combo-body"></tbody>
+            </table></div>
+            <p class="pf-note" id="pf-combo-none">No products yet. Search above and click a product to add it.</p>
+            {% for e in form.combo_items.errors %}<p class="ui-error">{{ e }}</p>{% endfor %}
+          </div>
+        </section>
+
+        {# ------------------------------------------------------------ Opening stock (new products) #}
+        {% if not instance %}
+        <section class="ui-form-section" id="pf-opening" data-stock-only>
+          <header><h2>Opening stock</h2><p>Stock you already have on the shelf. Leave it empty to add stock later with a purchase or an adjustment.</p></header>
+          <div class="body pf-fields">
+            <div class="ui-grid ui-grid-3">
+              {% ui "field" field=form.stock_location %}
+              <div class="ui-field" data-single-only>
+                <label class="ui-label" for="pf-qty-input">Quantity on hand</label>
+                <div class="pf-slot" data-slot="opening_stock"></div>
+                <p class="ui-help">Valued at the cost price above (used for profit reports).</p>
+              </div>
+            </div>
+            <div class="ui-alert ui-alert-info" role="note" data-variants-only>{% icon "info" "w-4 h-4" %}<div>Enter the quantity of each variant in the <strong>Opening qty</strong> column of the Variants table below. Products with no stock stay in the list but are hidden from the POS until stock is added.</div></div>
+          </div>
+        </section>
+        {% endif %}
+
+        {# ------------------------------------------------------------ Stock now (saved products) #}
+        {% if instance %}
+        <section class="ui-form-section" id="pf-stocknow" data-stock-only>
+          <header class="pf-head"><div><h2>Stock now</h2><p>What is on the shelves at the moment.</p></div>
+            <a class="ui-btn ui-btn-secondary ui-btn-sm" href="{% url 'inventory:quantity_adjustment' %}">{% icon "sliders" "w-4 h-4" %}<span>Adjust stock</span></a></header>
+          <div class="body">
+            {% if stock_rows %}
+            <div class="pf-table-wrap"><table class="pf-table">
+              <thead><tr><th>Warehouse</th><th>Variant</th><th class="num">On hand</th></tr></thead>
+              <tbody>{% for r in stock_rows %}<tr><td>{{ r.warehouse }}</td><td>{{ r.variant }}</td><td class="num{% if r.low %} is-low{% endif %}">{{ r.qty|floatformat:"-3" }}</td></tr>{% endfor %}</tbody>
+            </table></div>
+            {% else %}
+            <p class="pf-note">No stock yet. Receive it with a purchase, or add it with an adjustment.</p>
+            {% endif %}
+          </div>
+        </section>
+        {% endif %}
+
+        {# ------------------------------------------------------------ Variants #}
+        <section class="ui-form-section" id="pf-variants">
+          <header class="pf-head">
+            <div><h2>Variants</h2>
+              <p data-variants-only>Sizes, colours or flavours. Each variant has its own stock and can have its own price.</p>
+              <p data-single-only>Turn this on if the product comes in sizes, colours or flavours that you stock and price separately.</p></div>
+            <label class="pf-switch"><input type="checkbox" role="switch" id="pf-has-variants" {% if form.product_type.value == "variant" %}checked{% endif %}><i aria-hidden="true"></i><span>This product has variants</span></label>
+          </header>
+            <div class="ui-alert ui-alert-warning" role="status" id="pf-dropped" hidden style="margin:var(--sp-3) var(--sp-5) 0">{% icon "warning" "w-4 h-4" %}<div><span id="pf-dropped-n"></span> other variant(s) will be removed when you save (any that were already sold or bought are kept but switched off). Switch “This product has variants” back on to keep them.</div></div>
+          <div class="body" id="pf-variants-body" data-variants-only>
+            {{ formset.management_form }}
+            <div class="pv-quick">
+              <label class="ui-label" for="pv-quick-input">Quick add</label>
+              <div class="pv-quick-row">
+                <input type="text" id="pv-quick-input" placeholder="Type names separated by commas, e.g. Small, Medium, Large" autocomplete="off">
+                <button type="button" class="ui-btn ui-btn-secondary" id="pv-quick-btn">{% icon "plus" "w-4 h-4" %}<span>Add these</span></button>
+                <button type="button" class="ui-btn ui-btn-secondary" id="pv-add-row">{% icon "plus" "w-4 h-4" %}<span>Add one row</span></button>
+              </div>
+            </div>
+            <div class="pv-table">
+              <div class="pv-head" aria-hidden="true">
+                <span class="pv-name">Variant name</span><span>Cost</span><span>Selling price</span><span>{% if instance %}In stock{% else %}Opening qty{% endif %}</span><span>Barcode value</span><span></span>
+              </div>
+              <div data-variants>
+                {% for vf in formset %}{% include "catalog/_variant_card.html" with vf=vf %}{% endfor %}
+              </div>
+            </div>
+            <p class="pf-note" style="margin-top:var(--sp-3)">Every variant needs a different name. The barcode appears once saved when left empty; it is what the label printer encodes, so scanning it at the till adds this exact variant.</p>
+          </div>
+          {# the rows of a single product live here too (hidden): their inputs are shown in the cards above #}
+          <template id="variant-template">{% include "catalog/_variant_card.html" with vf=formset.empty_form %}</template>
+        </section>
+
+        <section class="ui-form-section">
+          <header><h2>Description</h2></header>
+          <div class="body">{% ui "field" field=form.description %}</div>
+        </section>
+      </div>
+
+      <aside class="pf-stack">
+        <div class="pf-aside-col">
+          <section class="ui-form-section pf-savecard">
+            <div class="body pf-save">
+              <button type="submit" class="ui-btn ui-btn-primary" data-submit>{% icon "check-mark" "w-4 h-4" %}<span>{% if instance %}Save changes{% else %}Save product{% endif %}</span></button>
+              {% if not instance %}<button type="submit" name="save_and_new" value="1" class="ui-btn ui-btn-secondary" data-submit>{% icon "plus" "w-4 h-4" %}<span>Save &amp; add another</span></button>{% endif %}
+              <button type="submit" name="save_and_print" value="1" class="ui-btn ui-btn-secondary" data-submit>{% icon "tag" "w-4 h-4" %}<span>Save &amp; print barcodes</span></button>
+              <a class="ui-btn ui-btn-ghost" href="{% url 'catalog:product_list' %}">Cancel</a>
+            </div>
+          </section>
+
+          <section class="ui-form-section">
+            <header><h2>Barcode preview</h2></header>
+            <div class="body">
+              <div class="pv-barcode-box" id="pf-bc-box" aria-live="polite"><span>Enter a code to see the barcode.</span></div>
+            </div>
+          </section>
+
+          <section class="ui-form-section">
+            <header><h2>Pictures</h2></header>
+            <div class="body pf-fields">
+              <div>
+                <span class="ui-label">Cover picture <span class="ui-help" style="font-weight:500">· shown on the POS tile</span></span>
+                <div class="pf-cover">
+                  <div class="pf-cover-thumb" id="pf-cover-thumb">
+                    <img id="pf-cover-img" alt="Cover picture" {% if not instance or not instance.image %}hidden{% else %}src="{{ instance.image.url }}"{% endif %}>
+                    <span id="pf-cover-empty" {% if instance and instance.image %}hidden{% endif %}>{% icon "cube" "w-6 h-6" %}</span>
+                  </div>
+                  <div style="flex:1;min-width:0">
+                    {{ form.image }}
+                    <p class="ui-help">JPG, PNG or WebP, up to 3 MB.</p>
+                  </div>
+                </div>
+                {% if instance and instance.image %}<label class="pf-check" id="pf-remove-cover"><input type="checkbox" name="remove_image" value="on"> Remove the cover picture</label>{% endif %}
+                <p class="ui-error" id="pf-cover-msg" hidden></p>
+                {% for e in form.image.errors %}<p class="ui-error">{{ e }}</p>{% endfor %}
+              </div>
+              <div class="pf-rule"></div>
+              <div>
+                <div class="pf-gal-head">
+                  <span class="ui-label" style="margin:0">Gallery <span class="ui-help" id="pf-gal-count" style="font-weight:500"></span></span>
+                  <button type="button" class="ui-btn ui-btn-secondary ui-btn-sm" id="pf-gal-add">{% icon "plus" "w-4 h-4" %}<span>Add pictures</span></button>
+                </div>
+                <input type="file" name="gallery" accept="image/*" multiple id="pf-gal-input" hidden>
+                <div class="pf-gallery" id="pf-gallery" {% if not gallery %}hidden{% endif %}>
+                  {% for pic in gallery %}
+                  <figure class="pf-pic" data-existing="{{ pic.pk }}">
+                    <img src="{{ pic.image.url }}" alt="Gallery picture {{ forloop.counter }}" loading="lazy">
+                    <button type="button" data-act="toggle-pic" aria-label="Remove this picture">{% icon "x" "w-3.5 h-3.5" %}</button>
+                    <input type="checkbox" name="remove_gallery" value="{{ pic.pk }}" hidden>
+                  </figure>
+                  {% endfor %}
+                </div>
+                <p class="pf-note" id="pf-gal-none" {% if gallery %}hidden{% endif %}>No gallery pictures yet.</p>
+                <p class="pf-note">Up to {{ gallery_max }} extra pictures, 3 MB each. They are uploaded when you save the product.</p>
+                <p class="ui-error" id="pf-gal-msg" hidden></p>
+                {% for e in form.gallery.errors %}<p class="ui-error">{{ e }}</p>{% endfor %}
+              </div>
+            </div>
+          </section>
+
+          <section class="ui-form-section">
+            <header><h2>Stock &amp; status</h2></header>
+            <div class="body pf-fields">
+              <div data-stock-only>{% ui "field" field=form.alert_quantity %}</div>
+              <label class="pf-switch pf-switch-line"><input type="checkbox" role="switch" name="{{ form.is_active.html_name }}" id="{{ form.is_active.id_for_label }}" {% if form.is_active.value %}checked{% endif %}><i aria-hidden="true"></i><span>Active — can be sold at the POS</span></label>
+            </div>
+          </section>
+
+          {% if attributes %}
+          <section class="ui-form-section">
+            <header><h2>Attributes available</h2></header>
+            <div class="body pf-note">{% for a in attributes %}<strong>{{ a.name }}</strong>{% if not forloop.last %}, {% endif %}{% endfor %}.<br><a class="erp-link" href="{% url 'catalog:attribute_list' %}" target="_blank" rel="noopener">Manage attributes</a></div>
+          </section>
+          {% endif %}
+        </div>
+      </aside>
+    </div>
+
+    {# narrow screens: the Save card is far down, so the buttons also sit in a bar at the bottom #}
+    <div class="ui-sticky-actions pf-savebar">
+      <a class="ui-btn ui-btn-ghost" href="{% url 'catalog:product_list' %}">Cancel</a>
+      <button type="submit" name="save_and_print" value="1" class="ui-btn ui-btn-secondary" data-submit>{% icon "tag" "w-4 h-4" %}<span>Print</span></button>
+      {% if not instance %}<button type="submit" name="save_and_new" value="1" class="ui-btn ui-btn-secondary" data-submit><span>Save &amp; add another</span></button>{% endif %}
+      <button type="submit" class="ui-btn ui-btn-primary" data-submit>{% icon "check-mark" "w-4 h-4" %}<span>{% if instance %}Save changes{% else %}Save product{% endif %}</span></button>
+    </div>
+  </form>
+</div>
+<script src="{% static 'js/barcode-svg.js' %}?v=20261010b"></script>
+<script src="{% static 'js/product-form.js' %}?v=20261010b" defer></script>
+{% endblock %}

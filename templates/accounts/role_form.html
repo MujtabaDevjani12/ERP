@@ -1,0 +1,55 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{% if role %}Edit role{% else %}New role{% endif %}{% endblock %}
+{% block content %}
+<div class="ui-form-wrap space-y-4" style="max-width:56rem" x-data="{ openApps: {}, all(on) { document.querySelectorAll('.rl-perm').forEach(c => c.checked = on); } }">
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{% url 'accounts:role_list' %}">Roles &amp; permissions</a><span class="sep">/</span><span>{% if role %}{{ role.name }}{% else %}New{% endif %}</span></nav>
+      <h1 class="page-title">{% if role %}Edit role <span class="ui-muted" style="font-weight:500">{{ role.name }}</span>{% else %}New role{% endif %}</h1>
+      <p class="page-subtitle">Tick everything this role may do. Areas left unticked stay hidden and blocked for people who only have this role.</p>
+    </div>
+  </div>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <section class="ui-form-section">
+      <header><h2>Role</h2></header>
+      <div class="body">{% ui "field" field=form.name %}</div>
+    </section>
+
+    <section class="ui-form-section">
+      <header style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div><h2>Permissions</h2><p>Grouped by area. Open a group to choose individual permissions.</p></div>
+        <div style="display:flex;gap:8px">
+          <button type="button" class="ui-btn ui-btn-secondary ui-btn-sm" @click="all(true)">Select all</button>
+          <button type="button" class="ui-btn ui-btn-secondary ui-btn-sm" @click="all(false)">Clear</button>
+        </div>
+      </header>
+      <div>
+        {% for app_label, perms in grouped_permissions.items %}
+        <div style="border-top:1px solid var(--ui-border)">
+          <button type="button" @click="openApps['{{ app_label }}'] = !openApps['{{ app_label }}']" :aria-expanded="!!openApps['{{ app_label }}']"
+                  style="display:flex;align-items:center;justify-content:space-between;width:100%;text-align:left;padding:12px var(--sp-5);background:none;border:0;cursor:pointer;color:inherit">
+            <span class="ui-cell-title" style="text-transform:capitalize">{{ app_label }}</span>
+            <span style="display:flex;align-items:center;gap:8px"><span class="ui-muted" style="font-size:12px">{{ perms|length }} permission{{ perms|length|pluralize }}</span>{% icon "chevron-down" "w-4 h-4" %}</span>
+          </button>
+          <div x-show="openApps['{{ app_label }}']" x-cloak class="ui-grid ui-grid-2" style="padding:4px var(--sp-5) var(--sp-4);gap:8px 20px">
+            {% for perm in perms %}
+            <label class="flex items-center gap-2.5 cursor-pointer" style="font-size:13px">
+              <input type="checkbox" class="rl-perm" name="permissions" value="{{ perm.id }}" {% if perm.id in selected_permission_ids %}checked{% endif %}>
+              <span>{{ perm.name }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <div class="ui-sticky-actions">
+      <a href="{% url 'accounts:role_list' %}" class="ui-btn ui-btn-secondary">Cancel</a>
+      <button type="submit" class="ui-btn ui-btn-primary">{% icon "check-mark" "w-4 h-4" %}<span>Save role</span></button>
+    </div>
+  </form>
+</div>
+{% endblock %}

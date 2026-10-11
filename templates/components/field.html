@@ -1,0 +1,16 @@
+{# A Django bound form field with label, help text and errors: {% ui "field" field=form.name %} #}
+{% if field.is_hidden %}{{ field }}{% else %}
+<div class="ui-field {{ css }}">
+  {% if field.widget_type == "checkbox" %}
+    <label class="flex items-start gap-2.5 cursor-pointer" for="{{ field.id_for_label }}">
+      <span class="pt-0.5">{{ field }}</span>
+      <span><span class="text-sm font-medium" style="color:var(--ui-text)">{{ field.label }}</span>{% if field.help_text %}<span class="ui-help block" style="margin-top:2px">{{ field.help_text }}</span>{% endif %}</span>
+    </label>
+  {% else %}
+    <label class="ui-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span style="color:var(--ui-danger)">*</span>{% endif %}</label>
+    {{ field }}
+    {% if field.help_text %}<p class="ui-help">{{ field.help_text|safe }}</p>{% endif %}
+  {% endif %}
+  {% for e in field.errors %}<p class="ui-error">{{ e }}</p>{% endfor %}
+</div>
+{% endif %}

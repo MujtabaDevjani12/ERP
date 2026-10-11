@@ -1,0 +1,42 @@
+{% extends "base.html" %}{% load ui %}
+{% comment %}
+Shared two-panel layout for sign-in and the password-reset pages (look: static/css/fx-skin.css section 10, .lx-*).
+Child templates fill {% block lx_title %}, {% block lx_lead %} and {% block lx_form %}.
+{% endcomment %}
+{% block auth_content %}
+<div class="lx">
+  <aside class="lx-hero" aria-hidden="false">
+    <div class="lx-hero-in">
+      <div class="lx-brand">
+        {% if system_settings.site_logo %}<img src="{{ system_settings.site_logo.url }}" alt="" class="lx-logo">
+        {% else %}<span class="lx-logo lx-logo-letter">{{ system_settings.site_name|default:"P"|slice:":1"|upper }}</span>{% endif %}
+        <span class="lx-brand-name">{{ system_settings.site_name|default:"Multiple POS" }}</span>
+      </div>
+      <div class="lx-pitch">
+        <p class="lx-eyebrow">{{ system_settings.tagline|default:"Retail management suite" }}</p>
+        <h2>Every sale, every shelf,<br>every branch — in one place.</h2>
+        <ul class="lx-points">
+          <li><span>{% icon "register" "w-4 h-4" %}</span><div><b>Fast billing</b><small>Barcode, keyboard shortcuts and instant receipts</small></div></li>
+          <li><span>{% icon "archive" "w-4 h-4" %}</span><div><b>Stock you can trust</b><small>Live quantities with low-stock alerts</small></div></li>
+          <li><span>{% icon "chart" "w-4 h-4" %}</span><div><b>Clear reports</b><small>Sales, purchases and profit at a glance</small></div></li>
+        </ul>
+      </div>
+      <p class="lx-copy">&copy; {% now "Y" %} {{ system_settings.site_name|default:"Multiple POS" }}. All rights reserved.</p>
+    </div>
+  </aside>
+
+  <main class="lx-main">
+    <div class="lx-card">
+      <div class="lx-card-brand">
+        {% if system_settings.site_logo %}<img src="{{ system_settings.site_logo.url }}" alt="" class="lx-logo">
+        {% else %}<span class="lx-logo lx-logo-letter">{{ system_settings.site_name|default:"P"|slice:":1"|upper }}</span>{% endif %}
+        <span class="lx-brand-name">{{ system_settings.site_name|default:"Multiple POS" }}</span>
+      </div>
+      <h1 class="lx-title">{% block lx_title %}{% endblock %}</h1>
+      <p class="lx-lead">{% block lx_lead %}{% endblock %}</p>
+      {% block lx_form %}{% endblock %}
+    </div>
+    <p class="lx-secure">{% icon "shield" "w-3.5 h-3.5" %}<span>Secure sign-in &middot; your session is protected</span></p>
+  </main>
+</div>
+{% endblock %}

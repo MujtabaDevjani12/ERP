@@ -1,0 +1,2 @@
+{# Server-side tabs: {% ui "tabs" items=tabs %}  items = [{"label": "Overview", "url": "?tab=overview", "active": True, "count": 3}] #}
+<div class="ui-tabs" role="tablist">{% for t in items %}<a class="ui-tab{% if t.active %} is-active{% endif %}" href="{{ t.url }}" role="tab"{% if t.active %} aria-selected="true"{% endif %}>{{ t.label }}{% if t.count is not None and t.count != "" %} <span class="ui-badge ui-badge-neutral no-dot" style="margin-left:6px">{{ t.count }}</span>{% endif %}</a>{% endfor %}</div>

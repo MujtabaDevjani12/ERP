@@ -1,0 +1,69 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Import &amp; export{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{% url 'reports:pack_index' %}">Reports</a><span class="sep">/</span><span>Import &amp; export</span></nav>
+      <h1 class="page-title">Import &amp; export</h1>
+      <p class="page-subtitle">Download any list as an Excel file, or bring a list in from Excel. Use “Check only” first to see what would happen without saving.</p>
+    </div>
+  </div>
+
+  {% if error %}{% ui "alert" tone="danger" title="This file could not be imported" message=error %}{% endif %}
+
+  {% if result %}
+  <section class="ui-card" style="padding:20px" aria-live="polite" aria-labelledby="imp-result-title">
+    <h2 id="imp-result-title" class="ui-cell-title" style="font-size:15px;margin-bottom:12px">{% if result.dry_run %}Check result — nothing was saved{% else %}Import finished{% endif %}{% if result_card %} · {{ result_card.plural }}{% endif %}</h2>
+    <div class="ui-kpi-grid" style="margin-bottom:12px">
+      {% ui "kpi" label="New" value=result.created %}{% ui "kpi" label="Updated" value=result.updated %}{% ui "kpi" label="Skipped (already there)" value=result.skipped %}{% ui "kpi" label="Problems" value=result.failed %}
+    </div>
+    {% if result.failed %}{% ui "alert" tone="warning" message="Rows with a problem are skipped; the other rows are fine. Fix the rows below and run the file again." %}
+    {% else %}{% ui "alert" tone="success" message="No problems found." %}{% endif %}
+    {% if result.made %}<p class="ui-help" style="margin-top:8px">Also created automatically: {% for what, n in result.made %}{{ n }} new {{ what }}{% if not forloop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
+    {% if result.errors %}
+    <h3 class="ui-cell-title" style="margin:16px 0 8px">Rows with problems</h3>
+    <div class="ui-table-wrap" style="max-height:320px;overflow:auto"><table class="ui-table"><thead><tr><th style="width:80px">Row</th><th>Problem</th></tr></thead>
+      <tbody>{% for e in result.errors %}<tr><td>{{ e.row }}</td><td>{{ e.message }}</td></tr>{% endfor %}</tbody></table></div>
+    {% if result.errors_truncated %}<p class="ui-help">Only the first problems are listed.</p>{% endif %}
+    {% endif %}
+    {% if result.warnings %}
+    <h3 class="ui-cell-title" style="margin:16px 0 8px">Notes</h3>
+    <ul class="ui-help" style="list-style:disc;padding-left:20px">{% for w in result.warnings %}<li>Row {{ w.row }}: {{ w.message }}</li>{% endfor %}</ul>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <div class="ui-grid" style="grid-template-columns:repeat(auto-fill,minmax(340px,1fr))">
+    {% for c in cards %}
+    <section class="ui-card" style="padding:20px" aria-labelledby="card-{{ c.key }}">
+      <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">
+        <div class="ui-empty-icon" style="margin:0;width:40px;height:40px;flex:none">{% icon c.icon "w-5 h-5" %}</div>
+        <div class="min-w-0"><h2 id="card-{{ c.key }}" class="ui-cell-title" style="font-size:15px">{{ c.plural }}</h2><p class="ui-help" style="margin-top:2px">{{ c.text }}</p></div>
+      </div>
+      {% if c.export %}
+      <form method="get" action="{% url 'reports:data_export' c.key %}" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:12px">
+        {% if c.dated %}
+        <div style="flex:1 1 120px"><label class="ui-label" for="f-{{ c.key }}">From</label><input type="date" id="f-{{ c.key }}" name="from"></div>
+        <div style="flex:1 1 120px"><label class="ui-label" for="t-{{ c.key }}">To</label><input type="date" id="t-{{ c.key }}" name="to"></div>
+        {% endif %}
+        <button type="submit" class="ui-btn ui-btn-secondary">{% icon "download" "w-4 h-4" %}<span>Export to Excel</span></button>
+      </form>
+      {% endif %}
+      {% if c.import %}
+      <form method="post" action="{% url 'reports:data_import' c.key %}" enctype="multipart/form-data" style="border-top:1px solid var(--ui-border);padding-top:12px">
+        {% csrf_token %}
+        <label class="ui-label" for="file-{{ c.key }}">Import from Excel (.xlsx) or CSV</label>
+        <input type="file" id="file-{{ c.key }}" name="file" accept=".xlsx,.csv" required>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-items:center">
+          <button type="submit" name="mode" value="check" class="ui-btn ui-btn-secondary">{% icon "search" "w-4 h-4" %}<span>Check only</span></button>
+          <button type="submit" name="mode" value="import" class="ui-btn ui-btn-primary">{% icon "plus" "w-4 h-4" %}<span>Import</span></button>
+          <a href="{% url 'reports:data_template' c.key %}" class="ui-help" style="margin-left:auto">Download template</a>
+        </div>
+      </form>
+      {% endif %}
+    </section>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

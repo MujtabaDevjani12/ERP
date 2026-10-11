@@ -1,0 +1,111 @@
+{% load static %}<style>
+  .erp-inline .ui-table tbody td { padding: 8px 8px; vertical-align: top; }
+  .erp-inline input, .erp-inline select { padding: 7px 9px; font-size: 13px; }
+  .erp-inline input[type=checkbox] { width: 1.1rem; height: 1.1rem; padding: 0; }
+  .erp-link { color: inherit; text-decoration: none; }
+  .erp-link:hover { color: var(--ui-primary); }
+  .erp-inline .lp-bar { padding: 14px 20px 6px; }
+  .erp-inline .lp-bar .lp-list { left: 20px; right: 20px; }
+  .erp-inline .lp-bar .ui-search input { padding: 9px 36px 9px 38px; font-size: 14px; }
+  .erp-inline tr.lp-flash td { animation: lp-flash 1.1s ease; }
+  @keyframes lp-flash { from { background: color-mix(in srgb, var(--brand-500, #6366f1) 22%, transparent); } to { background: transparent; } }
+  .ui-scroll-y { max-height: calc(100vh - 340px); min-height: 220px; }
+</style>
+<script>
+  // Type-to-search picker used for foreign keys (customer, item, supplier ...), with optional quick-create in a drawer.
+  function erpLookup(url, pk, text, createUrl, createLabel) {
+    return {
+      url: url, pk: pk || '', text: text || '', open: false, results: [], idx: 0, menuStyle: {}, createUrl: createUrl || '', createLabel: createLabel || 'record',
+      // The list is fixed-positioned under the box, so a card or a scrolling table around it can never cut it off.
+      place() {
+        var box = this.$refs && this.$refs.inp; if (!box) return;
+        var r = box.getBoundingClientRect(), vh = window.innerHeight, below = vh - r.bottom - 12, above = r.top - 12;
+        var up = below < 180 && above > below, room = Math.max(120, Math.min(240, up ? above : below));
+        var st = { position: 'fixed', left: r.left + 'px', right: 'auto', width: Math.max(r.width, 220) + 'px', marginTop: '0', zIndex: '130', maxHeight: room + 'px' };
+        if (up) { st.top = 'auto'; st.bottom = (vh - r.top + 4) + 'px'; } else { st.bottom = 'auto'; st.top = (r.bottom + 4) + 'px'; }
+        this.menuStyle = st;
+      },
+      async search() {
+        this.open = true; this.place();
+        var q = this.pk ? '' : this.text;
+        try {
+          var r = await fetch(this.url + '&q=' + encodeURIComponent(q), { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' });
+          var d = await r.json();
+          this.results = d.results || [];
+          this.idx = 0;
+        } catch (e) { this.results = []; }
+      },
+      typed() { this.pk = ''; this.search(); },
+      pick(r) { this.pk = r.id; this.text = r.text; this.open = false; },
+      clear() { this.pk = ''; this.text = ''; this.search(); },
+      move(d) { if (!this.open) { this.search(); return; } var n = this.results.length; if (n) this.idx = (this.idx + d + n) % n; },
+      enter(ev) { if (this.open && this.results.length && !this.pk) { ev.preventDefault(); this.pick(this.results[this.idx]); } },
+      create() {
+        var self = this;
+        this.open = false;
+        window.Alpine.store('drawer').load(this.createUrl + '?_drawer=1', {
+          title: 'New ' + this.createLabel,
+          onDone: function (d) { self.pk = d.id; self.text = d.text; }
+        });
+      }
+    };
+  }
+  // Line-item tables (Django formset): "Add row" clones the empty row and bumps TOTAL_FORMS. When the lines have a product
+  // (variant) column it also offers a scan-or-type bar: Enter on a scanned barcode / SKU adds the product as a new row (or
+  // adds one to the quantity of the row that already has it), with its cost filled in.
+  function erpInline(prefix, lookupUrl) {
+    var QTY = ['quantity', 'quantity_received', 'quantity_ordered'], COST = ['unit_cost', 'unit_price', 'estimated_cost', 'cost_price'];
+    function field(row, names) {
+      for (var i = 0; i < names.length; i++) {
+        var el = row.querySelector('[name$="-' + names[i] + '"]');
+        if (el && el.name.indexOf(prefix + '-') === 0) return el;
+      }
+      return null;
+    }
+    function set(el, v) { if (!el) return; el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }
+    function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+    var picker = window.lpSearch && lookupUrl ? window.lpSearch({ url: lookupUrl, onPick: function (v) { this.addVariant(v); } }) : {};
+    return Object.assign(picker, {
+      hasVariant: false,
+      init() { this.hasVariant = !!(lookupUrl && window.lpSearch && this.$refs.tpl && this.$refs.tpl.innerHTML.indexOf('-variant"') > -1); },
+      add() {
+        var total = this.$el.querySelector('input[name="' + prefix + '-TOTAL_FORMS"]');
+        var n = parseInt(total.value, 10);
+        var html = this.$refs.tpl.innerHTML.replace(/__prefix__/g, n);
+        this.$refs.body.insertAdjacentHTML('beforeend', html);
+        total.value = n + 1;
+        return this.$refs.body.lastElementChild;
+      },
+      async addVariant(v) {
+        var id = String(v.id), rows = Array.prototype.slice.call(this.$refs.body.querySelectorAll('tr')), hit = null, blank = null;
+        rows.forEach(function (tr) {
+          var inp = tr.querySelector('input[type="hidden"][name$="-variant"]');
+          if (!inp || inp.name.indexOf(prefix + '-') !== 0) return;
+          if (inp.value === id) hit = tr;
+          else if (inp.value === '' && !blank && !tr.querySelector('input[name$="-id"][value]:not([value=""])')) blank = tr;
+        });
+        var row = hit || blank || this.add(), q;
+        if (hit) {
+          q = field(row, QTY);
+          set(q, String(Math.round(((parseFloat(q && q.value) || 0) + 1) * 1000) / 1000));
+        } else {
+          var box, d = null;
+          for (var t = 0; t < 40; t++) {                       // Alpine starts the freshly added row on the next tick
+            box = row.querySelector('[x-data]');
+            d = box && window.Alpine ? window.Alpine.$data(box) : null;
+            if (d && 'pk' in d) break;
+            d = null; await wait(25);
+          }
+          if (d) { d.pk = v.id; d.text = v.name; d.open = false; }
+          q = field(row, QTY); if (q && (q.value === '' || parseFloat(q.value) === 0)) set(q, '1');
+          var acc = field(row, ['quantity_accepted']); if (acc && (acc.value === '' || parseFloat(acc.value) === 0)) set(acc, '1');
+          var c = field(row, COST); if (c && v.cost && (c.value === '' || parseFloat(c.value) === 0)) set(c, v.cost);
+        }
+        row.classList.remove('lp-flash'); void row.offsetWidth; row.classList.add('lp-flash');
+        if (row.scrollIntoView) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        if (this.$refs.scan) this.$refs.scan.focus();
+      }
+    });
+  }
+</script>
+<script src="{% static 'js/line-picker.js' %}?v=20261010i"></script>

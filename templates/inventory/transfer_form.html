@@ -1,0 +1,122 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}New stock transfer{% endblock %}
+{% block content %}
+<div class="ui-form-wrap space-y-4" x-data="transferForm()" x-init="init()">
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{% url 'inventory:transfer_list' %}">Stock transfers</a><span class="sep">/</span><span>New</span></nav>
+      <h1 class="page-title">New stock transfer</h1>
+      <p class="page-subtitle">Pick the two warehouses, scan or search the products and choose what happens now.</p>
+    </div>
+  </div>
+
+  <form method="post" @submit="beforeSubmit($event)" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="lines_json" x-ref="lines">
+    <input type="hidden" name="mode" x-ref="mode" value="pending">
+
+    <section class="ui-form-section">
+      <header><h2>Route</h2><p>Stock leaves the first warehouse and arrives in the second.</p></header>
+      <div class="body ui-grid ui-grid-2">
+        <div class="ui-field"><label class="ui-label" for="tf-from">From warehouse <span style="color:var(--ui-danger)">*</span></label>
+          <select name="from_warehouse" id="tf-from" x-model="from" @change="rows = rows.map(r => ({...r, stock: null})); refreshStock()">{% for w in warehouses %}<option value="{{ w.pk }}" {% if forloop.first %}selected{% endif %}>{{ w.name }}</option>{% endfor %}</select></div>
+        <div class="ui-field"><label class="ui-label" for="tf-to">To warehouse <span style="color:var(--ui-danger)">*</span></label>
+          <select name="to_warehouse" id="tf-to" x-model="to">{% for w in warehouses %}<option value="{{ w.pk }}" {% if forloop.counter == 2 or warehouses|length == 1 and forloop.first %}selected{% endif %}>{{ w.name }}</option>{% endfor %}</select></div>
+        <p class="ui-error ui-span-2" x-show="from && from === to" x-cloak>Choose two different warehouses.</p>
+        <div class="ui-field ui-span-2"><label class="ui-label" for="tf-note">Note</label><input type="text" name="note" id="tf-note" x-model="note" maxlength="500" placeholder="Optional - why is this being moved?"></div>
+      </div>
+    </section>
+
+    <section class="ui-form-section">
+      <header><h2>Products</h2><p>Scan a barcode (Enter adds it) or type a name or SKU.</p></header>
+      <div class="body space-y-3">
+        <div class="ui-search" style="max-width:none">
+          {% icon "search" "w-4 h-4" %}
+          <input type="search" x-ref="scan" x-model="query" @input.debounce.200ms="search()" @keydown.enter.prevent="enter()" placeholder="Scan or type to add a product…" autocomplete="off" aria-label="Search products">
+        </div>
+        <div class="ui-card" x-show="results.length" x-cloak style="box-shadow:none">
+          <template x-for="r in results" :key="r.id">
+            <button type="button" class="ui-list-row" style="width:100%;text-align:left;background:none;cursor:pointer" @click="add(r)">
+              <span class="min-w-0"><span class="ui-cell-title" x-text="r.name"></span><span class="ui-cell-sub" x-text="(r.sku || '') + (r.barcode ? ' · ' + r.barcode : '')"></span></span>
+              <span class="ui-muted tabular" x-text="'on hand: ' + r.stock"></span>
+            </button>
+          </template>
+        </div>
+        <p class="ui-help" x-show="searched && !results.length && query" x-cloak>No product matches “<span x-text="query"></span>”.</p>
+
+        <div class="ui-table-wrap" x-show="rows.length" x-cloak>
+          <table class="ui-table">
+            <thead><tr><th>Product</th><th class="num">In source</th><th class="num" style="width:9rem">Quantity</th><th class="col-actions"><span class="sr-only">Remove</span></th></tr></thead>
+            <tbody>
+              <template x-for="(r, i) in rows" :key="r.variant_id">
+                <tr>
+                  <td><div class="ui-cell-title" x-text="r.name"></div><div class="ui-cell-sub" x-text="r.sku"></div></td>
+                  <td class="num" :class="{ 'ui-neg': r.stock !== null && parseFloat(r.quantity) > parseFloat(r.stock) }" x-text="r.stock === null ? '…' : r.stock"></td>
+                  <td class="num"><input type="number" min="0" step="any" x-model="r.quantity" style="text-align:right" :aria-label="'Quantity of ' + r.name"></td>
+                  <td class="col-actions"><button type="button" class="icon-btn" @click="rows.splice(i, 1)" aria-label="Remove" style="color:var(--ui-danger)">{% icon "trash" "w-4 h-4" %}</button></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+        <div class="ui-empty" x-show="!rows.length" style="padding:28px 0"><div class="ui-empty-icon">{% icon "cube" "w-6 h-6" %}</div><h3>No products yet</h3><p>Scan or search above to add the items you are moving.</p></div>
+      </div>
+    </section>
+
+    <div class="ui-sticky-actions">
+      <span class="ui-muted" style="margin-right:auto"><strong x-text="rows.length"></strong> product<span x-show="rows.length !== 1">s</span> · <strong x-text="total()"></strong> units</span>
+      <a href="{% url 'inventory:transfer_list' %}" class="ui-btn ui-btn-secondary">Cancel</a>
+      <button type="submit" class="ui-btn ui-btn-secondary" :disabled="!ok()" @click="$refs.mode.value = 'pending'">Save as pending</button>
+      <button type="submit" class="ui-btn ui-btn-secondary" :disabled="!ok()" @click="$refs.mode.value = 'send'">Send now</button>
+      <button type="submit" class="ui-btn ui-btn-primary" :disabled="!ok()" @click="$refs.mode.value = 'complete'">{% icon "check" "w-4 h-4" %}<span>Complete now</span></button>
+    </div>
+  </form>
+</div>
+<script>
+function transferForm() {
+  const posted = {{ posted|default:"null"|safe }};
+  return {
+    from: '{{ warehouses.0.pk|default:"" }}', to: '{{ warehouses.1.pk|default:warehouses.0.pk|default:"" }}', note: '', query: '', results: [], rows: [], searched: false,
+    init() {
+      if (posted) {
+        this.from = posted.from || this.from; this.to = posted.to || this.to; this.note = posted.note || '';
+        try { this.rows = JSON.parse(posted.lines).map(l => ({ variant_id: l.variant_id, quantity: l.quantity, name: l.name || ('Product ' + l.variant_id), sku: l.sku || '', stock: null })); } catch (e) { this.rows = []; }
+        this.refreshStock();
+      }
+      this.$nextTick(() => this.$refs.scan && this.$refs.scan.focus());
+    },
+    url(q) { return '{% url "inventory:transfer_lookup" %}?warehouse=' + encodeURIComponent(this.from) + '&q=' + encodeURIComponent(q); },
+    async search() {
+      const q = this.query.trim();
+      if (!q) { this.results = []; this.searched = false; return; }
+      try { const r = await fetch(this.url(q), { credentials: 'same-origin' }); this.results = (await r.json()).results || []; } catch (e) { this.results = []; }
+      this.searched = true;
+    },
+    enter() {
+      const q = this.query.trim().toLowerCase();
+      const exact = this.results.find(r => (r.barcode || '').toLowerCase() === q || (r.sku || '').toLowerCase() === q);
+      if (exact) return this.add(exact);
+      if (this.results.length === 1) this.add(this.results[0]);
+    },
+    add(r) {
+      const row = this.rows.find(x => x.variant_id === r.id);
+      if (row) row.quantity = String((parseFloat(row.quantity) || 0) + 1);
+      else this.rows.push({ variant_id: r.id, name: r.name, sku: r.sku, stock: r.stock, quantity: '1' });
+      this.query = ''; this.results = []; this.searched = false;
+      this.$nextTick(() => this.$refs.scan.focus());
+    },
+    async refreshStock() {
+      for (const r of this.rows) {
+        try { const d = await (await fetch(this.url(r.sku || r.name), { credentials: 'same-origin' })).json(); const hit = (d.results || []).find(x => x.id === r.variant_id); r.stock = hit ? hit.stock : '0'; } catch (e) { r.stock = null; }
+      }
+    },
+    total() { return this.rows.reduce((s, r) => s + (parseFloat(r.quantity) || 0), 0); },
+    ok() { return this.rows.length > 0 && this.from && this.to && this.from !== this.to && this.rows.every(r => parseFloat(r.quantity) > 0); },
+    beforeSubmit(e) {
+      if (!this.ok()) { e.preventDefault(); return; }
+      this.$refs.lines.value = JSON.stringify(this.rows.map(r => ({ variant_id: r.variant_id, quantity: r.quantity, name: r.name, sku: r.sku })));
+    },
+  };
+}
+</script>
+{% endblock %}

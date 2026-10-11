@@ -1,0 +1,24 @@
+{% load ui %}{# Counter create/edit panel (loaded into the side drawer; JSON {ok:true} closes it). #}
+<form method="post" action="{{ request.get_full_path }}" novalidate>
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div style="margin-bottom:12px">{% for e in form.non_field_errors %}{% ui "alert" tone="danger" message=e %}{% endfor %}</div>{% endif %}
+  <div class="ui-grid" style="grid-template-columns:minmax(0,1fr)">
+    {% ui "field" field=form.name %}
+    {% ui "field" field=form.code %}
+    {% ui "field" field=form.warehouse %}
+    {% ui "field" field=form.default_payment_method %}
+    <div class="ui-field">
+      <div class="ui-label">Assigned users</div>
+      <div style="max-height:200px;overflow:auto;border:1px solid var(--ui-border);border-radius:8px;padding:8px">
+        {% for cb in form.assigned_users %}<label class="flex items-center gap-2 py-1 cursor-pointer">{{ cb.tag }}<span class="text-sm">{{ cb.choice_label }}</span></label>{% empty %}<span class="ui-help">No users.</span>{% endfor %}
+      </div>
+      <p class="ui-help">Only these users can open this counter. Leave everyone unticked to allow every cashier of the branch.</p>
+      {% for e in form.assigned_users.errors %}<p class="ui-error">{{ e }}</p>{% endfor %}
+    </div>
+    {% ui "field" field=form.is_active %}
+  </div>
+  <div class="ui-modal-foot" style="position:sticky;bottom:0;background:var(--ui-surface);padding-top:12px;margin-top:20px">
+    <button type="button" class="ui-btn ui-btn-ghost" @click="$store.drawer.close()">Cancel</button>
+    <button type="submit" class="ui-btn ui-btn-primary"><span>Save counter</span></button>
+  </div>
+</form>

@@ -1,0 +1,14 @@
+{% load ui %}
+<div class="st-body">
+  <h3 class="st-subtitle">Mail server</h3>
+  {% if smtp.live %}
+    <div class="ui-alert ui-alert-success" role="status">{% icon "success" "w-4 h-4" %}<div>Connected to <b>{{ smtp.host }}:{{ smtp.port }}</b>{% if smtp.user %} as {{ smtp.user }}{% endif %}{% if smtp.tls %} · TLS on{% endif %}{% if not smtp.has_password %} · <b>no password set</b>{% endif %}.</div></div>
+  {% else %}
+    <div class="ui-alert ui-alert-warning" role="status">{% icon "warning" "w-4 h-4" %}<div>No mail server is configured, so emails are only <b>printed in the server console</b> and never reach customers. Add <code>EMAIL_HOST</code>, <code>EMAIL_HOST_USER</code> and <code>EMAIL_HOST_PASSWORD</code> to the <code>.env</code> file and restart the server. (Passwords are kept in <code>.env</code> on purpose — they are never stored in the database.)</div></div>
+  {% endif %}
+  <form method="post" class="st-test" novalidate>
+    {% csrf_token %}<input type="hidden" name="action" value="test_email">
+    <div class="ui-field" style="flex:1;min-width:220px"><label class="ui-label" for="test_to">Send a test email to</label><input type="email" id="test_to" name="test_to" value="{{ test_to }}" placeholder="you@example.com"></div>
+    <button type="submit" class="ui-btn ui-btn-secondary">{% icon "mail" "w-4 h-4" %}<span>Send test</span></button>
+  </form>
+</div>

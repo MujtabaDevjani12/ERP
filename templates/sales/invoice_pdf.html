@@ -1,0 +1,103 @@
+{% load ui %}<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  body { font-family: 'DejaVu Sans', Arial, sans-serif; color: #111827; font-size: 12px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #4f46e5; padding-bottom: 14px; margin-bottom: 18px; }
+  .store-name { font-size: 20px; font-weight: 800; color: #111827; }
+  .store-meta { color: #6b7280; font-size: 11px; margin-top: 3px; }
+  .invoice-title { text-align: right; }
+  .invoice-title h1 { font-size: 22px; margin: 0; color: #4f46e5; letter-spacing: 1px; }
+  .invoice-title p { margin: 2px 0 0; color: #6b7280; }
+  .meta-grid { display: flex; justify-content: space-between; margin-bottom: 18px; }
+  .meta-grid .box { width: 48%; }
+  .meta-grid h3 { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: #9ca3af; margin: 0 0 4px; }
+  .meta-grid p { margin: 0; line-height: 1.5; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+  th { background: #f9fafb; text-align: left; font-size: 10px; text-transform: uppercase; color: #6b7280; padding: 8px 10px; border-bottom: 1px solid #e5e7eb; }
+  th.num, td.num { text-align: right; }
+  td { padding: 8px 10px; border-bottom: 1px solid #f3f4f6; }
+  .totals { width: 45%; margin-left: auto; }
+  .totals tr td { border: none; padding: 4px 10px; }
+  .totals tr.grand td { border-top: 2px solid #111827; font-weight: 800; font-size: 14px; padding-top: 8px; }
+  .footer { margin-top: 28px; padding-top: 14px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 10px; text-align: center; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; }
+  .badge-paid { background: #d1fae5; color: #065f46; }
+  .badge-partial { background: #fef3c7; color: #92400e; }
+  .badge-due { background: #fee2e2; color: #991b1b; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="store-name">{{ sale.store.name }}</div>
+      <div class="store-meta">
+        {{ sale.store.address }}<br>
+        {% if sale.store.phone %}{{ sale.store.phone }} · {% endif %}{{ sale.store.email }}
+      </div>
+    </div>
+    <div class="invoice-title">
+      <h1>INVOICE</h1>
+      <p>{{ sale.reference }}</p>
+      <p>{{ sale.created_at|date:"d M Y, H:i" }}</p>
+    </div>
+  </div>
+
+  <div class="meta-grid">
+    <div class="box">
+      <h3>Billed to</h3>
+      <p><strong>{{ sale.customer.name|default:"Walk-in customer" }}</strong></p>
+      {% if sale.customer.phone %}<p>{{ sale.customer.phone }}</p>{% endif %}
+      {% if sale.customer.address %}<p>{{ sale.customer.address }}</p>{% endif %}
+    </div>
+    <div class="box" style="text-align:right;">
+      <h3>Sale details</h3>
+      <p>Biller: {{ sale.biller.get_full_name|default:sale.biller.username }}</p>
+      <p>Warehouse: {{ sale.warehouse.name }}</p>
+      <p>
+        {% if sale.payment_status == "paid" %}<span class="badge badge-paid">PAID</span>
+        {% elif sale.payment_status == "partial" %}<span class="badge badge-partial">PARTIAL</span>
+        {% else %}<span class="badge badge-due">DUE</span>{% endif %}
+      </p>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Item</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Discount</th><th class="num">Tax</th><th class="num">Total</th></tr>
+    </thead>
+    <tbody>
+      {% for item in sale.items.all %}
+      <tr>
+        <td>{{ item.variant.product.name }}{% if item.variant.name != "Default" %} — {{ item.variant.name }}{% endif %}</td>
+        <td class="num">{{ item.quantity }}</td>
+        <td class="num">{{ item.unit_price|floatformat:2 }}</td>
+        <td class="num">{{ item.discount_amount|floatformat:2 }}</td>
+        <td class="num">{{ item.tax_amount|floatformat:2 }}</td>
+        <td class="num">{{ item.line_total|floatformat:2 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <table class="totals">
+    <tr><td>Subtotal</td><td class="num">{% money sale.subtotal sale.store.currency_symbol %}</td></tr>
+    <tr><td>Discount</td><td class="num">-{% money sale.discount_amount sale.store.currency_symbol %}</td></tr>
+    <tr><td>Tax</td><td class="num">+{% money sale.tax_amount sale.store.currency_symbol %}</td></tr>
+{% if sale.shipping_amount %}<tr><td>Shipping</td><td class="num">+{% money sale.shipping_amount sale.store.currency_symbol %}</td></tr>{% endif %}
+{% if sale.rounding_amount %}<tr><td>Rounding</td><td class="num">{% if sale.rounding_amount > 0 %}+{% endif %}{% money sale.rounding_amount sale.store.currency_symbol %}</td></tr>{% endif %}
+    <tr class="grand"><td>Total</td><td class="num">{% money sale.total_amount sale.store.currency_symbol %}</td></tr>
+    <tr><td>Paid</td><td class="num">{% money sale.paid_amount sale.store.currency_symbol %}</td></tr>
+    <tr><td>Balance due</td><td class="num">{% money sale.due_amount sale.store.currency_symbol %}</td></tr>
+  </table>
+
+  {% if sale.sale_note %}<p style="color:#6b7280;">Note: {{ sale.sale_note }}</p>{% endif %}
+
+  <div class="footer">
+    Thank you for shopping with {{ sale.store.name }}!<br>
+    This is a computer-generated invoice.
+  </div>
+</body>
+</html>

@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Reports{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <h1 class="page-title">Reports</h1>
+      <p class="page-subtitle">Pick a report, choose the dates, and download it as Excel, PDF or CSV.</p>
+    </div>
+    <div class="page-actions"><a class="ui-btn ui-btn-secondary" href="{% url 'reports:data_hub' %}">{% icon "table" "w-4 h-4" %}<span>Import &amp; export</span></a><a class="ui-btn ui-btn-secondary" href="{% url 'reports:dashboard' %}">{% icon "chart" "w-4 h-4" %}<span>Sales dashboard</span></a></div>
+  </div>
+  {% for g, items in groups %}
+  <section aria-labelledby="grp-{{ forloop.counter }}" class="space-y-2">
+    <h2 id="grp-{{ forloop.counter }}" class="ui-section-title" style="font-size:13px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ui-text-muted,#6b7280)">{{ g }}</h2>
+    <div class="ui-grid" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr))">
+      {% for r in items %}
+      <a href="{% url 'reports:pack_report' r.slug %}" class="ui-card ui-card-link" style="display:block;padding:20px;text-decoration:none;color:inherit">
+        <div class="ui-empty-icon" style="margin:0 0 12px;width:40px;height:40px">{% icon r.icon "w-5 h-5" %}</div>
+        <div class="ui-cell-title" style="font-size:15px">{{ r.title }}</div>
+        <p class="ui-help" style="margin-top:4px">{{ r.text }}</p>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+</div>
+{% endblock %}

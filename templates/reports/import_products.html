@@ -1,0 +1,28 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Import products{% endblock %}
+{% block content %}
+<div class="ui-form-wrap space-y-4" style="max-width:40rem">
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{% url 'catalog:product_list' %}">Products</a><span class="sep">/</span><span>Import</span></nav>
+      <h1 class="page-title">Import products from CSV</h1>
+      <p class="page-subtitle">An existing SKU updates its prices; a new SKU creates a new product.</p>
+    </div>
+  </div>
+  <form method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    <section class="ui-form-section">
+      <header><h2>CSV file</h2><p>Same layout as “Export products CSV”.</p></header>
+      <div class="body space-y-4">
+        <div class="ui-field"><label class="ui-label" for="imp-file">File <span style="color:var(--ui-danger)">*</span></label><input type="file" id="imp-file" name="file" accept=".csv" required></div>
+        <div class="ui-alert ui-alert-info" role="note">{% icon "info" "w-4 h-4" %}<div>Columns: <code>SKU, Product, Variant, Category, Brand, Unit, Barcode, Cost price, Selling price, Active</code></div></div>
+        <a class="ui-btn ui-btn-secondary" href="{% url 'reports:export_products_csv' %}">{% icon "download" "w-4 h-4" %}<span>Download current products as a template</span></a>
+      </div>
+    </section>
+    <div class="ui-sticky-actions">
+      <a href="{% url 'catalog:product_list' %}" class="ui-btn ui-btn-secondary">Cancel</a>
+      <button type="submit" class="ui-btn ui-btn-primary">{% icon "upload" "w-4 h-4" %}<span>Upload &amp; import</span></button>
+    </div>
+  </form>
+</div>
+{% endblock %}

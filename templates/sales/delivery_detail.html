@@ -1,0 +1,81 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Delivery {{ delivery.reference }}{% endblock %}
+{% block content %}
+<div class="space-y-4" x-data="{ deliver: false, confirmCancel: false }">
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{% url 'sales:delivery_list' %}">Deliveries</a><span class="sep">/</span><span>{{ delivery.reference }}</span></nav>
+      <h1 class="page-title">{{ delivery.reference }}
+        {% if delivery.status == "pending" %}{% badge delivery.status label=delivery.get_status_display tone="warning" %}{% elif delivery.status == "out_for_delivery" %}{% badge delivery.status label=delivery.get_status_display tone="info" %}{% else %}{% badge delivery.status label=delivery.get_status_display %}{% endif %}</h1>
+      <p class="page-subtitle">For sale <a class="erp-link" href="{% url 'sales:sale_detail' sale.pk %}"><strong>{{ sale.reference }}</strong></a> · created {{ delivery.created_at|date:"d M Y, H:i" }}</p>
+    </div>
+    <div class="page-actions">
+      <a class="ui-btn ui-btn-secondary" href="{% url 'sales:delivery_note' delivery.pk %}" target="_blank" rel="noopener">{% icon "printer" "w-4 h-4" %}<span class="hidden sm:inline">Delivery note</span></a>
+      {% if wa_url %}<a class="ui-btn ui-btn-secondary" href="{{ wa_url }}" target="_blank" rel="noopener">{% icon "bolt" "w-4 h-4" %}<span class="hidden sm:inline">WhatsApp</span></a>{% endif %}
+      {% if can_change and not delivery.is_closed or can_change and request.user.is_superuser %}<a class="ui-btn ui-btn-secondary" href="{% url 'sales:delivery_edit' delivery.pk %}">{% icon "pencil" "w-4 h-4" %}<span class="hidden sm:inline">Edit</span></a>{% endif %}
+    </div>
+  </div>
+
+  {% component "card" title="Progress" %}{% ui "stepper" steps=steps %}{% endcomponent %}
+
+  <div class="ui-grid ui-grid-2" style="align-items:start">
+    <div class="space-y-4">
+      {% component "card" title="Delivery details" %}
+      <dl class="ui-dl">
+        <dt>Recipient</dt><dd>{{ delivery.recipient_name|default:"—" }}</dd>
+        <dt>Phone</dt><dd>{{ delivery.phone|default:"—" }}</dd>
+        <dt>Address</dt><dd>{{ delivery.address }}{% if delivery.city %}, {{ delivery.city }}{% endif %}</dd>
+        <dt>Promised on</dt><dd>{{ delivery.scheduled_date|date:"d M Y"|default:"—" }}</dd>
+        <dt>Rider / courier</dt><dd>{% if delivery.rider %}{{ delivery.rider }}{% elif delivery.delivery_person %}{{ delivery.delivery_person.get_full_name|default:delivery.delivery_person.username }}{% else %}—{% endif %}</dd>
+        <dt>Tracking no.</dt><dd>{{ delivery.tracking_no|default:"—" }}</dd>
+        {% if delivery.delivered_at %}<dt>Delivered</dt><dd>{{ delivery.delivered_at|date:"d M Y, H:i" }}{% if delivery.received_by %} · received by {{ delivery.received_by }}{% endif %}</dd>{% endif %}
+        {% if delivery.note %}<dt>Note</dt><dd>{{ delivery.note|linebreaksbr }}</dd>{% endif %}
+      </dl>
+      {% endcomponent %}
+
+      {% component "card" title="Items in this parcel" flush=True %}
+      <div class="ui-table-wrap" style="border:0;box-shadow:none"><table class="ui-table">
+        <thead><tr><th>Item</th><th class="num">Qty</th></tr></thead>
+        <tbody>{% for it in items %}<tr><td><div class="ui-cell-title">{{ it.variant.product.name }}</div>{% if it.variant.name %}<div class="ui-cell-sub">{{ it.variant.name }}</div>{% endif %}</td><td class="num">{{ it.quantity|floatformat:"-3" }}</td></tr>{% endfor %}</tbody>
+      </table></div>
+      {% endcomponent %}
+    </div>
+
+    <div class="space-y-4">
+      {% if can_change and allowed %}
+      {% component "card" title="Update status" subtitle="Move the parcel to its next step." %}
+      <div class="flex gap-2" style="flex-wrap:wrap">
+        {% if "out_for_delivery" in allowed %}<form method="post" action="{% url 'sales:delivery_status' delivery.pk %}">{% csrf_token %}<input type="hidden" name="status" value="out_for_delivery"><button class="ui-btn ui-btn-primary">{% icon "truck" "w-4 h-4" %}<span>Send out</span></button></form>{% endif %}
+        {% if "delivered" in allowed %}<button type="button" class="ui-btn ui-btn-primary" @click="deliver = true">{% icon "check" "w-4 h-4" %}<span>Mark delivered</span></button>{% endif %}
+        {% if "pending" in allowed %}<form method="post" action="{% url 'sales:delivery_status' delivery.pk %}">{% csrf_token %}<input type="hidden" name="status" value="pending"><button class="ui-btn ui-btn-secondary">Back to packing</button></form>{% endif %}
+        {% if "cancelled" in allowed %}<form method="post" action="{% url 'sales:delivery_status' delivery.pk %}" data-confirm="Cancel this delivery?|The parcel will be marked as cancelled.|Cancel delivery">{% csrf_token %}<input type="hidden" name="status" value="cancelled"><button class="ui-btn ui-btn-danger-soft">Cancel delivery</button></form>{% endif %}
+      </div>
+      {% endcomponent %}
+      {% endif %}
+
+      {% component "card" title="Activity" %}{% ui "timeline" items=events %}{% endcomponent %}
+
+      {% component "card" title="Tell the customer" subtitle="Send a delivery update." %}
+      <form method="post" action="{% url 'sales:delivery_email' delivery.pk %}" class="flex gap-2" style="align-items:flex-end">
+        {% csrf_token %}
+        <div class="ui-field" style="flex:1"><label class="ui-label" for="dl-email">Email</label><input type="email" id="dl-email" name="email" value="{{ sale.customer.email }}" placeholder="customer@example.com"></div>
+        <button class="ui-btn ui-btn-secondary">{% icon "inbox" "w-4 h-4" %}<span>Send</span></button>
+      </form>
+      {% endcomponent %}
+
+      {% if can_delete %}
+      <form method="post" action="{% url 'sales:delivery_delete' delivery.pk %}" data-confirm="Delete this delivery?|This removes the delivery record. The sale is not affected.|Delete">{% csrf_token %}<button class="ui-btn ui-btn-danger-soft">{% icon "trash" "w-4 h-4" %}<span>Delete delivery</span></button></form>
+      {% endif %}
+    </div>
+  </div>
+
+  {% component "modal" open="deliver" title="Mark as delivered" %}
+  <form method="post" action="{% url 'sales:delivery_status' delivery.pk %}" class="space-y-3">
+    {% csrf_token %}<input type="hidden" name="status" value="delivered">
+    <div class="ui-field"><label class="ui-label" for="dl-rb">Received by</label><input type="text" id="dl-rb" name="received_by" value="{{ delivery.recipient_name }}" placeholder="Who signed for it?"></div>
+    <div class="ui-field"><label class="ui-label" for="dl-note">Note (optional)</label><input type="text" id="dl-note" name="note" placeholder="Anything worth recording"></div>
+    <div class="ui-modal-foot"><button type="button" class="ui-btn ui-btn-secondary" @click="deliver = false">Not yet</button><button class="ui-btn ui-btn-primary">{% icon "check" "w-4 h-4" %}<span>Confirm delivered</span></button></div>
+  </form>
+  {% endcomponent %}
+</div>
+{% endblock %}

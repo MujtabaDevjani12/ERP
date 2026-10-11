@@ -1,0 +1,2 @@
+{# Loading placeholder: {% ui "skeleton" lines=4 %} #}
+{% with n=lines|default:3 %}<div class="space-y-3" aria-busy="true" aria-label="Loading">{% for i in "x"|ljust:n %}<div class="ui-skeleton" style="height:14px;width:{% if forloop.last %}60%{% else %}100%{% endif %}"></div>{% endfor %}</div>{% endwith %}

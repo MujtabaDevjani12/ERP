@@ -1,0 +1,13 @@
+<tr>
+  {% for f in row.fields %}
+  <td style="min-width:8rem">
+    {% if forloop.first %}{% for h in row.hidden %}{{ h }}{% endfor %}{% endif %}
+    {{ f }}
+    {% for e in f.errors %}<p class="ui-error">{{ e }}</p>{% endfor %}
+    {% if forloop.first %}{% for e in row.errors %}<p class="ui-error">{{ e }}</p>{% endfor %}{% endif %}
+  </td>
+  {% endfor %}
+  {% if not row.fields %}<td>{% for h in row.hidden %}{{ h }}{% endfor %}</td>{% endif %}
+  {% for c in row.readonly %}<td style="color:var(--ui-text-2)">{{ c.html }}</td>{% endfor %}
+  {% if block.can_delete %}<td style="text-align:center">{% if row.delete %}{{ row.delete }}{% endif %}</td>{% endif %}
+</tr>

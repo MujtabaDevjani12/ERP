@@ -1,0 +1,24 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{{ module_title }}{% endblock %}
+{% block extra_head %}{% include "erp_ui/_head.html" %}{% endblock %}
+{% block content %}
+<div class="space-y-5">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">{{ module_title }}</h1>
+      <p class="page-subtitle">Pick a register to browse, or create a new record. You only see what your role can access.</p>
+    </div>
+  </div>
+  <div class="ui-grid ui-grid-3">
+    {% for c in cards %}
+    <div class="ui-card" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;transition:border-color var(--t-fast),box-shadow var(--t-fast)" onmouseover="this.style.borderColor='var(--brand-300)'" onmouseout="this.style.borderColor=''">
+      <a href="{{ c.url }}" class="min-w-0 flex-1" style="text-decoration:none">
+        <div class="truncate" style="font-weight:600;color:var(--ui-text)">{{ c.label }}</div>
+        <div style="font-size:12px;color:var(--ui-text-3);margin-top:2px">{% if c.count is not None %}{{ c.count }} record{{ c.count|pluralize }}{% else %}Open{% endif %}</div>
+      </a>
+      {% if c.can_add %}<a class="ui-btn ui-btn-secondary ui-btn-sm" style="flex:none" href="{{ c.add_url }}" data-tip="New record" data-tip-pos="bottom" aria-label="New {{ c.label }}">{% icon "plus" "w-4 h-4" %}</a>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

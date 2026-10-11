@@ -1,0 +1,8 @@
+{# Side panel bound to an Alpine flag in the parent scope: {% component "drawer" open="showFilters" title="Filters" %}…{% endcomponent %} #}
+{% load ui %}<div x-cloak x-show="{{ open }}" @keydown.escape.window="{{ open }} = false">
+  <div class="ui-overlay" x-show="{{ open }}" x-transition.opacity @click="{{ open }} = false"></div>
+  <aside class="ui-drawer" role="dialog" aria-modal="true" aria-label="{{ title }}" x-show="{{ open }}" x-transition:enter="ui-drawer-slide" x-transition:enter-start="from" x-transition:leave="ui-drawer-slide" x-transition:leave-end="from">
+    <div class="ui-drawer-head"><h3 class="ui-card-title">{{ title }}</h3><button type="button" class="icon-btn" @click="{{ open }} = false" aria-label="Close">{% icon "x" "w-5 h-5" %}</button></div>
+    <div class="ui-drawer-body">{{ body }}</div>
+  </aside>
+</div>
