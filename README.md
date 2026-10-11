@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Multiple POS
 
 Ek Django-based POS system jo Gold/Diamond, Mart, Restaurant aur Clothing — sab business types ko ek hi system se handle karta hai. Multi-store, multi-warehouse, role-based permissions, POS billing screen, register (till) sessions, purchases/suppliers, inventory + barcode scanning, invoices (PDF/email/WhatsApp), reports/charts, aur CSV import/export.
@@ -125,3 +126,7 @@ Upar wala POS bilkul pehle ki tarah chalta hai. Us ke upar ERP ke modules additi
 * ERP documents ki zyada tar screens **Django admin** (`/admin/`) mein hain; `/erp/` dashboard aur reports ke liye.
 * **Demo data sirf development ke liye:** `python manage.py seed_demo_erp` (DEBUG=False par chalta hi nahi).
   Production par kabhi `seed_demo` / `seed_demo_erp` na chalayen; `seed_demo` ke weak passwords (`admin12345` ...) turant badal dein.
+=======
+# ERP
+ERP POS
+>>>>>>> d8ca3bace3622db87cf33c4b69dcc3d1d5f3f452
