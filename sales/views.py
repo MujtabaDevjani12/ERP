@@ -4,7 +4,7 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from django.apps import apps
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, transaction
 from django.db.models import Count, F, Q
@@ -31,9 +31,10 @@ from .pricing import CartError, money, price_cart, to_decimal
 from .pos_stock import OUT_OF_STOCK, STOCK_CHANGED, stock_effects
 
 
-class SaleListView(PagedListMixin, LoginRequiredMixin, ListView):
+class SaleListView(PagedListMixin, LoginRequiredMixin, PermissionRequiredMixin, ListView):
     """Server-side search / status filter / pagination (25-100 rows per page) with summary tiles for the filtered set."""
     model = Sale
+    permission_required = "sales.view_sale"
     template_name = "sales/sale_list.html"
     context_object_name = "sales"
     filter_params = ("q", "status", "biller", "df", "dt", "pay", "warehouse")
@@ -82,8 +83,9 @@ class SaleListView(PagedListMixin, LoginRequiredMixin, ListView):
         return ctx
 
 
-class SaleDetailView(LoginRequiredMixin, DetailView):
+class SaleDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
     model = Sale
+    permission_required = "sales.view_sale"
     template_name = "sales/sale_detail.html"
     context_object_name = "sale"
 
@@ -263,6 +265,14 @@ def pos_finalize_sale(request):
     items = payload.get("items") or []
     if not isinstance(items, list) or not items:
         return JsonResponse({"ok": False, "error": "Cart is empty.", "code": "empty"}, status=400)
+
+    company = getattr(request, "company", None)                 # plan limit: sales / invoices per month
+    if company is not None and not payload.get("hold"):
+        from billing.access import is_platform_owner, limit_reached
+        if not is_platform_owner(request.user):
+            reached, why = limit_reached(company, "monthly_sales")
+            if reached:
+                return JsonResponse({"ok": False, "error": why, "code": "plan_limit"}, status=402)
 
     session = get_active_session(request)
     if not session:
@@ -527,9 +537,10 @@ def sale_feedback(request, pk):
     return render(request, "sales/_sale_feedback.html", {"sale": sale, "error": error, "rating": rating, "comment": comment})
 
 
-class FeedbackListView(PagedListMixin, LoginRequiredMixin, ListView):
+class FeedbackListView(PagedListMixin, LoginRequiredMixin, PermissionRequiredMixin, ListView):
     """What customers said, newest first, with the average and a 1-5 star breakdown for the current filter."""
     model = SaleFeedback
+    permission_required = "sales.view_salefeedback"
     template_name = "sales/feedback_list.html"
     context_object_name = "rows"
     filter_params = ("q", "rating", "df", "dt")

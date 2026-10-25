@@ -84,6 +84,23 @@ class Employee(TimeStampedModel):
     bank_name = models.CharField(max_length=80, blank=True)
     bank_account_no = models.CharField(max_length=40, blank=True)
 
+    # personal & statutory details
+    GENDER_CHOICES = [("male", "Male"), ("female", "Female"), ("other", "Other")]
+    MARITAL_CHOICES = [("single", "Single"), ("married", "Married"), ("divorced", "Divorced"), ("widowed", "Widowed")]
+    father_name = models.CharField("Father / husband name", max_length=150, blank=True)
+    date_of_birth = models.DateField(null=True, blank=True)
+    gender = models.CharField(max_length=10, choices=GENDER_CHOICES, blank=True)
+    marital_status = models.CharField(max_length=10, choices=MARITAL_CHOICES, blank=True)
+    permanent_address = models.CharField(max_length=255, blank=True)
+    emergency_contact_phone = models.CharField(max_length=30, blank=True)
+    reporting_to = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True, related_name="team",
+                                     help_text="Line manager.")
+    probation_end_date = models.DateField(null=True, blank=True)
+    confirmation_date = models.DateField(null=True, blank=True)
+    ntn = models.CharField("NTN / tax no.", max_length=20, blank=True)
+    eobi_number = models.CharField("EOBI no.", max_length=20, blank=True)
+    social_security_number = models.CharField("Social security no.", max_length=20, blank=True)
+
     class Meta:
         ordering = ["employee_code"]
         constraints = [models.UniqueConstraint(fields=["company", "employee_code"], name="uniq_employee_code")]
@@ -218,3 +235,160 @@ class LoanRepayment(TimeStampedModel):
 
     class Meta:
         ordering = ["date", "id"]
+
+
+# ---------------------------------------------------------------------------------------------- employee file
+class EmployeeDocument(TimeStampedModel):
+    """CNIC copy, contract, degree, experience letter ... with an expiry date so renewals are not missed."""
+    TYPE_CHOICES = [("cnic", "CNIC / ID"), ("contract", "Employment contract"), ("offer", "Offer / appointment letter"),
+                    ("degree", "Degree / certificate"), ("experience", "Experience letter"), ("license", "License / permit"),
+                    ("medical", "Medical / fitness"), ("other", "Other")]
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="documents")
+    doc_type = models.CharField("Type", max_length=12, choices=TYPE_CHOICES, default="other")
+    title = models.CharField(max_length=120)
+    file = models.FileField(upload_to="hr/documents/", blank=True, null=True)
+    issue_date = models.DateField(null=True, blank=True)
+    expiry_date = models.DateField(null=True, blank=True)
+    notes = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        ordering = ["employee", "doc_type", "title"]
+
+    def __str__(self):
+        return f"{self.employee.employee_code} {self.title}"
+
+
+class EmployeeMovement(TimeStampedModel, CreatedByModel):
+    """Promotion, transfer, confirmation, increment ... history. Saving a movement also updates the employee's
+    current department / designation (see hr.services.apply_movement)."""
+    PROMOTION, TRANSFER, CONFIRMATION, INCREMENT, DEMOTION, OTHER = "promotion", "transfer", "confirmation", "increment", "demotion", "other"
+    TYPE_CHOICES = [(PROMOTION, "Promotion"), (TRANSFER, "Transfer"), (CONFIRMATION, "Confirmation"), (INCREMENT, "Salary increment"),
+                    (DEMOTION, "Demotion"), (OTHER, "Other")]
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="movements")
+    movement_type = models.CharField(max_length=12, choices=TYPE_CHOICES, default=PROMOTION)
+    effective_date = models.DateField()
+    from_department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    to_department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    from_designation = models.ForeignKey(Designation, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    to_designation = models.ForeignKey(Designation, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    old_salary = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    new_salary = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    remarks = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        ordering = ["-effective_date", "-id"]
+
+    def __str__(self):
+        return f"{self.employee.employee_code} {self.get_movement_type_display()} {self.effective_date}"
+
+
+class DisciplinaryAction(TimeStampedModel, CreatedByModel):
+    VERBAL, WRITTEN, SHOW_CAUSE, SUSPENSION, FINE, TERMINATION = "verbal", "written", "show_cause", "suspension", "fine", "termination"
+    TYPE_CHOICES = [(VERBAL, "Verbal warning"), (WRITTEN, "Written warning"), (SHOW_CAUSE, "Show-cause notice"),
+                    (SUSPENSION, "Suspension"), (FINE, "Fine"), (TERMINATION, "Termination notice")]
+    OPEN, CLOSED = "open", "closed"
+    STATUS_CHOICES = [(OPEN, "Open"), (CLOSED, "Closed")]
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="disciplinary_actions")
+    date = models.DateField()
+    action_type = models.CharField(max_length=12, choices=TYPE_CHOICES, default=VERBAL)
+    reason = models.CharField(max_length=255)
+    details = models.TextField(blank=True)
+    employee_response = models.TextField(blank=True)
+    outcome = models.CharField(max_length=255, blank=True)
+    status = models.CharField(max_length=8, choices=STATUS_CHOICES, default=OPEN, db_index=True)
+
+    class Meta:
+        ordering = ["-date", "-id"]
+
+    def __str__(self):
+        return f"{self.employee.employee_code} {self.get_action_type_display()} {self.date}"
+
+
+# ---------------------------------------------------------------------------------------------- recruitment
+class Vacancy(TimeStampedModel):
+    OPEN, ON_HOLD, FILLED, CLOSED = "open", "on_hold", "filled", "closed"
+    STATUS_CHOICES = [(OPEN, "Open"), (ON_HOLD, "On hold"), (FILLED, "Filled"), (CLOSED, "Closed")]
+    company = models.ForeignKey("company.Company", on_delete=models.CASCADE, related_name="vacancies")
+    title = models.CharField(max_length=120)
+    department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True, related_name="vacancies")
+    designation = models.ForeignKey(Designation, on_delete=models.SET_NULL, null=True, blank=True, related_name="vacancies")
+    positions = models.PositiveSmallIntegerField(default=1)
+    employment_type = models.CharField(max_length=10, choices=Employee.TYPE_CHOICES, default="permanent")
+    description = models.TextField(blank=True)
+    requirements = models.TextField(blank=True)
+    salary_min = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    salary_max = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    opened_on = models.DateField(null=True, blank=True)
+    closing_date = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=OPEN, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name_plural = "Vacancies"
+
+    def __str__(self):
+        return self.title
+
+
+class Applicant(TimeStampedModel):
+    APPLIED, SCREENING, INTERVIEW, OFFERED, HIRED, REJECTED = "applied", "screening", "interview", "offered", "hired", "rejected"
+    STAGE_CHOICES = [(APPLIED, "Applied"), (SCREENING, "Screening"), (INTERVIEW, "Interview"), (OFFERED, "Offer made"),
+                     (HIRED, "Hired"), (REJECTED, "Rejected")]
+    vacancy = models.ForeignKey(Vacancy, on_delete=models.CASCADE, related_name="applicants")
+    full_name = models.CharField(max_length=150)
+    phone = models.CharField(max_length=30, blank=True)
+    email = models.EmailField(blank=True)
+    cnic = models.CharField(max_length=15, blank=True)
+    current_employer = models.CharField(max_length=150, blank=True)
+    experience_years = models.DecimalField(max_digits=4, decimal_places=1, null=True, blank=True)
+    expected_salary = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    resume = models.FileField(upload_to="hr/resumes/", blank=True, null=True)
+    source = models.CharField(max_length=60, blank=True, help_text="Referral, job portal, walk-in ...")
+    stage = models.CharField(max_length=10, choices=STAGE_CHOICES, default=APPLIED, db_index=True)
+    interview_date = models.DateTimeField(null=True, blank=True)
+    interview_notes = models.TextField(blank=True)
+    rating = models.PositiveSmallIntegerField(null=True, blank=True, help_text="1 (weak) to 5 (excellent)")
+    hired_as = models.ForeignKey(Employee, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+
+    class Meta:
+        ordering = ["vacancy", "-created_at"]
+
+    def __str__(self):
+        return f"{self.full_name} - {self.vacancy}"
+
+
+# ---------------------------------------------------------------------------------------------- training
+class TrainingProgram(TimeStampedModel):
+    PLANNED, RUNNING, COMPLETED, CANCELLED = "planned", "running", "completed", "cancelled"
+    STATUS_CHOICES = [(PLANNED, "Planned"), (RUNNING, "In progress"), (COMPLETED, "Completed"), (CANCELLED, "Cancelled")]
+    company = models.ForeignKey("company.Company", on_delete=models.CASCADE, related_name="training_programs")
+    title = models.CharField(max_length=150)
+    trainer = models.CharField(max_length=120, blank=True)
+    venue = models.CharField(max_length=120, blank=True)
+    start_date = models.DateField()
+    end_date = models.DateField(null=True, blank=True)
+    cost = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=PLANNED, db_index=True)
+    description = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-start_date"]
+
+    def __str__(self):
+        return self.title
+
+
+class TrainingParticipant(TimeStampedModel):
+    program = models.ForeignKey(TrainingProgram, on_delete=models.CASCADE, related_name="participants")
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="trainings")
+    attended = models.BooleanField(default=False)
+    score = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
+    certificate_issued = models.BooleanField(default=False)
+    feedback = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        ordering = ["program", "employee"]
+        constraints = [models.UniqueConstraint(fields=["program", "employee"], name="uniq_training_participant")]
+
+    def __str__(self):
+        return f"{self.employee.employee_code} @ {self.program}"

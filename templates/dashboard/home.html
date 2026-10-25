@@ -22,6 +22,7 @@
 
 {# ---- row 1: today + this month's numbers ---- #}
 <div class="dx-top">
+  {% if can_sales %}
   <section class="dx-card dx-hero" aria-labelledby="dx-today">
     <div class="dx-card-head">
       <h2 class="dx-card-title" id="dx-today">Today's sales</h2>
@@ -46,16 +47,21 @@
     </div>
   </section>
 
+  {% endif %}
+
+  {% if can_sales or can_purchases or can_expenses %}
   <div class="dx-tiles">
-    {% include "dashboard/_stat_card.html" with accent=True label="Total Sales" value=stat_sales_total change=stat_sales_change caption="Completed sales this month" icon="sales" %}
-    {% include "dashboard/_stat_card.html" with label="Total Purchases" value=stat_purchases_total change=stat_purchases_change caption="Ordered this month" icon="purchases" %}
-    {% include "dashboard/_stat_card.html" with label="Total Due" value=stat_due_total change=stat_due_change caption="Outstanding on this month's sales" icon="due" %}
-    {% include "dashboard/_stat_card.html" with label="Total Expenses" value=stat_expenses_total change=stat_expenses_change caption="Paid out this month" icon="expenses" %}
+    {% if can_sales %}{% include "dashboard/_stat_card.html" with accent=True label="Total Sales" value=stat_sales_total change=stat_sales_change caption="Completed sales this month" icon="sales" %}{% endif %}
+    {% if can_purchases %}{% include "dashboard/_stat_card.html" with label="Total Purchases" value=stat_purchases_total change=stat_purchases_change caption="Ordered this month" icon="purchases" %}{% endif %}
+    {% if can_sales %}{% include "dashboard/_stat_card.html" with label="Total Due" value=stat_due_total change=stat_due_change caption="Outstanding on this month's sales" icon="due" %}{% endif %}
+    {% if can_expenses %}{% include "dashboard/_stat_card.html" with label="Total Expenses" value=stat_expenses_total change=stat_expenses_change caption="Paid out this month" icon="expenses" %}{% endif %}
   </div>
+  {% endif %}
 </div>
 
 {# ---- row 2: monthly chart + quick actions / low stock ---- #}
 <div class="dx-grid">
+  {% if can_sales %}
   <section class="dx-card" aria-labelledby="dx-ov">
     <div class="dx-card-head">
       <div>
@@ -66,6 +72,7 @@
     </div>
     <div class="dx-chart" style="height:340px"><canvas id="overviewChart" role="img" aria-label="Monthly sales and purchases"></canvas></div>
   </section>
+  {% endif %}
 
   <div class="dx-stack">
     <section class="dx-card" aria-labelledby="dx-qa">
@@ -76,6 +83,7 @@
         {% endfor %}
       </div>
     </section>
+    {% if can_stock %}
     <section class="dx-card" aria-labelledby="dx-low" style="flex:1">
       <div class="dx-card-head" style="margin-bottom:8px">
         <h2 class="dx-card-title" id="dx-low">Low stock {% if low_count %}<span class="ui-badge ui-badge-danger no-dot" style="margin-left:6px">{{ low_count }}</span>{% endif %}</h2>
@@ -90,10 +98,12 @@
         <div class="dx-empty" style="padding:22px 8px">Nothing is running low.</div>
       {% endfor %}
     </section>
+    {% endif %}
   </div>
 </div>
 
 {# ---- row 3: recent sales + top products ---- #}
+{% if can_sales %}
 <div class="dx-grid">
   <section class="dx-card" aria-labelledby="dx-rs">
     <div class="dx-card-head">
@@ -135,7 +145,10 @@
   </section>
 </div>
 
+{% endif %}
+
 {# ---- row 4: daily sales + payment status ---- #}
+{% if can_sales %}
 <div class="dx-grid">
   <section class="dx-card" aria-labelledby="dx-30">
     <div class="dx-card-head">
@@ -155,6 +168,7 @@
     </div>
   </section>
 </div>
+{% endif %}
 
 <script>
 // Each chart is wrapped in its own try/catch on purpose: a mistake in one chart's config must never take the others down.

@@ -1,0 +1,109 @@
+{% extends "base.html" %}{% load ui billing_tags %}
+{% block title %}Create your company{% endblock %}
+{% block auth_content %}
+{% with sel_plan=form.plan.value|default:""|stringformat:"s" sel_int=form.interval.value|default:"monthly" %}
+<div class="bp-pub">
+  {% include "billing/public/_chrome_top.html" %}
+  <main class="bp-pub-main" id="main">
+    <div class="bp-hero">
+      <h1>Create your account</h1>
+      <p>Sign up with Google or your e-mail, then choose a plan and pay. {% if trial_days %}You get {{ trial_days }} free day{{ trial_days|pluralize }} to look around first.{% else %}Your ERP opens as soon as your first payment is confirmed.{% endif %}</p>
+      <div style="max-width:340px;margin:16px auto 0">{% include "billing/public/_auth_tabs.html" with active="signup" %}</div>
+    </div>
+
+    {% if not settings_obj.allow_public_signup %}
+      <div class="ui-card">{% ui "empty_state" icon="lock" title="Sign-up is closed right now" text="Please contact us to get an account." %}</div>
+    {% else %}
+    <form method="post" novalidate class="bp-signup" id="signup-form">
+      {% csrf_token %}
+      <section class="ui-card">
+        <div class="ui-card-header"><div class="ui-card-title">1. Choose a plan</div>
+          <div class="bp-toggle" role="radiogroup" aria-label="Billing period" style="margin:0">
+            {% for value, label in form.fields.interval.choices %}
+            <label style="cursor:pointer"><input type="radio" name="interval" value="{{ value }}" class="sr-only" {% if sel_int == value %}checked{% endif %} onchange="bpInterval(this.value)"><span class="bp-ivl {% if sel_int == value %}on{% endif %}" data-v="{{ value }}" style="display:inline-block;padding:7px 16px;border-radius:999px;font-size:13px;font-weight:600">{{ label }}</span></label>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="ui-card-body">
+          {% if form.plan.errors %}<p class="ui-error">{{ form.plan.errors.0 }}</p>{% endif %}
+          <div class="bp-plans" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr))">
+            {% for plan in plans %}
+            <label class="bp-pick">
+              <input type="radio" name="plan" value="{{ plan.pk }}" {% if sel_plan == plan.pk|stringformat:"s" %}checked{% endif %}>
+              <div class="bp-plan{% if plan.is_featured %} is-featured{% endif %}" style="height:100%">
+                {% if plan.is_featured %}<span class="ribbon">Most popular</span>{% endif %}
+                <div><h3>{{ plan.name }}</h3><p class="tag">{{ plan.tagline }}</p></div>
+                <div class="bp-price">
+                  <span data-ivl="monthly"><b>{{ plan.price_monthly|price:plan.currency }}</b> <small>/ month</small></span>
+                  <span data-ivl="yearly" hidden><b>{{ plan.price_yearly|price:plan.currency }}</b> <small>/ year</small>{% if plan.yearly_saving_percent %} <span class="ui-badge ui-badge-success no-dot">Save {{ plan.yearly_saving_percent }}%</span>{% endif %}</span>
+                </div>
+                <ul class="bp-list">
+                  {% for line in plan.limit_lines %}<li>{% icon "check" "w-4 h-4" %}<span>{{ line }}</span></li>{% endfor %}
+                  <li>{% icon "check" "w-4 h-4" %}<span>{{ plan.module_labels|join:", " }}</span></li>
+                </ul>
+              </div>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+      </section>
+
+      <section class="ui-card">
+        <div class="ui-card-header"><div class="ui-card-title">2. About you</div></div>
+        <div class="ui-card-body" style="display:grid;gap:14px">
+          {% if form.non_field_errors %}<div class="ui-alert ui-alert-danger" role="alert">{% icon "error" "w-4 h-4" %}<div>{% for e in form.non_field_errors %}{{ e }} {% endfor %}</div></div>{% endif %}
+          {% if google_client_id %}
+          <div class="bp-google" id="g-btn"></div>
+          <div class="bp-gerror" id="g-err" role="alert" hidden></div>
+          <div class="bp-or">or sign up with your email</div>
+          {% endif %}
+          {% ui "field" field=form.company_name %}
+          {% ui "field" field=form.owner_name %}
+          <div class="ui-grid ui-grid-2">{% ui "field" field=form.email %}{% ui "field" field=form.phone %}</div>
+          <div class="ui-grid ui-grid-2">{% ui "field" field=form.password1 %}{% ui "field" field=form.password2 %}</div>
+          {% ui "field" field=form.accept %}
+          {% if settings_obj.terms_url or settings_obj.privacy_url %}<p class="bp-muted" style="margin:-4px 0 0">Read our {% if settings_obj.terms_url %}<a class="erp-link" href="{{ settings_obj.terms_url }}" target="_blank" rel="noopener">Terms of service</a>{% endif %}{% if settings_obj.terms_url and settings_obj.privacy_url %} and {% endif %}{% if settings_obj.privacy_url %}<a class="erp-link" href="{{ settings_obj.privacy_url }}" target="_blank" rel="noopener">Privacy policy</a>{% endif %}.</p>{% endif %}
+          <button type="submit" class="ui-btn ui-btn-primary ui-btn-lg">{% icon "bolt" "w-4 h-4" %}<span>Create account{% if trial_days %} and start free demo{% else %} and continue to payment{% endif %}</span></button>
+          <p class="bp-muted" style="text-align:center">Already registered? <a class="erp-link" href="{% url 'accounts:login' %}">Sign in</a></p>
+        </div>
+      </section>
+    </form>
+    {% endif %}
+  </main>
+</div>
+{% endwith %}
+<style>.bp-toggle label:has(input:checked) .bp-ivl{background:var(--ui-primary);color:var(--ui-on-primary)}</style>
+<script>
+  function bpInterval(v) {
+    document.querySelectorAll('[data-ivl]').forEach(function (el) { el.hidden = el.dataset.ivl !== v; });
+  }
+  (function () {
+    var checked = document.querySelector('input[name=interval]:checked');
+    bpInterval(checked ? checked.value : 'monthly');
+  })();
+</script>
+{% if google_client_id and settings_obj.allow_public_signup %}
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+  window.addEventListener('load', function () {
+    if (!window.google || !google.accounts) { return; }
+    function csrf() { var m = document.querySelector('meta[name=csrf-token]'); return m ? m.content : ''; }
+    function val(n) { var e = document.querySelector('[name=' + n + ']:checked') || document.querySelector('[name=' + n + ']'); return e ? e.value : ''; }
+    google.accounts.id.initialize({
+      client_id: '{{ google_client_id|escapejs }}',
+      callback: function (resp) {
+        var err = document.getElementById('g-err'); err.hidden = true;
+        fetch('{% url 'billing:google_auth' %}', {
+          method: 'POST', credentials: 'same-origin',
+          headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf()},
+          body: JSON.stringify({credential: resp.credential, mode: 'signup', plan: val('plan'), interval: val('interval'), company_name: val('company_name')})
+        }).then(function (r) { return r.json(); }).then(function (d) {
+          if (d.ok) { window.location = d.redirect; } else { err.textContent = d.error || 'Google sign-up failed.'; err.hidden = false; }
+        }).catch(function () { err.textContent = 'Network problem. Please try again.'; err.hidden = false; });
+      }
+    });
+    google.accounts.id.renderButton(document.getElementById('g-btn'), {theme: 'outline', size: 'large', text: 'signup_with', width: 320});
+  });
+</script>
+{% endif %}
+{% endblock %}

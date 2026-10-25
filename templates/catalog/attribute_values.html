@@ -1,13 +1,14 @@
 {% extends "base.html" %}{% load ui %}
 {% block title %}{{ attribute.name }} values{% endblock %}
 {% block content %}
-<div class="space-y-4" style="max-width:40rem">
+<div class="space-y-4">
   <div class="page-header">
     <div class="min-w-0">
       <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{% url 'catalog:attribute_list' %}">{% icon "arrow-left" "w-3.5 h-3.5" %} Attributes</a></nav>
       <h1 class="page-title">{{ attribute.name }}: values</h1>
       <p class="page-subtitle">The choices for {{ attribute.name }}, for example Small, Medium, Large. They appear as buttons on the product's variants.</p>
     </div>
+    {% if can_delete %}<a class="ui-btn ui-btn-danger ui-btn-sm" href="{% url 'catalog:attribute_delete' attribute.pk %}">{% icon "trash" "w-4 h-4" %}<span>Delete attribute</span></a>{% endif %}
   </div>
 
   <form method="post" class="ui-card" novalidate>

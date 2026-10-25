@@ -10,6 +10,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.utils import timezone
+from core.decorators import needs_any_perm
 from django.views.decorators.http import require_GET
 from django.views.generic import CreateView, DeleteView, ListView, UpdateView
 
@@ -21,10 +22,11 @@ from . import giftcards as gc
 from .models import Customer, GiftCard, GiftCardTransaction
 
 
-class CustomerListView(PagedListMixin, LoginRequiredMixin, ListView):
+class CustomerListView(PagedListMixin, LoginRequiredMixin, PermissionRequiredMixin, ListView):
     """Server-side search / status filter / pagination."""
     filter_params = ("q", "status", "group")
     model = Customer
+    permission_required = "customers.view_customer"
     template_name = "customers/customer_list.html"
     context_object_name = "customers"
 
@@ -86,7 +88,7 @@ class CustomerDeleteView(StoreCrudMixin, DeleteContextMixin, DeleteView):
     permission_required = "customers.delete_customer"
 
 
-@login_required
+@needs_any_perm('customers.add_customer', 'sales.add_sale', json=True)
 def customer_quick_add(request):
     """Used by the POS screen's 'Add Customer' shortcut (Ctrl+Shift+A) —
     creates a full customer record (name, phone, email, CNIC, address,
@@ -283,7 +285,7 @@ class GiftCardDeleteView(StoreCrudMixin, DeleteContextMixin, DeleteView):
     permission_required = "customers.delete_giftcard"
 
 
-@login_required
+@needs_any_perm('customers.view_customer', 'sales.add_sale', json=True)
 def customer_search(request):
     """POS customer picker: search this branch's customers by name / phone / email (15 best matches)."""
     q = request.GET.get("q", "").strip()

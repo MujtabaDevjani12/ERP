@@ -1,0 +1,13 @@
+{% extends "ownerconsole/base.html" %}{% load owner_tags %}
+{% block title %}E-mail log{% endblock %}
+{% block content %}
+<div class="oc-head"><div><h1>E-mail log</h1><p>Every message the console sent or tried to send: invoices, reminders, password resets, alerts.</p></div>
+  {% if owner.is_admin %}<a class="btn" href="{% url 'owner:email_settings' %}">{% oicon "cog" %}<span>E-mail settings</span></a>{% endif %}</div>
+<section class="card">
+  <form method="get" class="toolbar"><div class="oc-field"><label for="e-s">Status</label><select id="e-s" name="status" onchange="this.form.submit()"><option value="">All</option>{% for key, label in statuses %}<option value="{{ key }}" {% if status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div></form>
+  {% if page.object_list %}<div class="tbl-wrap"><table class="tbl"><thead><tr><th>When</th><th>To</th><th>Subject</th><th>Type</th><th>Status</th></tr></thead><tbody>
+    {% for e in page.object_list %}<tr><td class="nowrap">{{ e.created_at|date:"d M Y, H:i" }}</td><td>{{ e.to_email }}</td><td>{{ e.subject }}</td><td class="muted">{{ e.kind|default:"-" }}</td>
+      <td>{% if e.status == "sent" %}<span class="badge success">Sent</span>{% elif e.status == "failed" %}<span class="badge danger">Failed</span>{% else %}<span class="badge">{{ e.get_status_display }}</span>{% endif %}{% if e.error %}<div class="sub" style="max-width:340px">{{ e.error }}</div>{% endif %}</td></tr>{% endfor %}</tbody></table></div>
+  {% include "ownerconsole/_pager.html" %}{% else %}<div class="empty">{% oicon "mail" %}<b>No e-mail yet</b><span>Messages appear here as soon as one is sent.</span></div>{% endif %}
+</section>
+{% endblock %}

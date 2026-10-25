@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Account locked{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="page-header"><div class="min-w-0"><h1 class="page-title">Your company's subscription is not active</h1>
+    <p class="page-subtitle">Please ask the person who manages billing in your company to pay the open invoice. Everything is kept safe and comes back as soon as it is paid.</p></div></div>
+  <div class="ui-card">{% ui "empty_state" icon="lock" title="Access is paused" text="Contact your company administrator." %}</div>
+</div>
+{% endblock %}

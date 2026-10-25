@@ -1,0 +1,39 @@
+{% load billing_tags %}<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Invoice {{ invoice.number }}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { font-family: Inter, system-ui, sans-serif; background: #f6f7f9; margin: 0; padding: 24px; color: #0f172a; }
+  .bp-invoice { max-width: 760px; margin: 0 auto; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 36px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 24px; } th, td { padding: 10px 8px; border-bottom: 1px solid #e5e7eb; text-align: left; } .num { text-align: right; }
+  .row { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+  .tag { display: inline-block; padding: 3px 12px; border-radius: 99px; font-weight: 700; font-size: 12px; }
+  .paid { background: #ecfdf5; color: #047857; } .open { background: #fffbeb; color: #b45309; } .void { background: #f1f5f9; color: #475569; }
+  button { margin: 0 auto 16px; display: block; padding: 9px 18px; border-radius: 8px; border: 1px solid #d1d5db; background: #fff; cursor: pointer; font-weight: 600; }
+  @media print { body { background: #fff; padding: 0; } .bp-invoice { border: 0; padding: 0; } button { display: none; } }
+</style></head>
+<body>
+<button onclick="window.print()">Print / save as PDF</button>
+<div class="bp-invoice">
+  <div class="row">
+    <div><h1 style="margin:0">Invoice</h1><div>{{ invoice.number }}</div></div>
+    <div style="text-align:right"><b>{{ settings_obj.business_name|default:"Multiple POS" }}</b>{% if settings_obj.support_email %}<br>{{ settings_obj.support_email }}{% endif %}{% if settings_obj.support_phone %}<br>{{ settings_obj.support_phone }}{% endif %}</div>
+  </div>
+  <div class="row" style="margin-top:24px">
+    <div><div style="color:#64748b;font-size:12px">Billed to</div><b>{{ company.name }}</b>{% if company.address %}<br>{{ company.address }}{% endif %}{% if company.email %}<br>{{ company.email }}{% endif %}</div>
+    <div style="text-align:right"><div style="color:#64748b;font-size:12px">Issued</div>{{ invoice.issued_at|date:"d M Y" }}
+      {% if invoice.due_at %}<div style="color:#64748b;font-size:12px;margin-top:8px">Due</div>{{ invoice.due_at|date:"d M Y" }}{% endif %}
+      <div style="margin-top:8px"><span class="tag {{ invoice.status }}">{{ invoice.get_status_display }}</span></div></div>
+  </div>
+  <table>
+    <thead><tr><th>Description</th><th class="num">Amount</th></tr></thead>
+    <tbody>
+      <tr><td>{{ invoice.plan_name }} plan - {{ invoice.get_interval_display }}{% if invoice.period_start %}<br><small style="color:#64748b">{{ invoice.period_start|date:"d M Y" }} to {{ invoice.period_end|date:"d M Y" }}</small>{% endif %}</td><td class="num">{{ invoice.subtotal|price:invoice.currency }}</td></tr>
+      {% if invoice.tax_amount %}<tr><td>Tax</td><td class="num">{{ invoice.tax_amount|price:invoice.currency }}</td></tr>{% endif %}
+      <tr><td><b>Total</b></td><td class="num"><b>{{ invoice.total|price:invoice.currency }}</b></td></tr>
+    </tbody>
+  </table>
+  {% if payments %}<h3 style="margin-top:28px">Payments</h3>
+  <table><tbody>{% for p in payments %}<tr><td>{{ p.created_at|date:"d M Y" }} - {{ p.get_method_display }}{% if p.reference %} ({{ p.reference }}){% endif %}</td><td>{{ p.get_status_display }}</td><td class="num">{{ p.amount|price:invoice.currency }}</td></tr>{% endfor %}</tbody></table>{% endif %}
+  {% if settings_obj.invoice_footer %}<p style="margin-top:32px;color:#64748b;font-size:13px;white-space:pre-line">{{ settings_obj.invoice_footer }}</p>{% endif %}
+</div>
+</body></html>

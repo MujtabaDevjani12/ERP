@@ -1,0 +1,118 @@
+{% extends "base.html" %}{% load ui billing_tags %}
+{% block title %}{{ company.name }} - subscription{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{% url 'platform:companies' %}">Companies</a><span class="sep">/</span><span>{{ company.name }}</span></nav>
+      <h1 class="page-title">{{ company.name }}</h1>
+      <p class="page-subtitle">{{ company.email|default:"No email" }}{% if company.phone %} &middot; {{ company.phone }}{% endif %}</p>
+    </div>
+    {% if sub %}<div class="page-actions"><span class="ui-badge ui-badge-{{ state|state_tone }}">{{ state|state_label }}</span></div>{% endif %}
+  </div>
+  {% include "billing/platform/_nav.html" with active="companies" %}
+
+  {% if not sub %}
+  <section class="ui-card">
+    <div class="ui-card-header"><div class="ui-card-title">Start a subscription</div></div>
+    <form method="post" class="ui-card-body" style="display:grid;gap:14px">
+      {% csrf_token %}<input type="hidden" name="action" value="start">
+      <p class="bp-muted">This company is not billed yet, so it has no limits and no payment. Choose a plan and how many free days to give.</p>
+      <div class="ui-grid ui-grid-3">
+        <div class="ui-field"><label class="ui-label" for="s-plan">Plan</label><select id="s-plan" name="plan">{% for p in plans %}<option value="{{ p.pk }}">{{ p.name }}</option>{% endfor %}</select></div>
+        <div class="ui-field"><label class="ui-label" for="s-int">Billing period</label><select id="s-int" name="interval"><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></div>
+        <div class="ui-field"><label class="ui-label" for="s-days">Free days</label><input type="number" id="s-days" name="days" min="0" max="365" placeholder="Plan default"></div>
+      </div>
+      <div><button class="ui-btn ui-btn-primary" type="submit">{% icon "bolt" "w-4 h-4" %}<span>Start subscription</span></button></div>
+    </form>
+  </section>
+  {% else %}
+
+  <div class="ui-kpi-grid">
+    {% ui "kpi" label="Plan" value=sub.plan.name icon="tag" foot=sub.get_interval_display %}
+    {% ui "kpi" label="Price" value=sub.price|price:sub.plan.currency icon="cash" foot="per period" %}
+    {% ui "kpi" label="Access ends" value=sub.paid_until|date:"d M Y" icon="calendar" foot=days_left %}
+    {% ui "kpi" label="Started" value=sub.started_at|date:"d M Y" icon="clock" %}
+  </div>
+
+  <div class="bp-split">
+    <div class="space-y-4">
+      <section class="ui-card">
+        <div class="ui-card-header"><div class="ui-card-title">Quick actions</div></div>
+        <div class="ui-card-body" style="display:grid;gap:16px">
+          <div class="bp-actions">
+            <form method="post">{% csrf_token %}<input type="hidden" name="action" value="extend_trial">
+              <div class="ui-field"><label class="ui-label" for="x-t">Give free days (extends the trial)</label><input type="number" id="x-t" name="days" min="1" max="365" value="7"></div>
+              <button class="ui-btn ui-btn-secondary" type="submit">{% icon "clock" "w-4 h-4" %}<span>Extend free access</span></button></form>
+            <form method="post">{% csrf_token %}<input type="hidden" name="action" value="grant_days">
+              <div class="ui-field"><label class="ui-label" for="x-g">Add paid days</label><input type="number" id="x-g" name="days" min="1" max="3650" value="30"></div>
+              <button class="ui-btn ui-btn-secondary" type="submit">{% icon "plus" "w-4 h-4" %}<span>Add days</span></button></form>
+          </div>
+          <div class="bp-actions">
+            <form method="post">{% csrf_token %}<input type="hidden" name="action" value="new_invoice"><button class="ui-btn ui-btn-secondary" type="submit">{% icon "receipt" "w-4 h-4" %}<span>Create renewal invoice</span></button></form>
+            {% if state == "suspended" %}
+            <form method="post">{% csrf_token %}<input type="hidden" name="action" value="unsuspend"><button class="ui-btn ui-btn-primary" type="submit">{% icon "success" "w-4 h-4" %}<span>Unsuspend</span></button></form>
+            {% else %}
+            <form method="post" onsubmit="return confirm('Suspend {{ company.name|escapejs }}? Nobody in this company will be able to use the ERP.')">{% csrf_token %}<input type="hidden" name="action" value="suspend">
+              <div class="ui-field"><label class="ui-label" for="x-r">Reason (shown to them)</label><input type="text" id="x-r" name="reason" maxlength="200" placeholder="Optional"></div>
+              <button class="ui-btn ui-btn-danger-soft" type="submit">{% icon "lock" "w-4 h-4" %}<span>Suspend</span></button></form>
+            {% endif %}
+          </div>
+        </div>
+      </section>
+
+      <section class="ui-card">
+        <div class="ui-card-header"><div class="ui-card-title">Plan, price and limits</div></div>
+        <form method="post" class="ui-card-body" style="display:grid;gap:14px">
+          {% csrf_token %}<input type="hidden" name="action" value="save">
+          <div class="ui-grid ui-grid-3">
+            {% ui "field" field=form.plan %}{% ui "field" field=form.interval %}{% ui "field" field=form.price_override %}
+          </div>
+          <p class="bp-muted">Leave a limit empty to follow the plan. 0 means unlimited.</p>
+          <div class="ui-grid ui-grid-4">
+            {% ui "field" field=form.max_users_override %}{% ui "field" field=form.max_stores_override %}{% ui "field" field=form.max_products_override %}{% ui "field" field=form.max_monthly_sales_override %}
+          </div>
+          {% ui "field" field=form.notes %}
+          <div><button class="ui-btn ui-btn-primary" type="submit">{% icon "success" "w-4 h-4" %}<span>Save changes</span></button></div>
+        </form>
+      </section>
+
+      <section class="ui-card">
+        <div class="ui-card-header"><div class="ui-card-title">Invoices</div></div>
+        {% if invoices %}
+        <div class="ui-table-wrap" style="border:0;box-shadow:none;border-radius:0"><table class="ui-table ui-table-cards">
+          <thead><tr><th>Invoice</th><th>Plan</th><th>Status</th><th class="num">Total</th><th class="col-actions"><span class="sr-only">Actions</span></th></tr></thead>
+          <tbody>{% for inv in invoices %}
+            <tr>
+              <td data-label="Invoice"><div class="ui-cell-title">{{ inv.number }}</div><div class="ui-cell-sub">{{ inv.issued_at|date:"d M Y" }}</div></td>
+              <td data-label="Plan">{{ inv.plan_name }} <span class="ui-muted">({{ inv.get_interval_display }})</span></td>
+              <td data-label="Status">{% if inv.status == "paid" %}{% badge "paid" label="Paid" %}{% elif inv.status == "void" %}{% badge "void" label="Cancelled" tone="neutral" %}{% else %}{% badge "open" label="Unpaid" tone="warning" %}{% endif %}</td>
+              <td data-label="Total" class="num"><strong>{{ inv.total|price:inv.currency }}</strong></td>
+              <td class="col-actions"><div class="ui-row-actions">
+                {% if inv.status == "open" %}
+                <form method="post" style="display:inline">{% csrf_token %}<input type="hidden" name="action" value="mark_paid"><input type="hidden" name="invoice" value="{{ inv.pk }}"><button class="ui-btn ui-btn-secondary ui-btn-sm" type="submit" onclick="return confirm('Mark {{ inv.number }} as paid (cash / received outside the system)?')">Mark paid</button></form>
+                <form method="post" style="display:inline">{% csrf_token %}<input type="hidden" name="action" value="void"><input type="hidden" name="invoice" value="{{ inv.pk }}"><button class="ui-btn ui-btn-ghost ui-btn-sm" type="submit" onclick="return confirm('Cancel {{ inv.number }}?')">Cancel</button></form>
+                {% endif %}
+                <a class="icon-btn" href="{% url 'billing:invoice' inv.pk %}" target="_blank" rel="noopener" aria-label="Print {{ inv.number }}">{% icon "printer" "w-4 h-4" %}</a></div></td>
+            </tr>{% endfor %}</tbody></table></div>
+        {% else %}<div class="ui-card-body"><p class="bp-muted">No invoices yet.</p></div>{% endif %}
+      </section>
+    </div>
+
+    <div class="space-y-4">
+      <section class="ui-card">
+        <div class="ui-card-header"><div class="ui-card-title">Usage</div></div>
+        <div class="ui-card-body bp-usage">
+          {% for r in limits %}<div class="row"><div class="top"><span>{{ r.label }}</span><span><b>{{ r.used }}</b>{% if r.unlimited %} &middot; unlimited{% else %} of {{ r.limit }}{% endif %}</span></div>
+            <div class="bp-meter {% if r.reached %}full{% elif r.percent >= 80 %}warn{% endif %}"><i style="width:{% if r.unlimited %}6{% else %}{{ r.percent }}{% endif %}%"></i></div></div>{% endfor %}
+        </div>
+      </section>
+      <section class="ui-card">
+        <div class="ui-card-header"><div class="ui-card-title">History</div></div>
+        <div class="ui-card-body">{% for e in events %}<div style="padding:8px 0;border-bottom:1px solid var(--ui-border);font-size:13px">{{ e.message }}<div class="bp-muted">{{ e.created_at|date:"d M Y, H:i" }}{% if e.actor %} &middot; {{ e.actor.get_username }}{% endif %}</div></div>{% empty %}<p class="bp-muted">Nothing yet.</p>{% endfor %}</div>
+      </section>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

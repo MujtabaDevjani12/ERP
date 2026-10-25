@@ -8,6 +8,8 @@ urlpatterns = [
     path("products/", views.ProductListView.as_view(), name="product_list"),
     path("products/add/", views.product_form, name="product_add"),
     path("products/<int:pk>/edit/", views.product_form, name="product_edit"),
+    path("products/<int:pk>/delete/", views.product_delete, name="product_delete"),
+    path("products/bulk-delete/", views.product_bulk_delete, name="product_bulk_delete"),
     path("barcode-generate/", views.barcode_generate, name="barcode_generate"),
     path("barcode-preview.png", views.barcode_preview, name="barcode_preview"),
     path("variants/<int:pk>/barcode.png", views.variant_barcode_png, name="variant_barcode"),
@@ -32,4 +34,5 @@ urlpatterns = [
 
     path("attributes/", views.attribute_list, name="attribute_list"),
     path("attributes/<int:pk>/values/", views.attribute_values, name="attribute_values"),
+    path("attributes/<int:pk>/delete/", views.attribute_delete, name="attribute_delete"),
 ]

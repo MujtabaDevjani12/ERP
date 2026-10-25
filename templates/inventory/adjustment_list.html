@@ -9,7 +9,7 @@
       <p class="page-subtitle">Every manual stock correction: who made it, where and why.</p>
     </div>
     <div class="page-actions">
-      <a class="ui-btn ui-btn-primary" href="{{ add_url }}">{% icon "plus" "w-4 h-4" %}<span>New adjustment</span></a>
+      {% if perms.inventory.add_stockadjustment %}<a class="ui-btn ui-btn-primary" href="{{ add_url }}">{% icon "plus" "w-4 h-4" %}<span>New adjustment</span></a>{% endif %}
     </div>
   </div>
 
@@ -45,7 +45,7 @@
   </div>
   {% ui "pagination" page_obj=page_obj %}
   {% else %}
-  <div class="ui-card">{% if has_filters %}{% ui "empty_state" icon="search" title="No adjustments match your search" %}{% else %}{% ui "empty_state" icon="sliders" title="No adjustments yet" text="Corrections you make to stock quantities are recorded here." action_url=add_url action_label="New adjustment" %}{% endif %}</div>
+  <div class="ui-card">{% if has_filters %}{% ui "empty_state" icon="search" title="No adjustments match your search" %}{% elif perms.inventory.add_stockadjustment %}{% ui "empty_state" icon="sliders" title="No adjustments yet" text="Corrections you make to stock quantities are recorded here." action_url=add_url action_label="New adjustment" %}{% else %}{% ui "empty_state" icon="sliders" title="No adjustments yet" %}{% endif %}</div>
   {% endif %}
 </div>
 {% endblock %}

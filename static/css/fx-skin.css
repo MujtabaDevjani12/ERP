@@ -697,11 +697,13 @@ body.pos-body .pos-totals .grand { margin-top: 6px; padding: 10px 14px; font-siz
 .pf-slot .ui-error, .pf-inline + .ui-help { margin-top: 6px; }
 .pf-aside-col { display: grid; gap: var(--sp-4); align-content: start; }
 .pf-aside-col > .ui-form-section + .ui-form-section { margin-top: 0; }
-.pf-savecard { position: sticky; top: 76px; z-index: 6; }
+/* the Save buttons live in ONE bar pinned to the bottom of the screen (all widths); the old floating card slid over the cards under it */
+.pf-savecard { display: none; }
 .pf-save { display: grid; gap: 8px; }
 .pf-save .ui-btn { width: 100%; justify-content: center; }
-@media (min-width: 1101px) { .pf-savebar { display: none; } }
-@media (max-width: 1100px) { .pf-savecard { display: none; } }
+.pf-savebar { position: sticky; bottom: 12px; z-index: 15; margin: var(--sp-4) 0 0; padding: 10px 14px; border-radius: 999px; gap: 8px; flex-wrap: wrap; justify-content: flex-end;
+  background: color-mix(in srgb, var(--ui-surface) 90%, transparent); backdrop-filter: blur(10px); border: 1px solid var(--ui-border-strong); box-shadow: 0 10px 30px rgba(0, 0, 0, .22); }
+@media (max-width: 560px) { .pf-savebar { border-radius: 20px; } .pf-savebar .ui-btn { flex: 1 1 auto; justify-content: center; } }
 .pf-gal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .pf-table-wrap { overflow-x: auto; border: 1px solid var(--ui-border); border-radius: 14px; }
 .pf-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }

@@ -1,0 +1,23 @@
+{% extends "base.html" %}{% load ui billing_tags %}
+{% block title %}Plans and pricing{% endblock %}
+{% block auth_content %}
+<div class="bp-pub">
+  {% include "billing/public/_chrome_top.html" %}
+  <main class="bp-pub-main" id="main">
+    <div class="bp-hero">
+      <h1>Pick the plan that fits your business</h1>
+      <p>Simple monthly or yearly pricing in PKR. Create your account, pick a plan, pay, and your ERP is ready. Upgrade, downgrade or cancel whenever you like.</p>
+      <div class="bp-toggle" role="group" aria-label="Billing period">
+        <a href="?interval=monthly" class="{% if interval == 'monthly' %}on{% endif %}">Monthly</a>
+        <a href="?interval=yearly" class="{% if interval == 'yearly' %}on{% endif %}">Yearly <span class="bp-save">save more</span></a>
+      </div>
+    </div>
+    {% if plans %}
+    <div class="bp-plans">{% for plan in plans %}{% include "billing/public/_plan_card.html" with cta=True %}{% endfor %}</div>
+    {% else %}
+    <div class="ui-card">{% ui "empty_state" icon="tag" title="Plans are being set up" text="Please check back soon." %}</div>
+    {% endif %}
+    <p class="bp-muted" style="text-align:center;margin-top:24px">Already have an account? <a class="erp-link" href="{% url 'accounts:login' %}">Sign in</a>{% if settings_obj.support_email %} &middot; Questions? <a class="erp-link" href="mailto:{{ settings_obj.support_email }}">{{ settings_obj.support_email }}</a>{% endif %}</p>
+  </main>
+</div>
+{% endblock %}

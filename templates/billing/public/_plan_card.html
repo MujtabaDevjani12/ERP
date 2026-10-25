@@ -1,0 +1,21 @@
+{% load ui billing_tags %}
+<div class="bp-plan{% if plan.is_featured %} is-featured{% endif %}">
+  {% if plan.is_featured %}<span class="ribbon">Most popular</span>{% endif %}
+  <div><h3>{{ plan.name }}</h3><p class="tag">{{ plan.tagline }}</p></div>
+  <div class="bp-price">
+    {% if interval == "yearly" %}
+      <b>{{ plan.price_yearly|price:plan.currency }}</b><small>/ year</small>
+      {% if plan.yearly_saving_percent %}<span class="ui-badge ui-badge-success no-dot">Save {{ plan.yearly_saving_percent }}%</span>{% endif %}
+    {% else %}
+      <b>{{ plan.price_monthly|price:plan.currency }}</b><small>/ month</small>
+    {% endif %}
+  </div>
+  {% if interval == "yearly" %}<p class="bp-muted" style="margin-top:-8px">That is {{ plan.yearly_per_month|price:plan.currency }} a month</p>
+  {% else %}{% if plan.price_yearly %}<p class="bp-muted" style="margin-top:-8px">or {{ plan.price_yearly|price:plan.currency }} a year{% if plan.yearly_saving_percent %} (save {{ plan.yearly_saving_percent }}%){% endif %}</p>{% endif %}{% endif %}
+  <ul class="bp-list">
+    {% for line in plan.limit_lines %}<li>{% icon "check" "w-4 h-4" %}<span>{{ line }}</span></li>{% endfor %}
+    {% for label in plan.module_labels %}<li>{% icon "check" "w-4 h-4" %}<span>{{ label }}</span></li>{% endfor %}
+    {% for line in plan.feature_lines %}<li>{% icon "star" "w-4 h-4" %}<span>{{ line }}</span></li>{% endfor %}
+  </ul>
+  {% if cta %}<div class="bp-cta"><a class="ui-btn {% if plan.is_featured %}ui-btn-primary{% else %}ui-btn-secondary{% endif %}" href="{% url 'billing:signup' %}?plan={{ plan.slug }}&interval={{ interval }}">{% if signup_open %}Choose {{ plan.name }}{% else %}Sign-up is closed{% endif %}</a></div>{% endif %}
+</div>

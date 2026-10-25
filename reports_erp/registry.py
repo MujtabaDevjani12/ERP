@@ -214,3 +214,7 @@ def run(key, company, params):
     report = REPORTS[key]
     headers, rows = report.func(company, params)
     return report, headers, rows
+
+
+# extra HR / payroll / accounting reports live in their own module (they register themselves on import)
+from . import extra_reports  # noqa: E402,F401

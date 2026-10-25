@@ -1,0 +1,24 @@
+{% extends "ownerconsole/base.html" %}{% load owner_tags billing_tags %}
+{% block title %}Invoices{% endblock %}
+{% block content %}
+<div class="oc-head"><div><h1>Invoices <span class="badge">{{ page.paginator.count }}</span></h1><p>Everything you have billed. Paid in this list: <b>{{ paid_total|price }}</b></p></div></div>
+<section class="card">
+  <form method="get" class="toolbar">
+    <div class="oc-field grow"><label for="i-q">Search</label><input type="search" id="i-q" name="q" value="{{ q }}" placeholder="Invoice number or company" autocomplete="off"></div>
+    <div class="oc-field"><label for="i-s">Status</label><select id="i-s" name="status"><option value="">All</option>{% for key, label in statuses %}<option value="{{ key }}" {% if status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+    <div class="row"><button class="btn primary" type="submit">{% oicon "search" %}<span>Apply</span></button>{% if q or status %}<a class="btn" href="{% url 'owner:invoices' %}">Reset</a>{% endif %}</div>
+  </form>
+  {% if page.object_list %}
+  <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Invoice</th><th>Company</th><th>Plan</th><th>Status</th><th class="num">Total</th><th></th></tr></thead><tbody>
+    {% for inv in page.object_list %}<tr>
+      <td><b>{{ inv.number }}</b><div class="sub">{{ inv.issued_at|date:"d M Y" }}</div></td>
+      <td><a href="{% url 'owner:company_detail' inv.company_id %}">{{ inv.subscription.company_name }}</a></td>
+      <td>{{ inv.plan_name }} <span class="faint">({{ inv.get_interval_display }})</span></td>
+      <td>{% if inv.status == "paid" %}<span class="badge success">Paid</span>{% elif inv.status == "void" %}<span class="badge">Cancelled</span>{% elif inv.is_overdue %}<span class="badge danger">Overdue</span>{% else %}<span class="badge warning">Unpaid</span>{% endif %}</td>
+      <td class="num"><b>{{ inv.total|price:inv.currency }}</b></td>
+      <td class="right"><a class="icon-btn" href="{% url 'owner:invoice' inv.pk %}" target="_blank" rel="noopener" aria-label="Print {{ inv.number }}">{% oicon "printer" %}</a></td>
+    </tr>{% endfor %}</tbody></table></div>
+  {% include "ownerconsole/_pager.html" %}
+  {% else %}<div class="empty">{% oicon "receipt" %}<b>No invoices</b></div>{% endif %}
+</section>
+{% endblock %}

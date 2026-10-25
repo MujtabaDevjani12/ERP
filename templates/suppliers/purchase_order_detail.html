@@ -65,7 +65,7 @@
   {% else %}<p class="ui-muted" style="padding:20px 16px;margin:0">No payment records yet.</p>{% endif %}
   {% endcomponent %}
 
-  {% if order.due_amount > 0 %}
+  {% if order.due_amount > 0 and can_pay %}
   <form id="add-payment" method="post" class="ui-card" style="padding:16px">
     {% csrf_token %}
     <h2 class="ui-cell-title" style="margin-bottom:10px">Record a payment</h2>

@@ -3,6 +3,7 @@
 {% block lx_title %}Welcome back{% endblock %}
 {% block lx_lead %}Sign in to continue to your dashboard.{% endblock %}
 {% block lx_form %}
+{% include "billing/public/_auth_tabs.html" with active="signin" %}
 <form method="post" novalidate class="lx-form">
   {% csrf_token %}
   {% if form.errors %}
@@ -23,4 +24,30 @@
   <input type="hidden" name="next" value="{{ next }}">
   <button type="submit" class="lx-btn">{% icon "lock" "w-4 h-4" %}<span>Sign in</span></button>
 </form>
+{% if google_client_id %}
+<div class="bp-or">or</div>
+<div class="bp-google" id="g-btn"></div>
+<p class="bp-gerror" id="g-err" role="alert" hidden></p>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+  window.addEventListener('load', function () {
+    if (!window.google || !google.accounts) { return; }
+    var csrf = (document.querySelector('meta[name=csrf-token]') || {}).content || '';
+    google.accounts.id.initialize({
+      client_id: '{{ google_client_id|escapejs }}',
+      callback: function (resp) {
+        var err = document.getElementById('g-err'); err.hidden = true;
+        fetch('{% url 'billing:google_auth' %}', {method: 'POST', credentials: 'same-origin',
+          headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
+          body: JSON.stringify({credential: resp.credential, mode: 'signin', next: '{{ next|escapejs }}'})})
+          .then(function (r) { return r.json(); })
+          .then(function (d) { if (d.ok) { window.location = d.redirect; } else { err.textContent = d.error || 'Google sign-in failed.'; err.hidden = false; } })
+          .catch(function () { err.textContent = 'Network problem. Please try again.'; err.hidden = false; });
+      }
+    });
+    google.accounts.id.renderButton(document.getElementById('g-btn'), {theme: 'outline', size: 'large', text: 'signin_with', width: 320});
+  });
+</script>
+{% endif %}
+{% if signup_open %}<p class="lx-lead" style="text-align:center;margin-top:16px">New here? <a class="lx-link" href="{% url 'billing:signup' %}">Sign up</a> &middot; your ERP opens after you choose a plan and pay.</p>{% endif %}
 {% endblock %}

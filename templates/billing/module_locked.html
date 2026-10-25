@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Not in your plan{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="page-header"><div class="min-w-0"><h1 class="page-title">{{ module_label }} is not part of your plan</h1>
+    <p class="page-subtitle">Your {{ plan.name }} plan does not include this module. Upgrade to switch it on.</p></div></div>
+  <div class="ui-card">{% ui "empty_state" icon="lock" title=module_label text="Available on a higher plan." action_url="/billing/#plans" action_label="See plans" %}</div>
+</div>
+{% endblock %}

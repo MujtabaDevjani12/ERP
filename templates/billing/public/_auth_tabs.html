@@ -1,0 +1,6 @@
+{% if signup_open %}
+<div class="bp-authtabs" role="tablist" aria-label="Sign in or sign up">
+  <a role="tab" href="{% url 'accounts:login' %}" class="{% if active == 'signin' %}on{% endif %}" aria-selected="{% if active == 'signin' %}true{% else %}false{% endif %}">Sign in</a>
+  <a role="tab" href="{% url 'billing:signup' %}" class="{% if active == 'signup' %}on{% endif %}" aria-selected="{% if active == 'signup' %}true{% else %}false{% endif %}">Sign up</a>
+</div>
+{% endif %}

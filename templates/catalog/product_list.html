@@ -2,7 +2,7 @@
 {% block title %}Products{% endblock %}
 {% block content %}
 {% url 'catalog:product_add' as add_url %}
-<div class="space-y-4" x-data="{ sel: [], all: false, toggleAll(e) { this.sel = e.target.checked ? Array.from(document.querySelectorAll('[data-pick]')).map(function (i) { return i.value; }) : []; }, printUrl() { return '{% url 'catalog:barcode_print' %}?' + this.sel.map(function (id) { return 'product=' + id; }).join('&'); } }">
+<div class="space-y-4" x-data="{ sel: [], all: false, toggleAll(e) { this.sel = e.target.checked ? Array.from(document.querySelectorAll('[data-pick]')).map(function (i) { return i.value; }) : []; }, delAsk() { var self = this; window.confirmDialog({ title: 'Delete ' + this.sel.length + ' selected product' + (this.sel.length === 1 ? '' : 's') + '?', message: 'They are removed for good. Products that were already sold or bought are kept - make those inactive instead.', confirmLabel: 'Delete', tone: 'danger' }).then(function (ok) { if (ok) document.getElementById('p-bulk').submit(); }); }, printUrl() { return '{% url 'catalog:barcode_print' %}?' + this.sel.map(function (id) { return 'product=' + id; }).join('&'); } }">
   <div class="page-header">
     <div class="min-w-0">
       <h1 class="page-title">Products <span class="ui-badge ui-badge-neutral no-dot" style="vertical-align:middle;margin-left:6px">{{ result_count }}</span></h1>
@@ -12,7 +12,7 @@
       {% excel_actions "products" %}
       <a class="ui-btn ui-btn-secondary" href="{% url 'catalog:barcode_print' %}">{% icon "tag" "w-4 h-4" %}<span class="hidden sm:inline">Print barcodes</span></a>
       <a class="ui-btn ui-btn-secondary" href="{% url 'inventory:stock_list' %}">{% icon "archive" "w-4 h-4" %}<span class="hidden sm:inline">Stock levels</span></a>
-      <a class="ui-btn ui-btn-primary" href="{{ add_url }}">{% icon "plus" "w-4 h-4" %}<span>Add product</span></a>
+      {% if perms.catalog.add_product %}<a class="ui-btn ui-btn-primary" href="{{ add_url }}">{% icon "plus" "w-4 h-4" %}<span>Add product</span></a>{% endif %}
     </div>
   </div>
 
@@ -65,6 +65,8 @@
   {% if products %}
   <div class="ui-alert ui-alert-info" x-show="sel.length" x-cloak role="status" style="align-items:center">{% icon "tag" "w-4 h-4" %}<div style="flex:1"><strong x-text="sel.length"></strong> selected</div>
     <a class="ui-btn ui-btn-primary ui-btn-sm" :href="printUrl()" target="_blank" rel="noopener">{% icon "tag" "w-4 h-4" %}<span>Print barcodes</span></a>
+    {% if perms.catalog.delete_product %}<form method="post" id="p-bulk" action="{% url 'catalog:product_bulk_delete' %}" data-no-loading>{% csrf_token %}<template x-for="id in sel" :key="id"><input type="hidden" name="ids" :value="id"></template>
+      <button type="button" class="ui-btn ui-btn-danger ui-btn-sm" @click="delAsk()">{% icon "trash" "w-4 h-4" %}<span>Delete selected</span></button></form>{% endif %}
     <button type="button" class="ui-btn ui-btn-ghost ui-btn-sm" @click="sel = []">Clear</button></div>
   <div class="ui-table-wrap">
     <table class="ui-table ui-table-cards">
@@ -73,7 +75,7 @@
       </thead>
       <tbody>
         {% for p in products %}
-        <tr class="is-clickable" data-href="{% url 'catalog:product_edit' p.pk %}">
+        <tr {% if perms.catalog.change_product %}class="is-clickable" data-href="{% url 'catalog:product_edit' p.pk %}"{% endif %}>
           <td data-label="Select" class="ui-nowrap" @click.stop><input type="checkbox" data-pick value="{{ p.pk }}" x-model="sel" aria-label="Select {{ p.name }}"></td>
           <td data-label="Product">
             <div class="ui-cell">
@@ -92,8 +94,9 @@
           <td data-label="Status">{% if p.is_active %}{% badge "active" label="Active" %}{% else %}{% badge "inactive" label="Inactive" tone="neutral" %}{% endif %}</td>
           <td class="col-actions">
             <div class="ui-row-actions">
-              <a class="icon-btn" href="{% url 'catalog:product_edit' p.pk %}" data-tip="Edit product" data-tip-pos="bottom" aria-label="Edit product">{% icon "pencil" "w-4 h-4" %}</a>
+              {% if perms.catalog.change_product %}<a class="icon-btn" href="{% url 'catalog:product_edit' p.pk %}" data-tip="Edit product" data-tip-pos="bottom" aria-label="Edit product">{% icon "pencil" "w-4 h-4" %}</a>{% endif %}
               <a class="icon-btn" href="{% url 'catalog:barcode_print' %}?product={{ p.pk }}" data-tip="Print barcodes" data-tip-pos="bottom" aria-label="Print barcodes">{% icon "tag" "w-4 h-4" %}</a>
+              {% if perms.catalog.delete_product %}<a class="icon-btn" href="{% url 'catalog:product_delete' p.pk %}" data-tip="Delete product" data-tip-pos="bottom" aria-label="Delete product" style="color:var(--ui-danger)" @click.stop>{% icon "trash" "w-4 h-4" %}</a>{% endif %}
             </div>
           </td>
         </tr>
@@ -103,7 +106,7 @@
   </div>
   {% ui "pagination" page_obj=page_obj %}
   {% else %}
-  <div class="ui-card">{% if has_filters %}{% ui "empty_state" icon="search" title="No products match your filters" text="Try another name, SKU or category." %}{% else %}{% ui "empty_state" icon="cube" title="No products yet" text="Add your first product to start selling." action_url=add_url action_label="Add product" %}{% endif %}</div>
+  <div class="ui-card">{% if has_filters %}{% ui "empty_state" icon="search" title="No products match your filters" text="Try another name, SKU or category." %}{% else %}{% if perms.catalog.add_product %}{% ui "empty_state" icon="cube" title="No products yet" text="Add your first product to start selling." action_url=add_url action_label="Add product" %}{% else %}{% ui "empty_state" icon="cube" title="No products yet" %}{% endif %}{% endif %}</div>
   {% endif %}
 </div>
 {% endblock %}

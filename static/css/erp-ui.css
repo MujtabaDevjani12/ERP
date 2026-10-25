@@ -622,3 +622,21 @@ html .ui-search > input { padding-left: 36px; }
 .pf-attr-opts input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .pf-attr-opts label:has(input:checked) { background: var(--ui-primary); border-color: var(--ui-primary); color: #fff; font-weight: 600; }
 .pf-attr-opts label:has(input:focus-visible) { box-shadow: 0 0 0 3px var(--ui-focus); }
+
+/* ---- rich-text description editor (static/js/richtext.js) */
+.rte { border: 1px solid var(--ui-border-strong); border-radius: var(--r-lg, 14px); background: var(--ui-surface); overflow: hidden; }
+.rte:focus-within { border-color: var(--ui-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary) 18%, transparent); }
+.rte-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 6px 8px; background: var(--ui-surface-2); border-bottom: 1px solid var(--ui-border); }
+.rte-btn { min-width: 32px; height: 30px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: var(--ui-text-2); font: inherit; font-weight: 700; cursor: pointer; }
+.rte-btn:hover { background: var(--ui-surface-hover, rgba(127,127,127,.15)); color: var(--ui-text); } .rte-btn.on { background: var(--ui-primary-soft); color: var(--ui-primary); }
+.rte-btn[data-cmd="italic"] { font-style: italic; } .rte-btn[data-cmd="underline"] { text-decoration: underline; }
+.rte-sep { width: 1px; height: 18px; background: var(--ui-border); margin: 0 6px; }
+.rte-area { min-height: 130px; max-height: 360px; overflow-y: auto; padding: 12px 14px; outline: none; line-height: 1.6; font-size: 14px; color: var(--ui-text); }
+.rte-area:empty::before { content: attr(data-placeholder); color: var(--ui-text-3); pointer-events: none; }
+.rte-area h3 { font-size: 16px; font-weight: 700; margin: 8px 0 4px; } .rte-area p, .rte-area div { margin: 0 0 6px; }
+.rte-area ul, .rte-area ol { margin: 4px 0 8px 22px; padding: 0; } .rte-area ul { list-style: disc; } .rte-area ol { list-style: decimal; }
+.rte-area blockquote { margin: 6px 0; padding: 4px 12px; border-left: 3px solid var(--ui-border-strong); color: var(--ui-text-2); }
+.rte-area a { color: var(--ui-primary); text-decoration: underline; }
+.rich-text p { margin: 0 0 8px; } .rich-text ul, .rich-text ol { margin: 4px 0 8px 22px; } .rich-text ul { list-style: disc; } .rich-text ol { list-style: decimal; }
+.rich-text h3 { font-weight: 700; margin: 8px 0 4px; } .rich-text a { color: var(--ui-primary); text-decoration: underline; }
+.rte [hidden], .rte textarea[hidden] { display: none !important; }

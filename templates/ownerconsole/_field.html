@@ -1,0 +1,7 @@
+{% if f.field.widget.input_type == "checkbox" %}
+<div class="oc-field{% if f.errors %} has-error{% endif %}"><label class="oc-check" for="{{ f.id_for_label }}">{{ f }}<span>{{ f.label }}</span></label>
+{% if f.help_text %}<p class="oc-help">{{ f.help_text }}</p>{% endif %}{% for e in f.errors %}<p class="oc-err">{{ e }}</p>{% endfor %}</div>
+{% else %}
+<div class="oc-field{% if f.errors %} has-error{% endif %}"><label for="{{ f.id_for_label }}">{{ f.label }}</label>{{ f }}
+{% if f.help_text %}<p class="oc-help">{{ f.help_text }}</p>{% endif %}{% for e in f.errors %}<p class="oc-err">{{ e }}</p>{% endfor %}</div>
+{% endif %}

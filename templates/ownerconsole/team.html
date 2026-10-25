@@ -1,0 +1,15 @@
+{% extends "ownerconsole/base.html" %}{% load owner_tags %}
+{% block title %}Team{% endblock %}
+{% block content %}
+<div class="oc-head"><div><h1>Team</h1><p>People who can sign in to this console. Each has their own e-mail and password. Support accounts can look at companies and approve payments but cannot change plans, prices or settings.</p></div>
+  <a class="btn primary" href="{% url 'owner:team_add' %}">{% oicon "plus" %}<span>Add person</span></a></div>
+<section class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Person</th><th>Role</th><th>Last sign-in</th><th>Status</th><th></th></tr></thead><tbody>
+  {% for m in members %}<tr>
+    <td><b>{{ m.name }}</b>{% if m.pk == owner.pk %} <span class="badge brand">You</span>{% endif %}<div class="sub">{{ m.email }}{% if m.phone %} &middot; {{ m.phone }}{% endif %}</div></td>
+    <td>{{ m.get_role_display }}</td>
+    <td class="nowrap">{% if m.last_login %}{{ m.last_login|date:"d M Y, H:i" }}<div class="sub">{{ m.last_login_ip|default:"" }}</div>{% else %}<span class="faint">never</span>{% endif %}</td>
+    <td>{% if not m.is_active %}<span class="badge">Switched off</span>{% elif m.is_locked %}<span class="badge danger">Locked</span>{% else %}<span class="badge success">Active</span>{% endif %}</td>
+    <td class="right nowrap"><a class="btn sm" href="{% url 'owner:team_edit' m.pk %}">Edit</a>
+      <form method="post" action="{% url 'owner:team_reset_link' m.pk %}" style="display:inline">{% csrf_token %}<button class="btn sm" type="submit" title="E-mail a password reset link">{% oicon "key" %}<span>Reset link</span></button></form></td>
+  </tr>{% endfor %}</tbody></table></div></section>
+{% endblock %}

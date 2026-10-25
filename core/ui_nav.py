@@ -17,7 +17,7 @@ SECTIONS = [
     ("Operations", ["sales", "catalog", "inventory", "purchasing", "production", "quality"]),
     ("Finance & people", ["accounting", "hr", "payroll"]),
     ("Insights", ["reports", "approvals"]),
-    ("Control", ["masters", "admin", "settings"]),
+    ("Control", ["masters", "admin", "settings", "billing"]),
 ]
 
 # key -> (label, icon). Single-link entries are declared in SINGLES.
@@ -43,6 +43,8 @@ SINGLES = {
     "pos": ("POS terminal", "register", "dashboard:pos", ["dashboard:pos"], "F2"),
     # one link to the Settings hub; the hub's own left-hand list holds every section (configuration/hub.py)
     "settings": ("Settings", "sliders", "configuration:hub", ["configuration:*"], ""),
+    # SaaS: a company's own subscription page (shown only to people who may manage billing; decided in _single_visible)
+    "billing": ("Billing & plans", "credit-card", "billing:home", ["billing:home", "billing:change_plan", "billing:invoice", "billing:locked"], ""),
 }
 
 # group -> [(label, url name, [match patterns on view_name; "!x" excludes], staff only)]
@@ -108,6 +110,60 @@ LEGACY = {
     ],
 }
 
+# url name -> permission needed to SEE the link (a str, or a tuple = any of). A link that is not listed is shown to everyone
+# signed in. Super Admins hold every permission, so they always see everything.
+LEGACY_PERMS = {
+    "sales:sale_list": "sales.view_sale",
+    "sales:delivery_list": "sales.view_delivery",
+    "sales:feedback_list": "sales.view_salefeedback",
+    "customers:customer_list": "customers.view_customer",
+    "accounts:biller_list": "accounts.view_user",
+    "customers:giftcard_list": "customers.view_giftcard",
+    "register:session_list": "register.view_registersession",
+    "register:counter_list": "register.view_register",
+    "payments:method_list": "payments.view_paymentmethod",
+    "documents:document_log_list": "sales.view_sale",
+    "catalog:product_list": "catalog.view_product",
+    "catalog:barcode_print": "catalog.view_product",
+    "catalog:category_list": "catalog.view_category",
+    "catalog:brand_list": "catalog.view_brand",
+    "catalog:unit_list": "catalog.view_unit",
+    "catalog:attribute_list": "catalog.view_productattribute",
+    "pricing:tax_list": "pricing.view_tax",
+    "pricing:discount_list": "pricing.view_discount",
+    "pricing:group_list": "pricing.view_customergroup",
+    "inventory:stock_list": "inventory.view_stockitem",
+    "inventory:quantity_adjustment": "inventory.add_stockadjustment",
+    "inventory:adjustment_list": "inventory.view_stockadjustment",
+    "inventory:transfer_list": "inventory.view_stocktransfer",
+    "inventory:warehouse_list": "inventory.view_warehouse",
+    "inventory:rack_list": "inventory.view_rack",
+    "suppliers:supplier_list": "suppliers.view_supplier",
+    "suppliers:purchase_list": "suppliers.view_purchaseorder",
+    "expenses:expense_list": "expenses.view_expense",
+    "expenses:category_list": "expenses.view_expensecategory",
+    "reports:pack_index": ("sales.view_sale", "payments.view_payment", "inventory.view_stockitem", "expenses.view_expense", "customers.view_customer"),
+    "reports:data_hub": ("catalog.view_product", "customers.view_customer", "suppliers.view_supplier"),
+    "reports:dashboard": "sales.view_sale",
+    "devices:device_list": "devices.view_device",
+    "accounts:staff_user_list": "accounts.view_user",
+    "accounts:role_list": "auth.view_group",
+    "configuration:pos_settings": "configuration.change_posconfiguration",
+    "configuration:system_settings": "configuration.change_systemconfiguration",
+    "configuration:currency_list": "configuration.view_currency",
+    "configuration:numbering_prefixes": "configuration.change_numberingprefix",
+}
+
+
+def _allowed(user, url_name):
+    need = LEGACY_PERMS.get(url_name)
+    if need is None:
+        return None                                            # not mapped
+    if isinstance(need, str):
+        need = (need,)
+    return any(user.has_perm(p) for p in need)
+
+
 # ERP module app label -> sidebar group
 ERP_GROUP = {
     "distribution": "sales", "pos_erp": "sales",
@@ -150,13 +206,57 @@ def _erp_modules(request):
         return []
 
 
+def _plan_filter(request):
+    """app label -> True when the company's plan includes it. The platform owner and companies without a subscription see everything."""
+    try:
+        from billing import access
+        from billing.modules import module_for_app
+    except ImportError:
+        return lambda app: True
+    if access.is_platform_owner(request.user):
+        return lambda app: True
+    if getattr(request, "subscription_state", None) in ("pending", "expired", "suspended"):
+        return lambda app: app == "billing"               # locked company: the menu shrinks to Billing
+    mods = access.allowed_modules(getattr(request, "company", None))
+    if mods is None:
+        return lambda app: True
+    return lambda app: module_for_app(app) is None or module_for_app(app) in mods
+
+
+def plan_allows(request, *apps):
+    """True when the company's plan includes every app label given (always true for the owner / unsubscribed companies)."""
+    ok = _plan_filter(request)
+    return all(ok(a) for a in apps)
+
+
+def _app_of(url_name):
+    return "sales" if url_name == "dashboard:pos" else url_name.split(":")[0]
+
+
+def _single_visible(key, request):
+    """The Billing link only shows to people who may manage their company's billing (the owner console is a separate site)."""
+    if key != "billing":
+        return True
+    try:
+        from billing import access
+    except ImportError:
+        return False
+    user = request.user
+    if access.is_platform_owner(user):
+        return False
+    return access.managed(getattr(request, "company", None)) and user.has_perm("billing.view_subscription")
+
+
 def build_nav(request):
     user = request.user
+    plan_ok = _plan_filter(request)
     match = getattr(request, "resolver_match", None)
     view_name = match.view_name if match else ""
     modules = _erp_modules(request)
     erp_by_group = {}
     for m in modules:
+        if not plan_ok(m["app"]):
+            continue
         erp_by_group.setdefault(ERP_GROUP.get(m["app"], "admin"), []).append(m)
 
     sections = []
@@ -165,6 +265,8 @@ def build_nav(request):
         for key in keys:
             if key in SINGLES:
                 label, icon, url_name, patterns, tip = SINGLES[key]
+                if not _single_visible(key, request) or not plan_ok(_app_of(url_name)):
+                    continue
                 url = _url(url_name)
                 if url:
                     entries.append({"type": "link", "key": key, "label": label, "icon": icon_path(icon), "url": url,
@@ -174,7 +276,12 @@ def build_nav(request):
             items = []
             legacy_count = 0
             for item_label, url_name, patterns, staff_only in LEGACY.get(key, []):
-                if staff_only and not user.is_staff:
+                if not plan_ok(_app_of(url_name)):
+                    continue
+                allowed = _allowed(user, url_name)
+                if allowed is False:
+                    continue
+                if allowed is None and staff_only and not user.is_staff:
                     continue
                 url = _url(url_name)
                 if not url:
@@ -209,12 +316,14 @@ def build_commands(nav, request):
                     if it["type"] == "link":
                         commands.append({"kind": "nav", "title": it["label"], "url": it["url"], "hint": e["label"], "keywords": e["label"]})
     pos = _url("dashboard:pos")
-    if pos:
+    if pos and request.user.has_perm("sales.add_sale") and plan_allows(request, "sales"):
         commands.append({"kind": "action", "title": "Open POS terminal", "url": pos, "hint": "F2", "keywords": "sale billing checkout"})
-    for title, name, kw in (("Add product", "catalog:product_add", "new item sku"), ("Add customer", "customers:customer_add", "new client"),
-                            ("Add supplier", "suppliers:supplier_add", "new vendor"), ("New purchase order", "suppliers:purchase_add", "buy stock")):
+    for title, name, kw, perm in (("Add product", "catalog:product_add", "new item sku", "catalog.add_product"),
+                                  ("Add customer", "customers:customer_add", "new client", "customers.add_customer"),
+                                  ("Add supplier", "suppliers:supplier_add", "new vendor", "suppliers.add_supplier"),
+                                  ("New purchase order", "suppliers:purchase_add", "buy stock", "suppliers.add_purchaseorder")):
         url = _url(name)
-        if url:
+        if url and request.user.has_perm(perm) and plan_allows(request, _app_of(name)):
             commands.append({"kind": "action", "title": title, "url": url, "hint": "Create", "keywords": kw})
     commands.append({"kind": "action", "title": "Toggle dark mode", "url": "", "action": "theme", "hint": "Appearance", "keywords": "light theme night"})
     commands.append({"kind": "action", "title": "Keyboard shortcuts", "url": "", "action": "shortcuts", "hint": "?", "keywords": "help keys"})

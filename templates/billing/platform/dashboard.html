@@ -1,0 +1,74 @@
+{% extends "base.html" %}{% load ui billing_tags %}
+{% block title %}Owner dashboard{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0"><h1 class="page-title">Owner dashboard</h1><p class="page-subtitle">Every company that pays you, what is coming in and who needs a nudge.</p></div>
+    <div class="page-actions">
+      <form method="post" action="{% url 'platform:run_cycle' %}">{% csrf_token %}<button class="ui-btn ui-btn-secondary" type="submit" data-tip="Check every company now: create renewal invoices, send reminders, lock expired ones">{% icon "refresh" "w-4 h-4" %}<span>Run billing check</span></button></form>
+      <a class="ui-btn ui-btn-primary" href="{% url 'platform:plan_add' %}">{% icon "plus" "w-4 h-4" %}<span>New plan</span></a>
+    </div>
+  </div>
+  {% include "billing/platform/_nav.html" with active="dashboard" %}
+
+  <div class="ui-kpi-grid">
+    {% ui "kpi" label="Monthly recurring revenue" value=m.mrr|price icon="trend-up" foot="Yearly plans counted per month" %}
+    {% ui "kpi" label="Collected this month" value=m.month_revenue|price icon="cash" foot="Paid invoices" %}
+    {% ui "kpi" label="Waiting to be paid" value=m.outstanding|price icon="receipt" foot="Open invoices" %}
+    {% ui "kpi" label="Companies" value=m.companies icon="building" foot="Free trial, paid or locked" %}
+  </div>
+  <div class="ui-kpi-grid">
+    {% ui "kpi" label="On free trial" value=m.counts.trial icon="clock" %}
+    {% ui "kpi" label="Active (paid)" value=m.counts.active icon="success" %}
+    {% ui "kpi" label="Payment overdue" value=m.counts.grace icon="warning" %}
+    {% ui "kpi" label="Expired or suspended" value=m.counts.expired icon="lock" foot="Locked until they pay" %}
+  </div>
+
+  {% if m.pending_payments %}
+  <div class="ui-alert ui-alert-warning" role="status">{% icon "warning" "w-5 h-5 shrink-0" %}<div><b>{{ m.pending_payments }} payment{{ m.pending_payments|pluralize }} waiting for your check.</b> <a class="erp-link" href="{% url 'platform:payments' %}">Review now</a></div></div>
+  {% endif %}
+  {% if unmanaged %}
+  <div class="ui-alert ui-alert-info" role="status">{% icon "info" "w-5 h-5 shrink-0" %}<div>{{ unmanaged }} compan{{ unmanaged|pluralize:"y,ies" }} {{ unmanaged|pluralize:"has,have" }} no subscription yet, so no limits apply. Open <a class="erp-link" href="{% url 'platform:companies' %}?state=none">Companies</a> to start a trial or plan.</div></div>
+  {% endif %}
+
+  <div class="bp-split">
+    <section class="ui-card">
+      <div class="ui-card-header"><div class="ui-card-title">Revenue, last 12 months</div><span class="bp-muted">Total ever: <b>{{ m.total_revenue|price }}</b></span></div>
+      <div class="ui-card-body">
+        <div class="bp-bars" role="img" aria-label="Revenue per month">
+          {% for b in bars %}<div class="col" title="{{ b.label }}: {{ b.value|price }}"><span class="val">{% if b.value %}{{ b.value|floatformat:0 }}{% endif %}</span><div class="bar" style="height:{{ b.pct }}%"></div><span class="lbl">{{ b.label }}</span></div>{% endfor %}
+        </div>
+      </div>
+    </section>
+
+    <section class="ui-card">
+      <div class="ui-card-header"><div class="ui-card-title">Ending within 7 days</div></div>
+      <div class="ui-card-body">
+        {% for s in expiring %}
+        <div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--ui-border)">
+          <div class="min-w-0"><a class="erp-link" href="{% url 'platform:company_detail' s.company_id %}"><b>{{ s.company.name }}</b></a><div class="bp-muted">{{ s.plan.name }} &middot; {{ s.state|state_label }}</div></div>
+          <span class="ui-badge ui-badge-{% if s.days_left <= 1 %}danger{% else %}warning{% endif %}">{{ s.days_left }} day{{ s.days_left|pluralize }}</span>
+        </div>
+        {% empty %}<p class="bp-muted">Nobody is about to expire.</p>{% endfor %}
+      </div>
+    </section>
+  </div>
+
+  <div class="bp-split" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+    <section class="ui-card">
+      <div class="ui-card-header"><div class="ui-card-title">Newest companies</div><a class="ui-btn ui-btn-ghost ui-btn-sm" href="{% url 'platform:companies' %}">All</a></div>
+      <div class="ui-card-body">
+        {% for s in recent %}<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--ui-border)"><a class="erp-link" href="{% url 'platform:company_detail' s.company_id %}">{{ s.company.name }}</a><span class="bp-muted">{{ s.plan.name }} &middot; {{ s.created_at|date:"d M" }}</span></div>
+        {% empty %}<p class="bp-muted">No companies yet. Share <b>/plans/</b> with your customers.</p>{% endfor %}
+      </div>
+    </section>
+    <section class="ui-card">
+      <div class="ui-card-header"><div class="ui-card-title">Latest activity</div></div>
+      <div class="ui-card-body">
+        {% for e in events %}<div style="padding:8px 0;border-bottom:1px solid var(--ui-border);font-size:13px"><b>{{ e.company.name }}</b> - {{ e.message }}<div class="bp-muted">{{ e.created_at|timesince }} ago</div></div>
+        {% empty %}<p class="bp-muted">Nothing yet.</p>{% endfor %}
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}

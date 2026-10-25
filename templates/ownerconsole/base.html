@@ -1,0 +1,49 @@
+{% load static owner_tags %}<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>{% block title %}Owner console{% endblock %} - {{ biz.business_name|default:"Owner console" }}</title>
+  <script>(function(){try{var t=localStorage.getItem('oc.theme');if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches){t='dark'}document.documentElement.setAttribute('data-theme',t==='dark'?'dark':'light');if(localStorage.getItem('oc.side')==='mini'&&window.innerWidth>860){document.documentElement.setAttribute('data-side','mini')}}catch(e){}})();</script>
+  <link rel="stylesheet" href="{% static 'ownerconsole/owner.css' %}?v=3">
+</head>
+<body>
+<div class="oc-app">
+  <aside class="oc-side" id="side" aria-label="Owner console navigation">
+    <div class="oc-brand"><span class="mark">{% oicon "shield" %}</span><span class="oc-brand-text">{{ biz.business_name|default:"Multiple POS" }}<small>Owner console</small></span></div>
+    <nav class="oc-nav">
+      {% for item in nav %}<a href="{{ item.url }}" class="{% if active == item.key %}on{% endif %}" title="{{ item.label }}" {% if active == item.key %}aria-current="page"{% endif %}>{% oicon item.icon %}<span>{{ item.label }}</span>{% if item.key == "payments" and pending_total %}<span class="count">{{ pending_total }}</span>{% endif %}</a>{% endfor %}
+    </nav>
+    <div class="oc-side-foot">
+      <a class="oc-foot-user" href="{% url 'owner:account' %}" title="My account"><span class="oc-avatar" aria-hidden="true">{{ owner.initials }}</span>
+        <span class="oc-foot-text"><b>{{ owner.name }}</b><small>{{ owner.email }}</small></span></a>
+    </div>
+  </aside>
+  <div class="oc-main">
+    <header class="oc-top">
+      <button class="icon-btn oc-burger" type="button" id="burger" aria-label="Open menu">{% oicon "menu" %}</button>
+      <button class="icon-btn oc-collapse" type="button" id="collapse" aria-label="Collapse or expand the menu" title="Collapse / expand menu">{% oicon "sidebar" %}</button>
+      <div class="grow"></div>
+      <button class="icon-btn" type="button" id="theme" aria-label="Switch light / dark">{% oicon "moon" %}</button>
+      <div class="oc-user"><span class="oc-avatar" aria-hidden="true">{{ owner.initials }}</span><span class="who small"><b>{{ owner.name }}</b><br><span class="faint">{{ owner.get_role_display }}</span></span></div>
+      <form method="post" action="{% url 'owner:logout' %}">{% csrf_token %}<button class="btn sm" type="submit">{% oicon "logout" %}<span>Sign out</span></button></form>
+    </header>
+    <main class="oc-content" id="main">
+      {% if messages %}<div class="toasts">{% for m in messages %}<div class="alert {{ m.tags }}" role="status">{% if m.tags == "success" %}{% oicon "check" %}{% elif m.tags == "error" %}{% oicon "alert" %}{% else %}{% oicon "info" %}{% endif %}<div>{{ m }}</div></div>{% endfor %}</div>{% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+<script>
+(function(){
+  var b=document.body;
+  document.getElementById('burger').addEventListener('click',function(){b.classList.toggle('nav-open')});
+  document.addEventListener('click',function(e){if(b.classList.contains('nav-open')&&!e.target.closest('#side')&&!e.target.closest('#burger')){b.classList.remove('nav-open')}});
+  var root=document.documentElement;
+  document.getElementById('collapse').addEventListener('click',function(){var mini=root.getAttribute('data-side')==='mini';if(mini){root.removeAttribute('data-side')}else{root.setAttribute('data-side','mini')}try{localStorage.setItem('oc.side',mini?'full':'mini')}catch(e){}});
+  document.getElementById('theme').addEventListener('click',function(){var r=document.documentElement,n=r.getAttribute('data-theme')==='dark'?'light':'dark';r.setAttribute('data-theme',n);try{localStorage.setItem('oc.theme',n)}catch(e){}});
+})();
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

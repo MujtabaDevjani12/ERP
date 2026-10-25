@@ -1,0 +1,12 @@
+{% extends "ownerconsole/base.html" %}{% load owner_tags %}
+{% block title %}{% if member %}Edit {{ member.name }}{% else %}Add person{% endif %}{% endblock %}
+{% block content %}
+<div class="oc-head"><div><div class="crumb"><a href="{% url 'owner:team' %}">Team</a> / {% if member %}{{ member.name }}{% else %}New{% endif %}</div><h1>{% if member %}Edit person{% else %}Add a person{% endif %}</h1>
+  {% if not member %}<p>They get an e-mail with a link to choose their own password.</p>{% endif %}</div></div>
+<form method="post" novalidate class="card"><div class="body stack">{% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert error">{% oicon "alert" %}<div>{{ form.non_field_errors }}</div></div>{% endif %}
+  <div class="grid g2">{% include "ownerconsole/_field.html" with f=form.name %}{% include "ownerconsole/_field.html" with f=form.email %}{% include "ownerconsole/_field.html" with f=form.phone %}{% include "ownerconsole/_field.html" with f=form.role %}</div>
+  <div class="grid g2">{% include "ownerconsole/_field.html" with f=form.is_active %}{% include "ownerconsole/_field.html" with f=form.notify_email %}</div>
+  <div class="row" style="justify-content:flex-end"><a class="btn" href="{% url 'owner:team' %}">Cancel</a><button class="btn primary" type="submit">{% oicon "check" %}<span>{% if member %}Save{% else %}Add and send invitation{% endif %}</span></button></div>
+</div></form>
+{% endblock %}

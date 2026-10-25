@@ -14,8 +14,8 @@ from core.errors import ERPError
 from core.money import q2
 from numbering.services import next_reference
 from approvals.services import submit_for_approval
-from .models import (Attendance, Employee, EmployeeLoan, Holiday, LeaveBalance, LeaveRequest, LeaveType, LoanRepayment,
-                     PerformanceReview)
+from .models import (Applicant, Attendance, Employee, EmployeeDocument, EmployeeLoan, EmployeeMovement, Holiday, LeaveBalance,
+                     LeaveRequest, LeaveType, LoanRepayment, PerformanceReview)
 
 ZERO = Decimal("0")
 
@@ -325,3 +325,81 @@ def add_review(employee, period, rating, *, reviewer=None, kpi_score=None, stren
         employee=employee, period=period, defaults={"rating": rating, "kpi_score": kpi_score, "strengths": strengths,
                                                     "improvements": improvements, "reviewer": _u(reviewer)})
     return review
+
+
+# ================================================================== employee file: movements, documents
+@transaction.atomic
+def apply_movement(movement, user=None):
+    """Record a promotion / transfer / confirmation and bring the employee's current record up to date.
+    Idempotent per call: it only copies what the movement states (target department / designation / confirmation date)."""
+    emp = Employee.objects.select_for_update().get(pk=movement.employee_id)
+    changed = []
+    if movement.from_department_id is None:
+        movement.from_department = emp.department
+    if movement.from_designation_id is None:
+        movement.from_designation = emp.designation
+    if movement.to_department_id:
+        emp.department = movement.to_department
+        changed.append("department")
+    if movement.to_designation_id:
+        emp.designation = movement.to_designation
+        changed.append("designation")
+    if movement.movement_type == EmployeeMovement.CONFIRMATION:
+        emp.confirmation_date = movement.effective_date
+        if emp.employment_type == "probation":
+            emp.employment_type = "permanent"
+            changed.append("employment_type")
+        changed.append("confirmation_date")
+    if changed:
+        emp.save(update_fields=changed + ["updated_at"])
+        log_action(AuditLog.OTHER, emp, user=_u(user), note=f"{movement.get_movement_type_display()} effective {movement.effective_date}"[:200],
+                   document_number=emp.employee_code, company=emp.company)
+    if movement.old_salary is not None or movement.new_salary is not None:
+        _sync_salary(emp, movement)
+    return movement
+
+
+def _sync_salary(emp, movement):
+    """An increment with a new salary updates the basic salary in the employee's salary structure when one exists."""
+    if movement.new_salary is None or movement.movement_type not in (EmployeeMovement.INCREMENT, EmployeeMovement.PROMOTION):
+        return
+    try:
+        structure = emp.salary
+    except Exception:                      # no salary structure yet - payroll owns creating it
+        return
+    if movement.old_salary is None:
+        movement.old_salary = structure.basic
+    structure.basic = movement.new_salary
+    structure.save(update_fields=["basic", "updated_at"])
+
+
+def expiring_documents(company, *, within_days=60, today=None):
+    """Employee documents that have expired or expire within `within_days` days (active employees only)."""
+    today = today or date.today()
+    return EmployeeDocument.objects.filter(
+        employee__company=company, employee__status=Employee.ACTIVE, expiry_date__isnull=False,
+        expiry_date__lte=today + timedelta(days=within_days),
+    ).select_related("employee").order_by("expiry_date")
+
+
+# ================================================================== recruitment
+@transaction.atomic
+def hire_applicant(applicant, joining_date, *, user=None, department=None, designation=None, employment_type=None):
+    """Turn an applicant into an employee (a normal Employee record with the next employee code)."""
+    applicant = Applicant.objects.select_for_update().select_related("vacancy__company").get(pk=applicant.pk)
+    if applicant.hired_as_id:
+        raise ERPError(f"{applicant.full_name} was already hired as {applicant.hired_as}.")
+    if applicant.stage == Applicant.REJECTED:
+        raise ERPError("A rejected applicant cannot be hired. Move them back to another stage first.")
+    vacancy = applicant.vacancy
+    emp = create_employee(
+        vacancy.company, applicant.full_name, joining_date, user=user, cnic=applicant.cnic, phone=applicant.phone, email=applicant.email,
+        department=department or vacancy.department, designation=designation or vacancy.designation,
+        employment_type=employment_type or vacancy.employment_type,
+    )
+    applicant.stage, applicant.hired_as = Applicant.HIRED, emp
+    applicant.save(update_fields=["stage", "hired_as", "updated_at"])
+    if vacancy.status == vacancy.OPEN and vacancy.applicants.filter(stage=Applicant.HIRED).count() >= vacancy.positions:
+        vacancy.status = vacancy.FILLED
+        vacancy.save(update_fields=["status", "updated_at"])
+    return emp

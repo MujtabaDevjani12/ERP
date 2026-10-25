@@ -10,7 +10,7 @@
     </div>
     <div class="page-actions">
       {% excel_actions "purchases" %}
-      <a class="ui-btn ui-btn-primary" href="{{ add_url }}">{% icon "plus" "w-4 h-4" %}<span>New purchase order</span></a>
+      {% if perms.suppliers.add_purchaseorder %}<a class="ui-btn ui-btn-primary" href="{{ add_url }}">{% icon "plus" "w-4 h-4" %}<span>New purchase order</span></a>{% endif %}
     </div>
   </div>
 
@@ -71,11 +71,11 @@
           <td class="col-actions">
             <div class="ui-row-actions">
               <a class="icon-btn" href="{% url 'suppliers:purchase_detail' o.pk %}" data-tip="View details" data-tip-pos="bottom" aria-label="View details">{% icon "eye" "w-4 h-4" %}</a>
-              {% component "row_menu" %}
+              {% if perms.suppliers.change_purchaseorder or perms.suppliers.add_purchasepayment %}{% component "row_menu" %}
                 <a class="ui-menu-item" href="{% url 'suppliers:purchase_detail' o.pk %}">{% icon "doc" "w-4 h-4" %}View details</a>
-                <a class="ui-menu-item" href="{% url 'suppliers:purchase_edit' o.pk %}">{% icon "pencil" "w-4 h-4" %}Edit order</a>
-                {% if o.due_amount > 0 %}<a class="ui-menu-item success" href="{% url 'suppliers:purchase_detail' o.pk %}#add-payment">{% icon "cash" "w-4 h-4" %}Add payment</a>{% endif %}
-              {% endcomponent %}
+                {% if perms.suppliers.change_purchaseorder %}<a class="ui-menu-item" href="{% url 'suppliers:purchase_edit' o.pk %}">{% icon "pencil" "w-4 h-4" %}Edit order</a>{% endif %}
+                {% if o.due_amount > 0 and perms.suppliers.add_purchasepayment %}<a class="ui-menu-item success" href="{% url 'suppliers:purchase_detail' o.pk %}#add-payment">{% icon "cash" "w-4 h-4" %}Add payment</a>{% endif %}
+              {% endcomponent %}{% endif %}
             </div>
           </td>
         </tr>
@@ -85,7 +85,7 @@
   </div>
   {% ui "pagination" page_obj=page_obj %}
   {% else %}
-  <div class="ui-card">{% if has_filters %}{% ui "empty_state" icon="search" title="No purchase orders match your filters" %}{% else %}{% ui "empty_state" icon="truck" title="No purchase orders yet" text="Create a purchase order to order stock from a supplier." action_url=add_url action_label="New purchase order" %}{% endif %}</div>
+  <div class="ui-card">{% if has_filters %}{% ui "empty_state" icon="search" title="No purchase orders match your filters" %}{% elif perms.suppliers.add_purchaseorder %}{% ui "empty_state" icon="truck" title="No purchase orders yet" text="Create a purchase order to order stock from a supplier." action_url=add_url action_label="New purchase order" %}{% else %}{% ui "empty_state" icon="truck" title="No purchase orders yet" %}{% endif %}</div>
   {% endif %}
 </div>
 {% endblock %}

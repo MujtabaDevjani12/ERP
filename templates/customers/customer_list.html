@@ -10,7 +10,7 @@
     </div>
     <div class="page-actions">
       {% excel_actions "customers" %}
-      <a class="ui-btn ui-btn-primary" href="{{ add_url }}">{% icon "plus" "w-4 h-4" %}<span>Add customer</span></a>
+      {% if perms.customers.add_customer %}<a class="ui-btn ui-btn-primary" href="{{ add_url }}">{% icon "plus" "w-4 h-4" %}<span>Add customer</span></a>{% endif %}
     </div>
   </div>
 
@@ -53,7 +53,7 @@
       </thead>
       <tbody>
         {% for c in customers %}
-        <tr class="is-clickable" data-href="{% url 'customers:customer_edit' c.pk %}">
+        <tr {% if perms.customers.change_customer %}class="is-clickable" data-href="{% url 'customers:customer_edit' c.pk %}"{% endif %}>
           <td data-label="Customer">
             <div class="ui-cell">
               <span class="ui-avatar-sm">{{ c.name|slice:":2"|upper }}</span>
@@ -68,16 +68,18 @@
           <td data-label="Status">{% if c.is_active %}{% badge "active" label="Active" %}{% else %}{% badge "inactive" label="Inactive" tone="neutral" %}{% endif %}</td>
           <td class="col-actions">
             <div class="ui-row-actions">
-              <a class="icon-btn" href="{% url 'sales:sale_list' %}?q={{ c.name|urlencode }}" data-tip="View sales" data-tip-pos="bottom" aria-label="View sales">{% icon "receipt" "w-4 h-4" %}</a>
+              {% if perms.sales.view_sale %}<a class="icon-btn" href="{% url 'sales:sale_list' %}?q={{ c.name|urlencode }}" data-tip="View sales" data-tip-pos="bottom" aria-label="View sales">{% icon "receipt" "w-4 h-4" %}</a>{% endif %}
               {% if perms.customers.add_giftcard and c.is_active %}<button type="button" class="icon-btn" data-drawer-url="{% url 'customers:customer_deposit' c.pk %}" data-drawer-title="Deposit · {{ c.name }}" data-tip="Add deposit" data-tip-pos="bottom" aria-label="Add deposit">{% icon "cash" "w-4 h-4" %}</button>{% endif %}
-              <a class="icon-btn" href="{% url 'customers:customer_edit' c.pk %}" data-tip="Edit" data-tip-pos="bottom" aria-label="Edit customer">{% icon "pencil" "w-4 h-4" %}</a>
+              {% if perms.customers.change_customer %}<a class="icon-btn" href="{% url 'customers:customer_edit' c.pk %}" data-tip="Edit" data-tip-pos="bottom" aria-label="Edit customer">{% icon "pencil" "w-4 h-4" %}</a>{% endif %}
+              {% if perms.customers.change_customer or perms.sales.view_sale or perms.customers.delete_customer or perms.customers.add_giftcard %}
               {% component "row_menu" %}
-                <a class="ui-menu-item" href="{% url 'customers:customer_edit' c.pk %}">{% icon "pencil" "w-4 h-4" %}Edit customer</a>
-                <a class="ui-menu-item" href="{% url 'sales:sale_list' %}?q={{ c.name|urlencode }}">{% icon "receipt" "w-4 h-4" %}View sales</a>
+                {% if perms.customers.change_customer %}<a class="ui-menu-item" href="{% url 'customers:customer_edit' c.pk %}">{% icon "pencil" "w-4 h-4" %}Edit customer</a>{% endif %}
+                {% if perms.sales.view_sale %}<a class="ui-menu-item" href="{% url 'sales:sale_list' %}?q={{ c.name|urlencode }}">{% icon "receipt" "w-4 h-4" %}View sales</a>{% endif %}
                 {% if perms.customers.add_giftcard and c.is_active %}<button type="button" class="ui-menu-item" data-drawer-url="{% url 'customers:customer_deposit' c.pk %}" data-drawer-title="Deposit · {{ c.name }}">{% icon "cash" "w-4 h-4" %}Add deposit</button>{% endif %}
-                <div class="ui-menu-sep"></div>
-                <a class="ui-menu-item danger" href="{% url 'customers:customer_delete' c.pk %}">{% icon "trash" "w-4 h-4" %}Delete customer</a>
+                {% if perms.customers.delete_customer %}<div class="ui-menu-sep"></div>
+                <a class="ui-menu-item danger" href="{% url 'customers:customer_delete' c.pk %}">{% icon "trash" "w-4 h-4" %}Delete customer</a>{% endif %}
               {% endcomponent %}
+              {% endif %}
             </div>
           </td>
         </tr>
@@ -87,7 +89,7 @@
   </div>
   {% ui "pagination" page_obj=page_obj %}
   {% else %}
-  <div class="ui-card">{% if has_filters %}{% ui "empty_state" icon="search" title="No customers match your search" text="Check the spelling or clear the filters." %}{% else %}{% ui "empty_state" icon="users" title="No customers yet" text="Add your first customer to track purchases and loyalty points." action_url=add_url action_label="Add customer" %}{% endif %}</div>
+  <div class="ui-card">{% if has_filters %}{% ui "empty_state" icon="search" title="No customers match your search" text="Check the spelling or clear the filters." %}{% elif perms.customers.add_customer %}{% ui "empty_state" icon="users" title="No customers yet" text="Add your first customer to track purchases and loyalty points." action_url=add_url action_label="Add customer" %}{% else %}{% ui "empty_state" icon="users" title="No customers yet" %}{% endif %}</div>
   {% endif %}
 </div>
 {% endblock %}

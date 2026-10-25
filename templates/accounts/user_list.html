@@ -10,9 +10,10 @@
     </div>
     <div class="page-actions">
       <a class="ui-btn ui-btn-secondary" href="{% url 'accounts:role_list' %}">{% icon "shield" "w-4 h-4" %}<span class="hidden sm:inline">Roles &amp; permissions</span></a>
-      <a class="ui-btn ui-btn-primary" href="{{ add_url }}">{% icon "plus" "w-4 h-4" %}<span>New user</span></a>
+      {% if can_add %}<a class="ui-btn ui-btn-primary" href="{{ add_url }}">{% icon "plus" "w-4 h-4" %}<span>New user</span></a>{% endif %}
     </div>
   </div>
+  {% if users_limit_msg %}<div class="ui-alert ui-alert-warning" role="status">{% icon "warning" "w-4 h-4" %}<div>{{ users_limit_msg }} <a class="erp-link" href="{% url 'billing:home' %}#plans">See plans</a></div></div>{% endif %}
 
   <form method="get" class="ui-toolbar">
     <div class="ui-search">
@@ -27,6 +28,10 @@
     <div style="min-width:9rem">
       <label class="ui-label" for="u-bl">Seller (biller)</label>
       <select id="u-bl" name="biller"><option value="">Everyone</option><option value="1" {% if request.GET.biller == "1" %}selected{% endif %}>Billers only</option><option value="0" {% if request.GET.biller == "0" %}selected{% endif %}>Not billers</option></select>
+    </div>
+    <div style="min-width:9rem">
+      <label class="ui-label" for="u-role">Role</label>
+      <select id="u-role" name="role"><option value="">All roles</option>{% for r in roles %}<option value="{{ r.pk }}" {% if role_filter == r.pk|stringformat:"s" %}selected{% endif %}>{{ r.name }}</option>{% endfor %}</select>
     </div>
     <div style="width:6rem">
       <label class="ui-label" for="u-per">Per page</label>
@@ -44,7 +49,7 @@
       <thead><tr><th>User</th><th>Store</th><th>Roles</th><th>Flags</th><th class="col-actions"><span class="sr-only">Actions</span></th></tr></thead>
       <tbody>
         {% for u in staff_users %}
-        <tr class="is-clickable" data-href="{% url 'accounts:staff_user_edit' u.pk %}">
+        <tr {% if can_change %}class="is-clickable" data-href="{% url 'accounts:staff_user_edit' u.pk %}"{% endif %}>
           <td data-label="User">
             <div class="ui-cell">
               <span class="ui-avatar-sm">{{ u.get_full_name|default:u.username|slice:":2"|upper }}</span>
@@ -52,16 +57,17 @@
             </div>
           </td>
           <td data-label="Store">{{ u.store.name|default:"—" }}</td>
-          <td data-label="Roles"><div class="ui-chips">{% for g in u.groups.all %}<span class="ui-badge ui-badge-brand no-dot">{{ g.name }}</span>{% empty %}<span class="ui-muted">No role</span>{% endfor %}</div></td>
+          <td data-label="Roles"><div class="ui-chips">{% for g in u.groups.all %}<span class="ui-badge {% if g.name == super_role %}ui-badge-info{% else %}ui-badge-brand{% endif %} no-dot">{{ g.name }}</span>{% empty %}<span class="ui-muted">No role</span>{% endfor %}</div></td>
           <td data-label="Flags"><div class="ui-chips">
-            {% if u.is_superuser %}<span class="ui-badge ui-badge-info no-dot">Superuser</span>{% endif %}
+            {% if u.is_superuser %}<span class="ui-badge ui-badge-info no-dot">Full access</span>{% endif %}
+            {% if u.is_staff and not u.is_superuser %}<span class="ui-badge ui-badge-neutral no-dot">Back office</span>{% endif %}
             {% if u.is_biller %}<span class="ui-badge ui-badge-success no-dot">Cashier</span>{% endif %}
             {% if not u.is_active %}<span class="ui-badge ui-badge-neutral no-dot">Inactive</span>{% endif %}
           </div></td>
           <td class="col-actions">
             <div class="ui-row-actions">
-              <a class="icon-btn" href="{% url 'accounts:staff_user_edit' u.pk %}" data-tip="Edit user" data-tip-pos="bottom" aria-label="Edit user">{% icon "pencil" "w-4 h-4" %}</a>
-              <a class="icon-btn" href="{% url 'accounts:staff_user_delete' u.pk %}" data-tip="Delete user" data-tip-pos="bottom" aria-label="Delete user" style="color:var(--ui-danger)">{% icon "trash" "w-4 h-4" %}</a>
+              {% if can_change %}<a class="icon-btn" href="{% url 'accounts:staff_user_edit' u.pk %}" data-tip="Edit user" data-tip-pos="bottom" aria-label="Edit user">{% icon "pencil" "w-4 h-4" %}</a>{% endif %}
+              {% if can_delete and u != request.user %}<a class="icon-btn" href="{% url 'accounts:staff_user_delete' u.pk %}" data-tip="Delete user" data-tip-pos="bottom" aria-label="Delete user" style="color:var(--ui-danger)">{% icon "trash" "w-4 h-4" %}</a>{% endif %}
             </div>
           </td>
         </tr>

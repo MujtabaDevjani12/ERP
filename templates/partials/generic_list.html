@@ -1,32 +1,39 @@
 {% extends "base.html" %}{% load ui xl %}
 {% block title %}{{ title }}{% endblock %}
 {% block content %}
-{% if add_url_name %}{% url add_url_name as add_url %}{% endif %}
-<div class="space-y-4">
+{% if add_url_name and can_add %}{% url add_url_name as add_url %}{% endif %}
+<div class="space-y-4" x-data="{ sel: 0, count() { this.sel = this.$root.querySelectorAll('[data-pick]:checked').length; }, all(e) { this.$root.querySelectorAll('[data-pick]').forEach(function (c) { c.checked = e.target.checked; }); this.count(); } }">
   <div class="page-header">
     <div class="min-w-0">
       <h1 class="page-title">{{ title }} <span class="ui-badge ui-badge-neutral no-dot" style="vertical-align:middle;margin-left:6px">{{ rows|length }}</span></h1>
-      <p class="page-subtitle">Add, edit or remove {{ title|lower }}.</p>
+      <p class="page-subtitle">{% if can_add or can_change or can_delete %}Add, edit or remove {{ title|lower }}.{% else %}{{ title }} on file.{% endif %}</p>
     </div>
     {% if add_url or excel_key %}<div class="page-actions">{% if excel_key %}{% excel_actions excel_key %}{% endif %}{% if add_url %}<a class="ui-btn ui-btn-primary" href="{{ add_url }}">{% icon "plus" "w-4 h-4" %}<span>Add</span></a>{% endif %}</div>{% endif %}
   </div>
   {% if rows %}
+  <form method="post" id="bulk-form">{% csrf_token %}<input type="hidden" name="action" value="bulk_delete">
+  {% if delete_url_name and can_delete %}
+  <div class="ui-alert ui-alert-info" x-show="sel" x-cloak role="status" style="align-items:center;margin-bottom:var(--sp-3)">{% icon "trash" "w-4 h-4" %}<div style="flex:1"><strong x-text="sel"></strong> selected</div>
+    <button type="submit" class="ui-btn ui-btn-danger ui-btn-sm" data-bulk-confirm="Delete {n} selected?" data-bulk-name="ids">{% icon "trash" "w-4 h-4" %}<span>Delete selected</span></button></div>
+  {% endif %}
   <div class="ui-table-wrap">
     <table class="ui-table">
-      <thead><tr><th>{{ title }}</th><th class="col-actions"><span class="sr-only">Actions</span></th></tr></thead>
+      <thead><tr>{% if delete_url_name and can_delete %}<th style="width:36px"><input type="checkbox" aria-label="Select all" @change="all($event)"></th>{% endif %}<th>{{ title }}</th><th class="col-actions"><span class="sr-only">Actions</span></th></tr></thead>
       <tbody>
         {% for row in rows %}
         <tr>
-          <td><div class="ui-cell-title">{{ row }}</div></td>
+          {% if delete_url_name and can_delete %}<td class="ui-nowrap"><input type="checkbox" data-pick name="ids" value="{{ row.pk }}" @change="count()" aria-label="Select {{ row }}"></td>{% endif %}
+          <td><div class="ui-cell-title">{{ row }}</div>{% if row.code %}<div class="ui-cell-sub">Code <strong>{{ row.code }}</strong></div>{% endif %}</td>
           <td class="col-actions"><div class="ui-row-actions">
-            {% if edit_url_name %}<a class="icon-btn" href="{% url edit_url_name row.pk %}" data-tip="Edit" data-tip-pos="bottom" aria-label="Edit">{% icon "pencil" "w-4 h-4" %}</a>{% endif %}
-            {% if delete_url_name %}<a class="icon-btn" href="{% url delete_url_name row.pk %}" data-tip="Delete" data-tip-pos="bottom" aria-label="Delete" style="color:var(--ui-danger)">{% icon "trash" "w-4 h-4" %}</a>{% endif %}
+            {% if edit_url_name and can_change %}<a class="icon-btn" href="{% url edit_url_name row.pk %}" data-tip="Edit" data-tip-pos="bottom" aria-label="Edit">{% icon "pencil" "w-4 h-4" %}</a>{% endif %}
+            {% if delete_url_name and can_delete %}<a class="icon-btn" href="{% url delete_url_name row.pk %}" data-tip="Delete" data-tip-pos="bottom" aria-label="Delete" style="color:var(--ui-danger)">{% icon "trash" "w-4 h-4" %}</a>{% endif %}
           </div></td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+  </form>
   {% else %}
   <div class="ui-card">{% if add_url %}{% ui "empty_state" icon="inbox" title="Nothing here yet" text="Get started by creating your first entry." action_url=add_url action_label="Add" %}{% else %}{% ui "empty_state" icon="inbox" title="Nothing here yet" %}{% endif %}</div>
   {% endif %}

@@ -1,5 +1,5 @@
 """
-The 21 ERP roles as Django Groups + the permissions each one gets.
+The 23 ERP roles (Super Admin, Company Admin and 21 job roles) as Django Groups + the permissions each one gets.
 Built by `manage.py seed_roles` (safe to re-run: it only ADDS the listed
 permissions to each group, it never removes ones you added by hand).
 
@@ -38,6 +38,15 @@ _DOC_ACTIONS = (APPROVE, REJECT, PRINT, EXPORT)
 
 ROLES = {
     "Super Admin": "ALL",
+    # The person who signs a company up (SaaS): runs everything inside THEIR company and pays for the subscription,
+    # but is not a Super Admin, so plan limits apply and platform screens (/platform/) stay closed to them.
+    "Company Admin": [(app, FULL) for app in ERP_APPS + LEGACY_POS_APPS] + [
+        ("accounts", FULL, ["user"]), ("tenants", FULL), ("configuration", FULL), ("auth", VIEW, ["group"]),
+        ("rbac", (APPROVE, REJECT, CANCEL, POST, REVERSE, PRINT, EXPORT, IMPORT, PAY)),
+        ("billing", VIEW, ["subscription", "invoice", "payment", "billingevent"]),
+        ("billing", (A,), ["payment"]), ("billing", (C,), ["subscription"]),
+    ],
+    "Auditor": _VIEW_ALL + [("rbac", (PRINT, EXPORT)), ("auth", VIEW, ["group"]), ("accounts", VIEW, ["user"])],
     "CEO": _VIEW_ALL + [("rbac", (APPROVE, REJECT, PRINT, EXPORT))],
     "General Manager": _VIEW_ALL + [("rbac", (APPROVE, REJECT, CANCEL, PRINT, EXPORT))],
 

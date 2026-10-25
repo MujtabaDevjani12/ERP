@@ -1,0 +1,18 @@
+{% extends "ownerconsole/base.html" %}{% load owner_tags %}
+{% block title %}{% if plan %}Edit {{ plan.name }}{% else %}New plan{% endif %}{% endblock %}
+{% block content %}
+<div class="oc-head"><div><div class="crumb"><a href="{% url 'owner:plans' %}">Plans</a> / {% if plan %}{{ plan.name }}{% else %}New{% endif %}</div><h1>{% if plan %}Edit plan{% else %}New plan{% endif %}</h1></div></div>
+<form method="post" novalidate class="card"><div class="body">{% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert error">{% oicon "alert" %}<div>{{ form.non_field_errors }}</div></div>{% endif %}
+  <div class="section"><div><h3>Name and price</h3><p class="why">Monthly and yearly are priced separately.</p></div>
+    <div class="grid g2">{% include "ownerconsole/_field.html" with f=form.name %}{% include "ownerconsole/_field.html" with f=form.slug %}{% include "ownerconsole/_field.html" with f=form.tagline %}{% include "ownerconsole/_field.html" with f=form.currency %}
+      {% include "ownerconsole/_field.html" with f=form.price_monthly %}{% include "ownerconsole/_field.html" with f=form.price_yearly %}{% include "ownerconsole/_field.html" with f=form.trial_days %}{% include "ownerconsole/_field.html" with f=form.sort_order %}
+      <div style="grid-column:1/-1">{% include "ownerconsole/_field.html" with f=form.description %}</div></div></div>
+  <div class="section"><div><h3>What is included</h3><p class="why">Modules and limits for this plan. 0 means unlimited.</p></div>
+    <div class="stack"><div class="oc-field"><label>Modules</label><div class="modgrid">{{ form.modules }}</div><p class="oc-help">{{ form.modules.help_text }}</p>{% for e in form.modules.errors %}<p class="oc-err">{{ e }}</p>{% endfor %}</div>
+      <div class="grid g4">{% include "ownerconsole/_field.html" with f=form.max_users %}{% include "ownerconsole/_field.html" with f=form.max_stores %}{% include "ownerconsole/_field.html" with f=form.max_products %}{% include "ownerconsole/_field.html" with f=form.max_monthly_sales %}</div>
+      {% include "ownerconsole/_field.html" with f=form.features %}</div></div>
+  <div class="section"><div><h3>Visibility</h3></div><div class="grid g3">{% include "ownerconsole/_field.html" with f=form.is_active %}{% include "ownerconsole/_field.html" with f=form.is_public %}{% include "ownerconsole/_field.html" with f=form.is_featured %}</div></div>
+  <div class="row" style="justify-content:flex-end"><a class="btn" href="{% url 'owner:plans' %}">Cancel</a><button class="btn primary" type="submit">{% oicon "check" %}<span>Save plan</span></button></div>
+</div></form>
+{% endblock %}

@@ -46,8 +46,10 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family={{ google_font_query|default:'Inter:wght@400;500;600;700;800' }}&display=swap">
-  <link rel="stylesheet" href="{% static 'css/erp-ui.css' %}?v=20261010j">
-  <link rel="stylesheet" href="{% static 'css/fx-skin.css' %}?v=20261010j">
+  <link rel="stylesheet" href="{% static 'css/erp-ui.css' %}?v=20261025c">
+  <link rel="stylesheet" href="{% static 'css/fx-skin.css' %}?v=20261025b">
+  <link rel="stylesheet" href="{% static 'css/layout-unify.css' %}?v=20261025a">
+  <link rel="stylesheet" href="{% static 'css/billing.css' %}?v=20261025c">
   <style>
     :root {
       --brand-50: {{ brand_shades.50|default:"#eef2ff" }}; --brand-100: {{ brand_shades.100|default:"#e0e7ff" }};
@@ -146,6 +148,32 @@
           </span>
         </div>
       {% endif %}
+      {% if billing_plan %}
+        <div class="sbp {{ billing_plan.tone }}" data-tip="{{ billing_plan.name }} · {{ billing_plan.label }}" data-tip-collapsed>
+          <a class="sbp-head" href="{% url 'billing:home' %}">
+            <span class="sbp-ico">{% icon "credit-card" "w-4 h-4" %}</span>
+            <span class="sbp-text">
+              <span class="sbp-name">{{ billing_plan.name }} plan</span>
+              <span class="sbp-state"><i class="sbp-dot"></i>{{ billing_plan.label }}</span>
+            </span>
+          </a>
+          <div class="sbp-body">
+            {% if billing_plan.line %}<div class="sbp-line">{{ billing_plan.line }}</div>{% endif %}
+            <div class="sbp-meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ billing_plan.pct }}"><span style="width:{{ billing_plan.pct }}%"></span></div>
+            {% for r in billing_plan.usage %}
+              <div class="sbp-use"><span>{{ r.label }}</span><b>{{ r.used }}/{{ r.limit }}</b></div>
+              <div class="sbp-meter sm{% if r.reached %} full{% endif %}"><span style="width:{{ r.percent }}%"></span></div>
+            {% endfor %}
+            {% if billing_plan.locked and billing_plan.can_view %}
+              <a class="sbp-btn primary" href="{% url 'billing:home' %}#pay">Pay now</a>
+            {% elif billing_plan.can_upgrade %}
+              <a class="sbp-btn" href="{% url 'billing:home' %}#plans">Upgrade plan</a>
+            {% elif billing_plan.can_view %}
+              <a class="sbp-btn" href="{% url 'billing:home' %}">Open billing</a>
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
       <a href="{% url 'dashboard:pos' %}" class="fx-cta" data-tip="Open POS" data-tip-collapsed>{% icon "bolt" "w-5 h-5" %}<span class="nav-label">Open POS</span></a>
       <form method="post" action="{% url 'accounts:logout' %}" data-no-loading>{% csrf_token %}
         <button type="submit" class="nav-link fx-logout" data-tip="Sign out" data-tip-collapsed>{% icon "logout" "nav-icon" %}<span class="nav-label">Sign out</span></button>
@@ -239,6 +267,7 @@
           <div class="ui-menu-sep"></div>
           <button type="button" class="ui-menu-item" @click="open = false; $dispatch('ui-shortcuts')">{% icon "question" "w-4 h-4" %}Keyboard shortcuts</button>
           <a class="ui-menu-item" href="{% url 'accounts:profile' %}">{% icon "user" "w-4 h-4" %}My profile</a>
+          {% if billing_plan and billing_plan.can_view %}<a class="ui-menu-item" href="{% url 'billing:home' %}">{% icon "credit-card" "w-4 h-4" %}Billing &amp; plan<span class="bp-menu-tag {{ billing_plan.tone }}">{{ billing_plan.name }}</span></a>{% if billing_plan.can_upgrade %}<a class="ui-menu-item" href="{% url 'billing:home' %}#plans">{% icon "star" "w-4 h-4" %}Upgrade plan</a>{% endif %}{% endif %}
           <a class="ui-menu-item" href="{% url 'dashboard:pos' %}">{% icon "register" "w-4 h-4" %}Open POS</a>
           <button type="button" class="ui-menu-item" @click="$store.ui.toggleTheme()">
             <span x-show="$store.ui.theme !== 'dark'">{% icon "moon" "w-4 h-4" %}</span><span x-cloak x-show="$store.ui.theme === 'dark'">{% icon "sun" "w-4 h-4" %}</span>
@@ -255,6 +284,8 @@
 
     <main id="main" class="app-content" tabindex="-1">
       <div class="page">
+        {% if billing_announcement %}<div class="bp-banner {{ billing_announcement.level }} no-print" role="status"><span>{% icon "bell" "w-4 h-4" %} {{ billing_announcement.text }}</span></div>{% endif %}
+        {% if billing_banner %}<div class="bp-banner {{ billing_banner.level }} no-print" role="status"><span>{{ billing_banner.text }}</span>{% if billing_banner.can_pay %}<a href="{% url 'billing:home' %}">Open billing</a>{% endif %}</div>{% endif %}
         {% block content %}{% endblock %}
       </div>
     </main>
@@ -266,5 +297,7 @@
   {% include "components/overlays.html" %}
 {% endif %}
 {% block extra_body %}{% endblock %}
+<form id="cdm-post" method="post" hidden>{% csrf_token %}</form>
+<script src="{% static 'js/confirm-delete.js' %}?v=20261025a"></script>
 </body>
 </html>

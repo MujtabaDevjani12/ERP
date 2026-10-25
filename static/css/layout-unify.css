@@ -1,0 +1,61 @@
+/* ==========================================================================================================
+   layout-unify.css  -  ONE width for every page, form and table.
+
+   Before: .page was 1440px in erp-ui.css and 1680px in fx-skin.css, forms were capped at 1040px (and many
+   templates overrode that inline with 30rem / 34rem / 40rem / 44rem / 48rem / 56rem), so list tables and
+   forms never lined up from one screen to the next.
+
+   Now: a single --page-max drives the page container; every form, section, card, toolbar and table inside it
+   fills that container, so the left and right edges are the same on every screen. Loaded last (after
+   erp-ui.css and fx-skin.css), so it wins without needing to touch those files.
+   ========================================================================================================== */
+:root { --page-max: 1600px; --field-min: 17rem; }
+
+/* same box model everywhere (Tailwind's preflight does this too; repeated so no page depends on it loading) */
+.page, .page *, .page *::before, .page *::after, .ui-form-wrap *, .ui-form-section * { box-sizing: border-box; }
+
+/* the container: same on every page */
+.app-content > .page, .page { max-width: var(--page-max); width: 100%; margin-left: auto; margin-right: auto; }
+
+/* things that used to be narrower than the page now fill it */
+.page-narrow,
+.ui-form-wrap,
+.page > .max-w-2xl, .page > .max-w-3xl, .page > .max-w-4xl, .page > .max-w-5xl, .page > .max-w-6xl {
+  max-width: none !important; width: 100%; margin-left: 0; margin-right: 0;
+}
+
+/* every block inside a page stretches to the same width */
+.page > *, .ui-form-wrap > * { max-width: 100%; }
+.ui-form-wrap > form, .ui-form-wrap > section, .ui-form-section, .ui-card, .ui-toolbar, .ui-table-wrap, .ui-alert {
+  box-sizing: border-box; width: auto; max-width: 100%;      /* block boxes fill the container; padding/border never push them wider */
+}
+
+/* tables: always as wide as their wrapper (no shrink-to-content tables that stop short of the right edge) */
+.ui-table-wrap > table, .ui-table-wrap table.ui-table, table.ui-table { width: 100%; }
+.ui-table-wrap { max-width: 100%; }
+
+/* form fields: equal-width columns on every form, however many fields a section holds.
+   (a section with 2 fields and one with 5 now show the same field width) */
+.ui-form-wrap .ui-form-section > .body.ui-grid-2,
+.ui-form-wrap .ui-form-section > .body.ui-grid-3,
+.ui-form-wrap .ui-form-section > .body > .ui-grid-2,
+.ui-form-wrap .ui-form-section > .body > .ui-grid-3,
+.ui-form-wrap .ui-form-section > form > .body.ui-grid-2,
+.ui-form-wrap .ui-form-section > form > .body.ui-grid-3 {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--field-min)), 1fr));
+}
+/* a field that wants a whole row (notes, addresses, descriptions) still gets one */
+.ui-form-wrap .ui-grid-2 > .col-span-full, .ui-form-wrap .ui-grid-3 > .col-span-full,
+.ui-form-wrap .ui-grid-2 > .ui-field-wide, .ui-form-wrap .ui-grid-3 > .ui-field-wide { grid-column: 1 / -1; }
+
+/* inputs never overflow their cell */
+.ui-form-section input:not([type=checkbox]):not([type=radio]), .ui-form-section select, .ui-form-section textarea { max-width: 100%; }
+
+/* settings hub, profile and similar two-pane screens use the same outer width */
+.st-layout, .st-head { max-width: 100%; width: 100%; }
+
+/* small screens: edge to edge with the standard gutter */
+@media (max-width: 640px) { .page { max-width: 100%; } }
+
+/* printing keeps its own paper widths */
+@media print { .page, .ui-form-wrap { max-width: none !important; } }

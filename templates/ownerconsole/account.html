@@ -1,0 +1,17 @@
+{% extends "ownerconsole/base.html" %}{% load owner_tags %}
+{% block title %}My account{% endblock %}
+{% block content %}
+<div class="oc-head"><div><h1>My account</h1><p>Your own sign-in details for the owner console.</p></div></div>
+<div class="grid g2" style="align-items:start">
+  <section class="card"><header><h2>Profile</h2></header>
+    <form method="post" class="body stack" novalidate>{% csrf_token %}<input type="hidden" name="action" value="profile">
+      {% include "ownerconsole/_field.html" with f=profile.name %}{% include "ownerconsole/_field.html" with f=profile.email %}{% include "ownerconsole/_field.html" with f=profile.phone %}{% include "ownerconsole/_field.html" with f=profile.notify_email %}
+      <div><button class="btn primary" type="submit">{% oicon "check" %}<span>Save profile</span></button></div></form></section>
+  <section class="card"><header><h2>Change password</h2></header>
+    <form method="post" class="body stack" novalidate>{% csrf_token %}<input type="hidden" name="action" value="password">
+      {% include "ownerconsole/_field.html" with f=pw.current %}{% include "ownerconsole/_field.html" with f=pw.password1 %}{% include "ownerconsole/_field.html" with f=pw.password2 %}
+      <p class="small muted">At least 10 characters. Changing it signs you out of every other browser.</p>
+      <div><button class="btn primary" type="submit">{% oicon "key" %}<span>Change password</span></button></div></form></section>
+</div>
+<section class="card"><div class="body small muted">Role: <b>{{ owner.get_role_display }}</b> &middot; Last sign-in: {% if owner.last_login %}{{ owner.last_login|date:"d M Y, H:i" }}{% else %}-{% endif %}{% if owner.last_login_ip %} from {{ owner.last_login_ip }}{% endif %}</div></section>
+{% endblock %}

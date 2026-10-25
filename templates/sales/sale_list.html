@@ -11,7 +11,7 @@
     <div class="page-actions">
       {% excel_actions "sales" %}
       <a class="ui-btn ui-btn-secondary" href="{% url 'documents:document_log_list' %}">{% icon "doc" "w-4 h-4" %}<span class="hidden sm:inline">Document log</span></a>
-      <a class="ui-btn ui-btn-primary" href="{% url 'dashboard:pos' %}">{% icon "register" "w-4 h-4" %}<span>New sale (POS)</span></a>
+      {% if perms.sales.add_sale %}<a class="ui-btn ui-btn-primary" href="{% url 'dashboard:pos' %}">{% icon "register" "w-4 h-4" %}<span>New sale (POS)</span></a>{% endif %}
     </div>
   </div>
 
@@ -95,7 +95,7 @@
               {% component "row_menu" %}
                 <a class="ui-menu-item" href="{% url 'sales:sale_detail' sale.pk %}">{% icon "doc" "w-4 h-4" %}Sale details</a>
                 <a class="ui-menu-item" href="{% url 'documents:invoice_pdf' sale.pk %}" target="_blank" rel="noopener">{% icon "download" "w-4 h-4" %}Download PDF</a>
-                {% if sale.due_amount > 0 and sale.status != "held" and sale.status != "cancelled" %}<a class="ui-menu-item success" href="{% url 'sales:sale_detail' sale.pk %}#add-payment">{% icon "cash" "w-4 h-4" %}Add payment</a>{% endif %}
+                {% if sale.due_amount > 0 and sale.status != "held" and sale.status != "cancelled" and perms.payments.add_payment %}<a class="ui-menu-item success" href="{% url 'sales:sale_detail' sale.pk %}#add-payment">{% icon "cash" "w-4 h-4" %}Add payment</a>{% endif %}
                 {% if sale.status == "completed" or sale.status == "partially_returned" %}{% if perms.sales.change_sale %}<a class="ui-menu-item" href="{% url 'sales:sale_return' sale.pk %}">{% icon "refresh" "w-4 h-4" %}Return / refund</a>{% endif %}{% if perms.sales.add_salereturn %}<a class="ui-menu-item" href="{% url 'sales:sale_return' sale.pk %}?exchange=1">{% icon "refresh" "w-4 h-4" %}Exchange items</a>{% endif %}{% endif %}
                 <div class="ui-menu-sep"></div>
                 {% if perms.sales.add_sale and sale.status != "held" and sale.status != "cancelled" %}<button type="button" class="ui-menu-item" data-drawer-url="{% url 'sales:sale_feedback' sale.pk %}" data-drawer-title="Customer feedback · {{ sale.reference }}">{% icon "star" "w-4 h-4" %}{% if sale.feedback %}Edit feedback{% else %}Add feedback{% endif %}</button>{% endif %}

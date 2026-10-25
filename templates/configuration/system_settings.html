@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}System configuration{% endblock %}
 {% block content %}
-<div class="max-w-3xl mx-auto">
+<div class="space-y-4">
   <h1 class="text-xl font-bold text-ink mb-1">System Configuration</h1>
   <p class="text-sm text-gray-500 mb-5">Site-wide defaults for the whole deployment. Billing-screen behaviour lives in <a href="{% url 'configuration:pos_settings' %}" class="text-brand-600 hover:underline">POS Configuration</a>, and document numbering is <a href="{% url 'configuration:numbering_prefixes' %}" class="text-brand-600 hover:underline">here</a>.</p>
 

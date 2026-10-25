@@ -4,6 +4,7 @@ from decimal import Decimal, InvalidOperation
 from django import forms
 from django.forms import inlineformset_factory
 
+from core.richtext import RichTextWidget, sanitize_html
 from tenants.models import Warehouse
 from .models import Brand, Category, Product, ProductAttribute, ProductAttributeValue, ProductImage, ProductVariant, Unit
 
@@ -62,7 +63,7 @@ class ProductForm(forms.ModelForm):
             "promo_start": forms.DateInput(attrs={"type": "date"}), "promo_end": forms.DateInput(attrs={"type": "date"}),
             "alert_quantity": forms.NumberInput(attrs={"step": "0.001", "min": "0"}),
             "image": forms.FileInput(attrs={"accept": "image/*"}),
-            "category": forms.Select(), "description": forms.Textarea(attrs={"rows": 3, "placeholder": "Short description (optional)"}),
+            "category": forms.Select(), "description": RichTextWidget(),
         }
 
     def __init__(self, *args, store=None, **kwargs):
@@ -91,6 +92,9 @@ class ProductForm(forms.ModelForm):
 
     def clean_name(self):
         return (self.cleaned_data.get("name") or "").strip()
+
+    def clean_description(self):
+        return sanitize_html(self.cleaned_data.get("description"))          # formatted text from the editor, made safe
 
     def clean_image(self):
         image = self.cleaned_data.get("image")
@@ -339,23 +343,43 @@ VariantFormSetEdit = inlineformset_factory(
 )
 
 
-class CategoryForm(forms.ModelForm):
+class _CodeFormMixin:
+    """Optional short code that must be unique inside the store (compared without upper / lower case)."""
+    def clean_code(self):
+        code = (self.cleaned_data.get("code") or "").strip().upper()
+        store = self.store or getattr(self.instance, "store", None)
+        if code and store is not None:
+            clash = self._meta.model.objects.filter(store=store, code__iexact=code).exclude(pk=self.instance.pk)
+            if clash.exists():
+                raise forms.ValidationError(f"The code {code} is already used by {clash.first().name}.")
+        return code
+
+
+class CategoryForm(_CodeFormMixin, forms.ModelForm):
     class Meta:
         model = Category
-        fields = ["parent", "name", "image", "is_active"]
-        widgets = {"parent": forms.Select(attrs={}), "name": forms.TextInput(attrs={})}
+        fields = ["parent", "name", "code", "image", "is_active"]
+        widgets = {"parent": forms.Select(attrs={}), "name": forms.TextInput(attrs={}),
+                   "code": forms.TextInput(attrs={"placeholder": "Auto, e.g. GRO-001", "autocomplete": "off"})}
 
     def __init__(self, *args, store=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.store = store
         if store is not None:
             self.fields["parent"].queryset = Category.objects.filter(store=store)
+        self.fields["code"].required = False
 
 
-class BrandForm(forms.ModelForm):
+class BrandForm(_CodeFormMixin, forms.ModelForm):
     class Meta:
         model = Brand
-        fields = ["name", "image"]
-        widgets = {"name": forms.TextInput(attrs={})}
+        fields = ["name", "code", "image"]
+        widgets = {"name": forms.TextInput(attrs={}), "code": forms.TextInput(attrs={"placeholder": "Auto, e.g. NES-001", "autocomplete": "off"})}
+
+    def __init__(self, *args, store=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.store = store
+        self.fields["code"].required = False
 
 
 class UnitForm(forms.ModelForm):

@@ -4,10 +4,21 @@ from core.models import TimeStampedModel
 from tenants.models import Store
 
 
+def make_code(model, store_id, name, exclude_pk=None):
+    """A short unique code made from a name, e.g. 'Cooking Oil' -> COO-001 (unique inside the store)."""
+    base = "".join(ch for ch in (name or "") if ch.isalnum()).upper()[:3] or "ITM"
+    taken = set(model.objects.filter(store_id=store_id).exclude(pk=exclude_pk).values_list("code", flat=True))
+    n = 1
+    while f"{base}-{n:03d}" in taken:
+        n += 1
+    return f"{base}-{n:03d}"
+
+
 class Category(TimeStampedModel):
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="categories")
     parent = models.ForeignKey("self", on_delete=models.CASCADE, null=True, blank=True, related_name="children")
     name = models.CharField(max_length=100)
+    code = models.CharField(max_length=20, blank=True, help_text="Short code, e.g. GRO-001. Leave empty and one is made from the name.")
     image = models.ImageField(upload_to="categories/", blank=True, null=True)
     is_active = models.BooleanField(default=True)
 
@@ -21,10 +32,16 @@ class Category(TimeStampedModel):
     def __str__(self):
         return self.name
 
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = make_code(Category, self.store_id, self.name, self.pk)
+        super().save(*args, **kwargs)
+
 
 class Brand(TimeStampedModel):
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="brands")
     name = models.CharField(max_length=100)
+    code = models.CharField(max_length=20, blank=True, help_text="Short code, e.g. NES-001. Leave empty and one is made from the name.")
     image = models.ImageField(upload_to="brands/", blank=True, null=True)
 
     class Meta:
@@ -33,6 +50,11 @@ class Brand(TimeStampedModel):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = make_code(Brand, self.store_id, self.name, self.pk)
+        super().save(*args, **kwargs)
 
 
 class Unit(TimeStampedModel):

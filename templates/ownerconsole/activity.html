@@ -1,0 +1,12 @@
+{% extends "ownerconsole/base.html" %}{% load owner_tags %}
+{% block title %}Activity{% endblock %}
+{% block content %}
+<div class="oc-head"><div><h1>Activity</h1><p>Everything that happened to a company's subscription: sign-ups, payments, plan changes, suspensions.</p></div></div>
+<section class="card">
+  <form method="get" class="toolbar"><div class="oc-field grow"><label for="a-q">Search</label><input type="search" id="a-q" name="q" value="{{ q }}" placeholder="Company, text or who did it" autocomplete="off"></div>
+    <div class="row"><button class="btn primary" type="submit">{% oicon "search" %}<span>Search</span></button>{% if q %}<a class="btn" href="{% url 'owner:activity' %}">Reset</a>{% endif %}</div></form>
+  {% if page.object_list %}<div class="tbl-wrap"><table class="tbl"><thead><tr><th>When</th><th>Company</th><th>What happened</th><th>By</th></tr></thead><tbody>
+    {% for e in page.object_list %}<tr><td class="nowrap">{{ e.created_at|date:"d M Y, H:i" }}</td><td>{% if e.company_id %}<a href="{% url 'owner:company_detail' e.company_id %}">{{ e.company_name|default:e.company_id }}</a>{% endif %}</td><td>{{ e.message }}<div class="sub">{{ e.kind }}</div></td><td class="muted">{{ e.actor|default:"system" }}</td></tr>{% endfor %}</tbody></table></div>
+  {% include "ownerconsole/_pager.html" %}{% else %}<div class="empty">{% oicon "clock" %}<b>Nothing yet</b></div>{% endif %}
+</section>
+{% endblock %}

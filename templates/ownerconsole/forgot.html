@@ -1,0 +1,17 @@
+{% extends "ownerconsole/auth_base.html" %}{% load owner_tags %}
+{% block title %}Forgot password{% endblock %}
+{% block card %}
+{% if sent %}
+<div><h1>Check your e-mail</h1><p class="lead muted">If an owner account uses that address, a reset link is on its way. It works once and expires in {{ reset_hours }} hours.</p></div>
+<div class="alert info">{% oicon "mail" %}<div>No e-mail after a few minutes? Look in spam, or ask another owner to send you a reset link from <b>Team</b>.{% if debug %} <span class="small">(Development: with no SMTP saved the message is printed in the server console.)</span>{% endif %}</div></div>
+<a class="btn block" href="{% url 'owner:login' %}">Back to sign in</a>
+{% else %}
+<div><h1>Forgot your password?</h1><p class="lead muted">Enter your owner e-mail. We send a link to choose a new password.</p></div>
+<form method="post" class="stack" novalidate>
+  {% csrf_token %}
+  <div class="oc-field{% if form.email.errors %} has-error{% endif %}"><label for="{{ form.email.id_for_label }}">E-mail</label>{{ form.email }}{% for e in form.email.errors %}<p class="oc-err">{{ e }}</p>{% endfor %}</div>
+  <button class="btn primary lg block" type="submit">{% oicon "send" %}<span>Send reset link</span></button>
+</form>
+<a class="small" style="text-align:center" href="{% url 'owner:login' %}">Back to sign in</a>
+{% endif %}
+{% endblock %}

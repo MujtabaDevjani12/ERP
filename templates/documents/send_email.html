@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% load ui %}
 {% block title %}Email invoice{% endblock %}
 {% block content %}
-<div class="ui-form-wrap space-y-4" style="max-width:36rem">
+<div class="ui-form-wrap space-y-4">
   <div class="page-header">
     <div class="min-w-0">
       <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{% url 'sales:sale_detail' sale.pk %}">{{ sale.reference }}</a><span class="sep">/</span><span>Email</span></nav>

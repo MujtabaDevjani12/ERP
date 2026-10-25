@@ -11,7 +11,7 @@
     <div class="page-actions">
       {% if perms.register.view_register %}<a class="ui-btn ui-btn-secondary" href="{% url 'reports:pack_report' 'registers' %}" title="Shift report with cash difference, Excel and PDF">{% icon "chart" "w-4 h-4" %}<span class="hidden sm:inline">Shift report</span></a>{% endif %}
       {% if perms.register.view_register %}<a class="ui-btn ui-btn-secondary" href="{% url 'register:counter_list' %}">{% icon "register" "w-4 h-4" %}<span class="hidden sm:inline">Counters</span></a>{% endif %}
-      <a class="ui-btn ui-btn-primary" href="{% url 'register:open' %}?switch=1">{% icon "plus" "w-4 h-4" %}<span>Open register</span></a>
+      {% if perms.sales.add_sale %}<a class="ui-btn ui-btn-primary" href="{% url 'register:open' %}?switch=1">{% icon "plus" "w-4 h-4" %}<span>Open register</span></a>{% endif %}
     </div>
   </div>
 
@@ -57,7 +57,7 @@
   </div>
   {% ui "pagination" page_obj=page_obj %}
   {% else %}
-  <div class="ui-card">{% if has_filters %}{% ui "empty_state" icon="search" title="No sessions match these filters" %}{% else %}{% ui "empty_state" icon="register" title="No register sessions yet" text="Open a register at a counter to start your first shift." action_url=open_url action_label="Open register" %}{% endif %}</div>
+  <div class="ui-card">{% if has_filters %}{% ui "empty_state" icon="search" title="No sessions match these filters" %}{% elif perms.sales.add_sale %}{% ui "empty_state" icon="register" title="No register sessions yet" text="Open a register at a counter to start your first shift." action_url=open_url action_label="Open register" %}{% else %}{% ui "empty_state" icon="register" title="No register sessions yet" %}{% endif %}</div>
   {% endif %}
 </div>
 {% endblock %}

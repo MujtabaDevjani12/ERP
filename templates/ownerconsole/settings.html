@@ -1,0 +1,64 @@
+{% extends "ownerconsole/base.html" %}{% load owner_tags %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<div class="oc-head"><div><h1>Settings</h1><p>How customers pay you, how long the free demo lasts and when reminders go out.</p></div>
+  <a class="btn" href="{% url 'owner:email_settings' %}">{% oicon "mail" %}<span>E-mail settings</span></a></div>
+<nav class="jump no-print" aria-label="Jump to a settings section">
+  <a href="#business">Business</a><a href="#billing">Billing rules</a><a href="#invoicing">Invoices</a><a href="#stripe">Stripe</a><a href="#manual">Manual payments</a>
+  <a href="#google">Google</a><a href="#announce">Announcement</a><a href="#signup">Sign-up page</a><a href="#security">Security</a><a href="#data">Data export</a>
+</nav>
+<form method="post" novalidate class="card"><div class="body">{% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert error">{% oicon "alert" %}<div>{{ form.non_field_errors }}</div></div>{% endif %}
+
+  <div class="section" id="business"><div><h3>Business</h3><p class="why">Shown on invoices, in e-mails and on the ERP sign-up page.</p></div>
+    <div class="grid g2">{% include "ownerconsole/_field.html" with f=form.business_name %}{% include "ownerconsole/_field.html" with f=form.support_email %}{% include "ownerconsole/_field.html" with f=form.support_phone %}{% include "ownerconsole/_field.html" with f=form.tax_percent %}
+      <div style="grid-column:1/-1">{% include "ownerconsole/_field.html" with f=form.erp_base_url %}</div>
+      <div style="grid-column:1/-1">{% include "ownerconsole/_field.html" with f=form.invoice_footer %}</div></div></div>
+
+  <div class="section" id="billing"><div><h3>Demo, grace and reminders</h3><p class="why">With 0 demo days a new company must pay before it can open the ERP. You can still give demo days to one company from its page.</p></div>
+    <div class="grid g3">{% include "ownerconsole/_field.html" with f=form.trial_days %}{% include "ownerconsole/_field.html" with f=form.grace_days %}{% include "ownerconsole/_field.html" with f=form.renewal_invoice_days %}
+      {% include "ownerconsole/_field.html" with f=form.reminder_days %}<div style="grid-column:span 2">{% include "ownerconsole/_field.html" with f=form.allow_public_signup %}</div></div></div>
+
+  <div class="section" id="invoicing"><div><h3>Invoices</h3><p class="why">How invoice numbers look and how long a customer has to pay a new invoice. Tax is under Business.</p></div>
+    <div class="grid g2">{% include "ownerconsole/_field.html" with f=form.invoice_prefix %}{% include "ownerconsole/_field.html" with f=form.payment_due_days %}
+      <div class="small muted" style="grid-column:1/-1">Next invoice number will look like <b>{{ form.invoice_prefix.value|default:"SUB"|upper }}-{% now "Y" %}-00001</b>. Old invoices keep the number they already have.</div></div></div>
+
+  <div class="section" id="stripe"><div><h3>Card payments - Stripe</h3><p class="why">Create the keys in your Stripe dashboard. Add a webhook that points to <b>{{ erp_url }}/billing/webhooks/stripe/</b> (your ERP, not this console) and listen for <i>checkout.session.completed</i>.</p></div>
+    <div class="grid g2">{% include "ownerconsole/_field.html" with f=form.stripe_enabled %}<div></div>{% include "ownerconsole/_field.html" with f=form.stripe_publishable_key %}{% include "ownerconsole/_field.html" with f=form.stripe_secret_key %}{% include "ownerconsole/_field.html" with f=form.stripe_webhook_secret %}
+      <div class="small muted" style="align-self:end">{% if obj.stripe_secret_key %}A secret key is saved.{% else %}No secret key saved yet.{% endif %} {% if obj.stripe_webhook_secret %}Webhook secret saved.{% endif %}</div></div></div>
+
+  <div class="section" id="manual"><div><h3>Manual payments</h3><p class="why">Bank, JazzCash and Easypaisa. Customers send the money, upload the receipt and you approve it under Payments.</p></div>
+    <div class="grid g2">{% include "ownerconsole/_field.html" with f=form.manual_enabled %}<div></div>
+      <div style="grid-column:1/-1">{% include "ownerconsole/_field.html" with f=form.bank_details %}</div>
+      {% include "ownerconsole/_field.html" with f=form.jazzcash_number %}{% include "ownerconsole/_field.html" with f=form.easypaisa_number %}
+      <div style="grid-column:1/-1">{% include "ownerconsole/_field.html" with f=form.payment_instructions %}</div></div></div>
+
+  <div class="section" id="google"><div><h3>Google sign-in {% if obj.google_client_id %}<span class="badge success">ON</span>{% else %}<span class="badge">OFF</span>{% endif %}</h3>
+    <p class="why">Once the Client ID is saved, the ERP sign-in and sign-up pages show "Sign in with Google" by themselves.</p></div>
+    <div class="stack"><div class="grid g2">{% include "ownerconsole/_field.html" with f=form.google_client_id %}{% include "ownerconsole/_field.html" with f=form.google_client_secret %}</div>
+      <p class="small muted">{% if obj.google_client_secret %}A client secret is saved.{% else %}No client secret saved.{% endif %} The button only needs the Client ID; the secret stays private and is never shown again.</p>
+      <ol class="small muted" style="margin:0;padding-left:18px;display:grid;gap:4px">
+        <li>console.cloud.google.com &rarr; APIs &amp; Services &rarr; Credentials &rarr; Create credentials &rarr; <b>OAuth client ID</b> &rarr; Application type: <b>Web application</b>.</li>
+        <li><b>Authorised JavaScript origins</b>: add your ERP address, <b>{{ erp_url }}</b> (and your live domain).</li>
+        <li>Paste the Client ID and secret here and save. Then open <a href="{{ erp_url }}/accounts/login/" target="_blank" rel="noopener">the ERP sign-in page</a> to test.</li>
+      </ol></div></div>
+
+  <div class="section" id="announce"><div><h3>Announcement banner {% if obj.announcement_enabled and obj.announcement_text %}<span class="badge success">LIVE</span>{% else %}<span class="badge">OFF</span>{% endif %}</h3>
+    <p class="why">One message shown on top of every page for every company that uses your ERP: maintenance, a new feature, a price change. Switch it off when it is no longer needed.</p></div>
+    <div class="stack">{% include "ownerconsole/_field.html" with f=form.announcement_enabled %}
+      <div class="grid g2"><div style="grid-column:span 2">{% include "ownerconsole/_field.html" with f=form.announcement_text %}</div>{% include "ownerconsole/_field.html" with f=form.announcement_level %}</div></div></div>
+
+  <div class="section" id="signup"><div><h3>Sign-up page and welcome e-mail</h3><p class="why">Legal links appear under the sign-up form. The welcome note is added to the e-mail a new company gets.</p></div>
+    <div class="grid g2">{% include "ownerconsole/_field.html" with f=form.terms_url %}{% include "ownerconsole/_field.html" with f=form.privacy_url %}
+      <div style="grid-column:1/-1">{% include "ownerconsole/_field.html" with f=form.welcome_note %}</div></div></div>
+
+  <div class="section" id="security"><div><h3>Security</h3><p class="why">Applies to this owner console only. Changing a password signs that person out of every other browser.</p></div>
+    <div class="grid g2">{% include "ownerconsole/_field.html" with f=form.session_hours %}
+      <div class="small muted" style="align-self:end">Five wrong passwords lock an account for 15 minutes. "Remember me" keeps a sign-in for 14 days.</div></div></div>
+
+  <div class="section" id="data"><div><h3>Data export</h3><p class="why">Download your records as a spreadsheet (CSV) for your accountant or your own backup.</p></div>
+    <div class="row"><a class="btn" href="{% url 'owner:export' 'companies' %}">{% oicon "building" %}<span>Companies</span></a><a class="btn" href="{% url 'owner:export' 'invoices' %}">{% oicon "receipt" %}<span>Invoices</span></a><a class="btn" href="{% url 'owner:export' 'payments' %}">{% oicon "cash" %}<span>Payments</span></a></div></div>
+
+  <div class="row" style="justify-content:flex-end"><button class="btn primary" type="submit">{% oicon "check" %}<span>Save settings</span></button></div>
+</div></form>
+{% endblock %}

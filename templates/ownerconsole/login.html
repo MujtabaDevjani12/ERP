@@ -1,0 +1,18 @@
+{% extends "ownerconsole/auth_base.html" %}{% load owner_tags %}
+{% block title %}Sign in{% endblock %}
+{% block card %}
+<div><h1>Owner sign in</h1><p class="lead muted">Use your owner console account. This is not your ERP login.</p></div>
+{% if error %}<div class="alert error" role="alert">{% oicon "alert" %}<div>{{ error }}</div></div>{% endif %}
+<form method="post" class="stack" novalidate>
+  {% csrf_token %}<input type="hidden" name="next" value="{{ next }}">
+  <div class="oc-field{% if form.email.errors %} has-error{% endif %}"><label for="{{ form.email.id_for_label }}">E-mail</label>{{ form.email }}{% for e in form.email.errors %}<p class="oc-err">{{ e }}</p>{% endfor %}</div>
+  <div class="oc-field{% if form.password.errors %} has-error{% endif %}">
+    <div class="row between"><label for="{{ form.password.id_for_label }}">Password</label><a class="small" href="{% url 'owner:forgot' %}">Forgot password?</a></div>
+    <div class="pw">{{ form.password }}<button type="button" class="icon-btn" id="show-pw" aria-label="Show password" style="width:30px;height:30px;border:0;background:transparent">{% oicon "eye" %}</button></div>
+    {% for e in form.password.errors %}<p class="oc-err">{{ e }}</p>{% endfor %}</div>
+  <div class="oc-field"><label class="oc-check" for="{{ form.remember.id_for_label }}">{{ form.remember }}<span>Keep me signed in on this device</span></label></div>
+  <button class="btn primary lg block" type="submit">{% oicon "lock" %}<span>Sign in</span></button>
+</form>
+<p class="small faint" style="text-align:center">Too many wrong passwords lock the account for 15 minutes.</p>
+{% endblock %}
+{% block scripts %}<script>document.getElementById('show-pw').addEventListener('click',function(){var i=document.getElementById('{{ form.password.id_for_label }}');i.type=i.type==='password'?'text':'password'});</script>{% endblock %}

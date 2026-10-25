@@ -54,7 +54,7 @@
       </thead>
       <tbody>
         {% for s in suppliers %}
-        <tr class="is-clickable" data-href="{% url 'suppliers:supplier_edit' s.pk %}">
+        <tr {% if perms.suppliers.change_supplier %}class="is-clickable" data-href="{% url 'suppliers:supplier_edit' s.pk %}"{% endif %}>
           <td data-label="Supplier">
             <div class="ui-cell">
               <span class="ui-avatar-sm">{{ s.name|slice:":2"|upper }}</span>
@@ -74,14 +74,14 @@
             <div class="ui-row-actions">
               {% if s.phone %}<a class="icon-btn" href="tel:{{ s.phone }}" data-tip="Call" data-tip-pos="bottom" aria-label="Call {{ s.name }}">{% icon "phone" "w-4 h-4" %}</a>{% endif %}
               {% if perms.suppliers.add_purchaseorder and s.is_active %}<a class="icon-btn" href="{% url 'suppliers:purchase_add' %}?supplier={{ s.pk }}" data-tip="New purchase" data-tip-pos="bottom" aria-label="New purchase from {{ s.name }}">{% icon "cart" "w-4 h-4" %}</a>{% endif %}
-              <a class="icon-btn" href="{% url 'suppliers:supplier_edit' s.pk %}" data-tip="Edit" data-tip-pos="bottom" aria-label="Edit supplier">{% icon "pencil" "w-4 h-4" %}</a>
-              {% component "row_menu" %}
-                <a class="ui-menu-item" href="{% url 'suppliers:supplier_edit' s.pk %}">{% icon "pencil" "w-4 h-4" %}Edit supplier</a>
-                <a class="ui-menu-item" href="{% url 'suppliers:purchase_list' %}?q={{ s.name|urlencode }}">{% icon "receipt" "w-4 h-4" %}Purchase orders</a>
+              {% if perms.suppliers.change_supplier %}<a class="icon-btn" href="{% url 'suppliers:supplier_edit' s.pk %}" data-tip="Edit" data-tip-pos="bottom" aria-label="Edit supplier">{% icon "pencil" "w-4 h-4" %}</a>{% endif %}
+              {% if perms.suppliers.change_supplier or perms.suppliers.view_purchaseorder or perms.suppliers.delete_supplier or s.email %}{% component "row_menu" %}
+                {% if perms.suppliers.change_supplier %}<a class="ui-menu-item" href="{% url 'suppliers:supplier_edit' s.pk %}">{% icon "pencil" "w-4 h-4" %}Edit supplier</a>{% endif %}
+                {% if perms.suppliers.view_purchaseorder %}<a class="ui-menu-item" href="{% url 'suppliers:purchase_list' %}?q={{ s.name|urlencode }}">{% icon "receipt" "w-4 h-4" %}Purchase orders</a>{% endif %}
                 {% if s.email %}<a class="ui-menu-item" href="mailto:{{ s.email }}">{% icon "mail" "w-4 h-4" %}Send email</a>{% endif %}
-                <div class="ui-menu-sep"></div>
-                <a class="ui-menu-item danger" href="{% url 'suppliers:supplier_delete' s.pk %}">{% icon "trash" "w-4 h-4" %}Delete supplier</a>
-              {% endcomponent %}
+                {% if perms.suppliers.delete_supplier %}<div class="ui-menu-sep"></div>
+                <a class="ui-menu-item danger" href="{% url 'suppliers:supplier_delete' s.pk %}">{% icon "trash" "w-4 h-4" %}Delete supplier</a>{% endif %}
+              {% endcomponent %}{% endif %}
             </div>
           </td>
         </tr>
@@ -91,7 +91,7 @@
   </div>
   {% ui "pagination" page_obj=page_obj %}
   {% else %}
-  <div class="ui-card">{% if has_filters %}{% ui "empty_state" icon="search" title="No suppliers match your search" text="Check the spelling or clear the filters." %}{% else %}{% ui "empty_state" icon="truck" title="No suppliers yet" text="Add the people you buy stock from, then raise purchase orders against them." action_url=add_url action_label="Add supplier" %}{% endif %}</div>
+  <div class="ui-card">{% if has_filters %}{% ui "empty_state" icon="search" title="No suppliers match your search" text="Check the spelling or clear the filters." %}{% elif perms.suppliers.add_supplier %}{% ui "empty_state" icon="truck" title="No suppliers yet" text="Add the people you buy stock from, then raise purchase orders against them." action_url=add_url action_label="Add supplier" %}{% else %}{% ui "empty_state" icon="truck" title="No suppliers yet" %}{% endif %}</div>
   {% endif %}
 </div>
 {% endblock %}

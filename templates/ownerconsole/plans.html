@@ -1,0 +1,20 @@
+{% extends "ownerconsole/base.html" %}{% load owner_tags billing_tags %}
+{% block title %}Plans{% endblock %}
+{% block content %}
+<div class="oc-head"><div><h1>Plans</h1><p>What each plan includes and what it costs, monthly and yearly. Changes apply to new invoices; companies already subscribed keep their price until the next renewal.</p></div>
+  <div><a class="btn primary" href="{% url 'owner:plan_add' %}">{% oicon "plus" %}<span>New plan</span></a></div></div>
+{% if plans %}
+<div class="plans">{% for plan in plans %}
+  <div class="plan{% if plan.is_featured %} featured{% endif %}">
+    {% if plan.is_featured %}<span class="ribbon">Most popular</span>{% endif %}
+    <div class="row between"><div><h3>{{ plan.name }}</h3><p class="small muted">{{ plan.tagline }}</p></div>
+      {% if not plan.is_active %}<span class="badge">Off</span>{% elif not plan.is_public %}<span class="badge info">Hidden</span>{% else %}<span class="badge success">Live</span>{% endif %}</div>
+    <div class="price"><b>{{ plan.price_monthly|price:plan.currency }}</b> <span class="muted">/ month</span></div>
+    <div class="small muted" style="margin-top:-8px">{{ plan.price_yearly|price:plan.currency }} / year{% if plan.yearly_saving_percent %} &middot; saves {{ plan.yearly_saving_percent }}%{% endif %}</div>
+    <ul>{% for line in plan.limit_lines %}<li>{% oicon "check" %}<span>{{ line }}</span></li>{% endfor %}{% for label in plan.module_labels %}<li>{% oicon "check" %}<span>{{ label }}</span></li>{% endfor %}</ul>
+    <div class="small muted">{{ plan.companies }} compan{{ plan.companies|pluralize:"y,ies" }} on this plan</div>
+    <div class="row" style="margin-top:auto"><a class="btn" href="{% url 'owner:plan_edit' plan.pk %}">{% oicon "pencil" %}<span>Edit</span></a>
+      <form method="post" action="{% url 'owner:plan_delete' plan.pk %}" onsubmit="return confirm('Remove {{ plan.name|escapejs }}? If companies use it, it will only be hidden.')">{% csrf_token %}<button class="btn danger" type="submit" aria-label="Delete {{ plan.name }}">{% oicon "trash" %}</button></form></div>
+  </div>{% endfor %}</div>
+{% else %}<section class="card"><div class="empty">{% oicon "tag" %}<b>No plans yet</b><span>Create your first plan, or run <code>python manage.py seed_plans</code> for Starter, Business and Enterprise.</span><a class="btn primary" href="{% url 'owner:plan_add' %}">New plan</a></div></section>{% endif %}
+{% endblock %}

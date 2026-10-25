@@ -1,0 +1,45 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Gateway and settings{% endblock %}
+{% block content %}
+<div class="space-y-4 ui-form-wrap">
+  <div class="page-header"><div class="min-w-0"><h1 class="page-title">Gateway and settings</h1><p class="page-subtitle">How customers pay you, how long the free trial lasts and when reminders go out.</p></div></div>
+  {% include "billing/platform/_nav.html" with active="settings" %}
+  <form method="post" novalidate class="space-y-4">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="ui-alert ui-alert-danger" role="alert">{% icon "error" "w-4 h-4" %}<div>{{ form.non_field_errors }}</div></div>{% endif %}
+
+    <section class="ui-form-section"><header><h2>Business</h2><p>Shown on invoices and on the sign-up page.</p></header>
+      <div class="body ui-grid ui-grid-2">{% ui "field" field=form.business_name %}{% ui "field" field=form.support_email %}{% ui "field" field=form.support_phone %}{% ui "field" field=form.tax_percent %}
+        <div style="grid-column:1/-1">{% ui "field" field=form.invoice_footer %}</div></div></section>
+
+    <section class="ui-form-section"><header><h2>Free trial, reminders and renewals</h2><p>Each company can still get its own extra days from its page.</p></header>
+      <div class="body ui-grid ui-grid-3">{% ui "field" field=form.trial_days %}{% ui "field" field=form.grace_days %}{% ui "field" field=form.renewal_invoice_days %}
+        {% ui "field" field=form.reminder_days %}{% ui "field" field=form.allow_public_signup %}</div></section>
+
+    <section class="ui-form-section"><header><h2>Card payments - Stripe</h2><p>Create the keys in your Stripe dashboard. Add a webhook that points to <b>{{ request.scheme }}://{{ request.get_host }}{% url 'billing:stripe_webhook' %}</b> and listen for <i>checkout.session.completed</i>.</p></header>
+      <div class="body ui-grid ui-grid-2">{% ui "field" field=form.stripe_enabled %}<div></div>{% ui "field" field=form.stripe_publishable_key %}{% ui "field" field=form.stripe_secret_key %}{% ui "field" field=form.stripe_webhook_secret %}
+        <div class="bp-muted" style="align-self:end">{% if obj.stripe_secret_key %}A secret key is saved.{% else %}No secret key saved yet.{% endif %} {% if obj.stripe_webhook_secret %}Webhook secret saved.{% endif %}</div></div></section>
+
+    <section class="ui-form-section"><header><h2>Manual payments - bank, JazzCash, Easypaisa</h2><p>Customers send the money, upload the receipt and you approve it under Payments.</p></header>
+      <div class="body ui-grid ui-grid-2">{% ui "field" field=form.manual_enabled %}<div></div>
+        <div style="grid-column:1/-1">{% ui "field" field=form.bank_details %}</div>
+        {% ui "field" field=form.jazzcash_number %}{% ui "field" field=form.easypaisa_number %}
+        <div style="grid-column:1/-1">{% ui "field" field=form.payment_instructions %}</div></div></section>
+
+    <section class="ui-form-section"><header><h2>Google sign-in {% if obj.google_client_id %}<span class="ui-badge ui-badge-success no-dot">ON</span>{% else %}<span class="ui-badge ui-badge-neutral no-dot">OFF</span>{% endif %}</h2>
+      <p>Jab Client ID save ho jaye to login aur sign-up page par "Sign in with Google" button khud aa jata hai.</p></header>
+      <div class="body" style="display:grid;gap:14px">
+        <div class="ui-grid ui-grid-2">{% ui "field" field=form.google_client_id %}{% ui "field" field=form.google_client_secret %}</div>
+        <div class="bp-muted">{% if obj.google_client_secret %}A client secret is saved.{% else %}No client secret saved.{% endif %} Google button ke liye sirf Client ID zaroori hai; secret hifazat se save rehta hai aur kabhi page par wapas nahi dikhaya jata.</div>
+        <ol class="bp-muted" style="margin:0;padding-left:18px;display:grid;gap:4px">
+          <li>console.cloud.google.com &rarr; APIs &amp; Services &rarr; Credentials &rarr; Create credentials &rarr; <b>OAuth client ID</b> &rarr; Application type: <b>Web application</b>.</li>
+          <li><b>Authorised JavaScript origins</b> mein ye daalein: <b>{{ request.scheme }}://{{ request.get_host }}</b> (live site ka domain bhi alag se add karein).</li>
+          <li>Client ID aur Client secret yahan paste karke Save karein.</li>
+          <li>Test karein: <a class="erp-link" href="{% url 'accounts:login' %}" target="_blank" rel="noopener">Login page</a> &middot; <a class="erp-link" href="{% url 'billing:signup' %}" target="_blank" rel="noopener">Sign-up page</a></li>
+        </ol>
+      </div></section>
+
+    <div style="display:flex;justify-content:flex-end"><button class="ui-btn ui-btn-primary" type="submit">{% icon "success" "w-4 h-4" %}<span>Save settings</span></button></div>
+  </form>
+</div>
+{% endblock %}

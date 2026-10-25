@@ -3,7 +3,7 @@ from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.db import transaction
 from django.db.models import Count, F, Q
 from django.shortcuts import redirect, render
@@ -17,10 +17,11 @@ from tenants.models import Warehouse
 from .models import Rack, StockAdjustment, StockAdjustmentItem, StockItem
 
 
-class StockListView(PagedListMixin, LoginRequiredMixin, ListView):
+class StockListView(PagedListMixin, LoginRequiredMixin, PermissionRequiredMixin, ListView):
     """Server-side search / warehouse + low-stock filters / pagination."""
     filter_params = ("q", "low", "warehouse", "category")
     model = StockItem
+    permission_required = "inventory.view_stockitem"
     template_name = "inventory/stock_list.html"
     context_object_name = "stock_items"
 
@@ -108,10 +109,11 @@ def quantity_adjustment_view(request):
     return render(request, "inventory/quantity_adjustment.html", {"warehouses": warehouses, "reasons": StockAdjustment.REASON_CHOICES})
 
 
-class StockAdjustmentListView(PagedListMixin, LoginRequiredMixin, ListView):
+class StockAdjustmentListView(PagedListMixin, LoginRequiredMixin, PermissionRequiredMixin, ListView):
     """Server-side search / pagination."""
     filter_params = ("q",)
     model = StockAdjustment
+    permission_required = "inventory.view_stockadjustment"
     template_name = "inventory/adjustment_list.html"
     context_object_name = "adjustments"
 
@@ -136,8 +138,9 @@ class RackListView(LoginRequiredMixin, SimpleListMixin, ListView):
         return Rack.objects.filter(warehouse__store=self.request.store)
 
 
-class RackCreateView(LoginRequiredMixin, CreateView):
+class RackCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
     model = Rack
+    permission_required = "inventory.add_rack"
     fields = ["warehouse", "name"]
     template_name = "partials/simple_form.html"
     success_url = reverse_lazy("inventory:rack_list")
@@ -151,8 +154,9 @@ class RackCreateView(LoginRequiredMixin, CreateView):
         return super().get_context_data(title="Add rack", back_url=self.success_url, **kwargs)
 
 
-class RackUpdateView(LoginRequiredMixin, UpdateView):
+class RackUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
     model = Rack
+    permission_required = "inventory.change_rack"
     fields = ["warehouse", "name"]
     template_name = "partials/simple_form.html"
     success_url = reverse_lazy("inventory:rack_list")
@@ -169,8 +173,9 @@ class RackUpdateView(LoginRequiredMixin, UpdateView):
         return super().get_context_data(title="Edit rack", back_url=self.success_url, **kwargs)
 
 
-class RackDeleteView(LoginRequiredMixin, DeleteContextMixin, DeleteView):
+class RackDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteContextMixin, DeleteView):
     model = Rack
+    permission_required = "inventory.delete_rack"
     template_name = "partials/confirm_delete.html"
     success_url = reverse_lazy("inventory:rack_list")
 

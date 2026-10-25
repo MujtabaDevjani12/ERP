@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% load ui %}
 {% block title %}Attributes{% endblock %}
 {% block content %}
-<div class="space-y-4" style="max-width:56rem">
+<div class="space-y-4" x-data="{ sel: 0, count() { this.sel = document.querySelectorAll('[data-pick]:checked').length; }, all(e) { document.querySelectorAll('[data-pick]').forEach(function (c) { c.checked = e.target.checked; }); this.count(); } }">
   <div class="page-header">
     <div class="min-w-0">
       <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{% url 'catalog:product_list' %}">Products</a><span class="sep">/</span><span>Attributes</span></nav>
@@ -10,7 +10,7 @@
     </div>
   </div>
 
-  <form method="post" class="ui-card" novalidate>
+  {% if can_add %}<form method="post" class="ui-card" novalidate>
     {% csrf_token %}
     <div class="ui-card-body">
       <div class="ui-grid ui-grid-2">
@@ -24,20 +24,31 @@
     <div class="ui-card-header" style="border-top:1px solid var(--ui-border);border-bottom:0;justify-content:flex-end">
       <button type="submit" class="ui-btn ui-btn-primary">{% icon "plus" "w-4 h-4" %}<span>Add attribute</span></button>
     </div>
-  </form>
+  </form>{% endif %}
+
+  {% if attributes and can_delete %}<form method="post" id="attr-bulk" data-no-loading>{% csrf_token %}<input type="hidden" name="action" value="bulk_delete">
+    <div class="ui-card"><div class="ui-card-body" style="display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;padding-top:var(--sp-3);padding-bottom:var(--sp-3)">
+      <label style="display:flex;align-items:center;gap:8px;font-weight:600"><input type="checkbox" @change="all($event)" aria-label="Select all attributes"> Select all</label>
+      <span class="ui-muted" x-show="sel" x-cloak><strong x-text="sel"></strong> selected</span>
+      <button type="submit" class="ui-btn ui-btn-danger ui-btn-sm" style="margin-left:auto" x-show="sel" x-cloak data-bulk-confirm="Delete {n} selected attribute(s)?" data-bulk-text="Attributes that variants use are kept. Their values are deleted together with them." data-bulk-name="ids">{% icon "trash" "w-4 h-4" %}<span>Delete selected</span></button>
+    </div></div></form>{% endif %}
 
   {% for attr in attributes %}
   <section class="ui-card">
     <div class="ui-card-header" style="justify-content:space-between">
-      <div><div class="ui-cell-title">{{ attr.name }}</div><div class="ui-cell-sub">{{ attr.values.all|length }} value{{ attr.values.all|length|pluralize }}</div></div>
-      <a class="ui-btn ui-btn-secondary ui-btn-sm" href="{% url 'catalog:attribute_values' attr.pk %}">{% icon "pencil" "w-4 h-4" %}<span>Edit values</span></a>
+      <div style="display:flex;align-items:center;gap:var(--sp-3)">{% if can_delete %}<input type="checkbox" data-pick name="ids" value="{{ attr.pk }}" form="attr-bulk" @change="count()" aria-label="Select {{ attr.name }}">{% endif %}<div><div class="ui-cell-title">{{ attr.name }}</div><div class="ui-cell-sub">{{ attr.values.all|length }} value{{ attr.values.all|length|pluralize }}{% if attr.in_use %} · used by {{ attr.in_use }} variant{{ attr.in_use|pluralize }}{% endif %}</div></div></div>
+      <div class="flex gap-2">
+        {% if can_change %}<a class="ui-btn ui-btn-secondary ui-btn-sm" href="{% url 'catalog:attribute_values' attr.pk %}">{% icon "pencil" "w-4 h-4" %}<span>Edit values</span></a>{% endif %}
+        {% if can_delete and attr.in_use %}<form method="post" action="{% url 'catalog:attribute_delete' attr.pk %}" data-no-loading data-confirm="Delete “{{ attr.name }}” anyway?|It is used by {{ attr.in_use }} variant{{ attr.in_use|pluralize }}. It is only removed from them (their names, stock and sales stay the same).|Delete anyway">{% csrf_token %}<input type="hidden" name="force" value="1"><button type="submit" class="ui-btn ui-btn-danger ui-btn-sm">{% icon "trash" "w-4 h-4" %}<span>Delete anyway</span></button></form>
+        {% elif can_delete %}<a class="ui-btn ui-btn-danger ui-btn-sm" href="{% url 'catalog:attribute_delete' attr.pk %}">{% icon "trash" "w-4 h-4" %}<span>Delete</span></a>{% endif %}
+      </div>
     </div>
     <div class="ui-card-body">
-      <div class="at-chips">{% for v in attr.values.all %}<span class="at-chip">{{ v.value }}</span>{% empty %}<span class="pf-note">No values yet. Use “Edit values” to add some.</span>{% endfor %}</div>
+      <div class="at-chips">{% for v in attr.values.all %}<span class="at-chip">{{ v.value }}</span>{% empty %}<span class="pf-note">No values yet.{% if can_change %} Use “Edit values” to add some.{% endif %}</span>{% endfor %}</div>
     </div>
   </section>
   {% empty %}
-  <div class="ui-card">{% ui "empty_state" icon="sliders" title="No attributes yet" text="Add your first one above, for example Size with the values Small, Medium, Large." %}</div>
+  <div class="ui-card">{% if can_add %}{% ui "empty_state" icon="sliders" title="No attributes yet" text="Add your first one above, for example Size with the values Small, Medium, Large." %}{% else %}{% ui "empty_state" icon="sliders" title="No attributes yet" %}{% endif %}</div>
   {% endfor %}
 </div>
 <style>.at-chips { display: flex; flex-wrap: wrap; gap: 6px; } .at-chip { padding: 4px 12px; border-radius: 99px; border: 1px solid var(--ui-border-strong); background: var(--ui-surface-2); font-size: 13px; }</style>

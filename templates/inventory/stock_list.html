@@ -9,8 +9,8 @@
     </div>
     <div class="page-actions">
       {% excel_actions "stock" %}
-      <a class="ui-btn ui-btn-secondary" href="{% url 'inventory:adjustment_list' %}">{% icon "clock" "w-4 h-4" %}<span class="hidden sm:inline">Adjustment history</span></a>
-      <a class="ui-btn ui-btn-primary" href="{% url 'inventory:quantity_adjustment' %}">{% icon "sliders" "w-4 h-4" %}<span>Adjust quantity</span></a>
+      {% if perms.inventory.view_stockadjustment %}<a class="ui-btn ui-btn-secondary" href="{% url 'inventory:adjustment_list' %}">{% icon "clock" "w-4 h-4" %}<span class="hidden sm:inline">Adjustment history</span></a>{% endif %}
+      {% if perms.inventory.add_stockadjustment %}<a class="ui-btn ui-btn-primary" href="{% url 'inventory:quantity_adjustment' %}">{% icon "sliders" "w-4 h-4" %}<span>Adjust quantity</span></a>{% endif %}
     </div>
   </div>
 

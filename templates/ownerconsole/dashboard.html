@@ -1,0 +1,95 @@
+{% extends "ownerconsole/base.html" %}{% load owner_tags billing_tags %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="hero-text">
+    <p class="hero-date">{% now "l, j F Y" %}</p>
+    <h1>{{ greeting }}, {{ owner.name|truncatechars:24 }}</h1>
+    <p>{% if attention %}{{ attention|length }} thing{{ attention|length|pluralize }} need{{ attention|length|pluralize:"s," }} you today.{% else %}Everything is under control. Nothing needs you right now.{% endif %}</p>
+  </div>
+  {% if owner.is_admin %}<div class="row no-print">
+    <form method="post" action="{% url 'owner:run_cycle' %}">{% csrf_token %}<button class="btn hero-btn" type="submit" title="Create renewal invoices, send reminders, lock expired companies">{% oicon "refresh" %}<span>Run billing check</span></button></form>
+    <a class="btn hero-btn" href="{% url 'owner:payments' %}">{% oicon "cash" %}<span>Payments{% if m.pending_payments %} ({{ m.pending_payments }}){% endif %}</span></a>
+    <a class="btn hero-btn primary" href="{% url 'owner:plan_add' %}">{% oicon "plus" %}<span>New plan</span></a></div>{% endif %}
+</section>
+
+{% if attention %}
+<section class="card attn"><header><h2>Needs your attention</h2><span class="badge warning">{{ attention|length }}</span></header>
+  <div class="attn-grid">{% for a in attention %}<a class="attn-item {{ a.tone }}" href="{{ a.url }}"><span class="ic">{% oicon a.icon %}</span><span><b>{{ a.count }}</b> {{ a.text }}</span><span class="go">&rsaquo;</span></a>{% endfor %}</div></section>
+{% else %}<div class="alert success">{% oicon "check" %}<div><b>All clear.</b> No payments to review, nobody overdue, no failed e-mails.</div></div>{% endif %}
+
+<div class="grid g4">
+  <div class="card kpi"><div class="l">{% oicon "trend" %}Monthly recurring revenue</div><div class="v">{{ m.mrr|price }}</div><div class="f">{{ m.arr|price }} a year &middot; {{ insights.arpa|price }} per paying company</div></div>
+  <div class="card kpi k-ok"><div class="l">{% oicon "cash" %}Collected this month</div><div class="v">{{ m.month_revenue|price }}</div>
+    <div class="f">{% if insights.delta is not None %}<span class="delta {% if insights.delta >= 0 %}up{% else %}down{% endif %}">{% if insights.delta >= 0 %}&#9650;{% else %}&#9660;{% endif %} {{ insights.delta }}%</span> vs last month ({{ insights.last_month|price }}){% else %}Last month: {{ insights.last_month|price }}{% endif %}</div></div>
+  <div class="card kpi k-warn"><div class="l">{% oicon "receipt" %}Waiting to be paid</div><div class="v">{{ m.outstanding|price }}</div><div class="f">Open invoices{% if insights.collection_rate is not None %} &middot; {{ insights.collection_rate }}% of invoices get paid{% endif %}</div></div>
+  <div class="card kpi k-info"><div class="l">{% oicon "building" %}Companies</div><div class="v">{{ m.companies }}</div><div class="f">{{ insights.paying }} paying &middot; {{ insights.new_30d }} new in 30 days &middot; {{ m.locked }} locked</div></div>
+</div>
+
+<div class="split">
+  <section class="card"><header><h2>Revenue, last 12 months</h2><span class="small muted">All time: <b>{{ m.total_revenue|price }}</b></span></header>
+    <div class="body">
+      <div class="chart{% if not has_revenue %} is-empty{% endif %}">
+        <div class="axis"><span>{{ peak|price }}</span><span>{{ half_peak|price }}</span><span>0</span></div>
+        <div class="plot">
+          <div class="grid-lines" aria-hidden="true"><i></i><i></i><i></i></div>
+          <div class="bars" role="img" aria-label="Revenue per month">{% for b in bars %}<div class="col{% if b.now %} now{% endif %}" title="{{ b.label }}: {{ b.value|price }}"><span class="val">{% if b.value %}{{ b.value|floatformat:0 }}{% endif %}</span><div class="bar" style="height:{{ b.pct }}%"></div><span class="lbl">{{ b.label|slice:":3" }}</span></div>{% endfor %}</div>
+          {% if not has_revenue %}<div class="chart-empty"><b>No payments yet</b><span>Money you approve under Payments appears here month by month.</span></div>{% endif %}
+        </div>
+      </div>
+    </div></section>
+
+  <section class="card"><header><h2>Company status</h2><span class="small muted">{{ m.companies }} total</span></header>
+    <div class="body">
+      {% if insights.state_mix %}
+      <div class="donut-wrap"><div class="donut" style="background:conic-gradient({{ donut }})" role="img" aria-label="Companies by status"><div class="hole"><b>{{ m.companies }}</b><span>companies</span></div></div>
+        <ul class="legend">{% for x in insights.state_mix %}<li><i style="background:var(--c-{{ x.key }})"></i><span>{{ x.label }}</span><b>{{ x.count }}</b></li>{% endfor %}</ul></div>
+      {% else %}<div class="empty"><b>No companies yet</b><span>They appear here after the first sign-up.</span></div>{% endif %}
+    </div></section>
+</div>
+
+<div class="grid g3">
+  <section class="card"><header><h2>Plans in use</h2><a class="btn sm" href="{% url 'owner:plans' %}">Plans</a></header>
+    <div class="body">{% for p in insights.plan_mix %}<div class="mix"><div class="top"><span class="t">{{ p.name }}</span><span class="small muted">{{ p.count }} compan{{ p.count|pluralize:"y,ies" }} &middot; {{ p.mrr|price }}/mo</span></div><div class="meter"><i style="width:{{ p.pct }}%"></i></div></div>
+      {% empty %}<p class="muted">No companies yet.</p>{% endfor %}</div></section>
+
+  <section class="card"><header><h2>New sign-ups</h2><span class="small muted">last 8 weeks</span></header>
+    <div class="body"><div class="spark" role="img" aria-label="Sign-ups per week">{% for w in insights.weeks %}<div class="c" title="Week to {{ w.label }}: {{ w.count }} sign-up{{ w.count|pluralize }}"><span class="n">{% if w.count %}{{ w.count }}{% endif %}</span><i style="height:{{ w.pct }}%"></i><span class="d">{{ w.label|slice:":2" }}</span></div>{% endfor %}</div></div></section>
+
+  <section class="card"><header><h2>Best customers</h2><span class="small muted">total paid</span></header>
+    <div class="body">{% for c in insights.best %}<div class="list-row"><div><span class="rank">{{ forloop.counter }}</span> <a class="t" href="{% url 'owner:company_detail' c.company_id %}">{{ c.name }}</a></div><b>{{ c.total|price:c.currency }}</b></div>
+      {% empty %}<p class="muted">Nobody has paid yet.</p>{% endfor %}</div></section>
+</div>
+
+<div class="split">
+  <div class="stack">
+    <section class="card"><header><h2>Payments to review</h2><a class="btn sm" href="{% url 'owner:payments' %}">All payments</a></header>
+      <div class="body">{% for p in pending %}<div class="list-row"><div><a class="t" href="{% url 'owner:company_detail' p.company_id %}">{{ p.invoice.subscription.company_name }}</a><div class="small muted">{{ p.get_method_display }}{% if p.reference %} &middot; {{ p.reference }}{% endif %} &middot; {{ p.invoice.number }}</div></div><b>{{ p.amount|price:p.invoice.currency }}</b></div>
+        {% empty %}<p class="muted">Nothing is waiting for you.</p>{% endfor %}</div></section>
+
+    <section class="card"><header><h2>Waiting for their first payment</h2></header>
+      <div class="body">{% for s in awaiting %}<div class="list-row"><div><a class="t" href="{% url 'owner:company_detail' s.company_id %}">{{ s.company_name }}</a><div class="small muted">{{ s.plan.name }} &middot; signed up {{ s.created_at|timesince }} ago</div></div><span class="badge warning">Awaiting payment</span></div>
+        {% empty %}<p class="muted">Nobody is waiting.</p>{% endfor %}</div></section>
+
+    <section class="card"><header><h2>Newest companies</h2><a class="btn sm" href="{% url 'owner:companies' %}">All companies</a></header>
+      <div class="body">{% for s in recent %}<div class="list-row"><div><a class="t" href="{% url 'owner:company_detail' s.company_id %}">{{ s.company_name }}</a><div class="small muted">{{ s.plan.name }} &middot; {{ s.created_at|timesince }} ago</div></div><span class="badge {% if s.status == 'suspended' %}danger{% endif %}">{{ s.get_interval_display }}</span></div>
+        {% empty %}<p class="muted">No sign-ups yet.</p>{% endfor %}</div></section>
+  </div>
+
+  <div class="stack">
+    <section class="card"><header><h2>Ending within 7 days</h2></header>
+      <div class="body">{% for s in expiring %}<div class="list-row"><div><a class="t" href="{% url 'owner:company_detail' s.company_id %}">{{ s.company_name }}</a><div class="small muted">{{ s.plan.name }}</div></div><span class="badge {% if s.days_left <= 1 %}danger{% else %}warning{% endif %}">{{ s.days_left }} day{{ s.days_left|pluralize }}</span></div>
+        {% empty %}<p class="muted">Nobody is about to expire.</p>{% endfor %}</div></section>
+
+    <section class="card"><header><h2>Latest activity</h2><a class="btn sm" href="{% url 'owner:activity' %}">All</a></header>
+      <div class="body"><ol class="tl">{% for e in events %}<li><i></i><div><b>{{ e.company_name|default:"-" }}</b> - {{ e.message }}<div class="small faint">{{ e.created_at|timesince }} ago</div></div></li>{% empty %}<li class="muted">Nothing yet.</li>{% endfor %}</ol></div></section>
+
+    <section class="card"><header><h2>Setup checklist</h2><span class="badge {% if checklist_done == checklist|length %}success{% else %}warning{% endif %}">{{ checklist_done }} / {{ checklist|length }}</span></header>
+      <div class="body"><div class="meter" style="margin-bottom:10px"><i style="width:{% widthratio checklist_done checklist|length 100 %}%"></i></div>
+        {% for label, ok, url in checklist %}<div class="check-row {% if ok %}done{% endif %}"><span class="dot">{% oicon "check" %}</span>{% if ok %}<span>{{ label }}</span>{% else %}<a href="{% url url %}">{{ label }}</a>{% endif %}</div>{% endfor %}</div></section>
+
+    {% if unmanaged %}<section class="card"><header><h2>ERP companies without a subscription</h2></header>
+      <div class="body">{% for c in unmanaged %}<div class="list-row"><a class="t" href="{% url 'owner:company_detail' c.pk %}">{{ c.name }}</a><a class="btn sm" href="{% url 'owner:company_detail' c.pk %}">Set up</a></div>{% endfor %}</div></section>{% endif %}
+  </div>
+</div>
+{% endblock %}

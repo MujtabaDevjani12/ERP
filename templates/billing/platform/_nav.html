@@ -1,0 +1,4 @@
+{% load ui %}
+<nav class="ui-tabs-bar no-print" aria-label="Owner console" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">
+  {% for key, label, url in platform_tabs %}<a class="ui-btn ui-btn-sm {% if active == key %}ui-btn-primary{% else %}ui-btn-secondary{% endif %}" href="{{ url }}">{{ label }}{% if key == "payments" and pending_total %} <span class="ui-badge ui-badge-warning no-dot">{{ pending_total }}</span>{% endif %}</a>{% endfor %}
+</nav>

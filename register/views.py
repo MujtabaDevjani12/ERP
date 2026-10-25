@@ -1,10 +1,11 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.db.models import Count, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from core.decorators import needs_any_perm
 from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import ListView
 
@@ -35,7 +36,7 @@ def _is_ajax(request):
 
 
 # ---------------------------------------------------------------- counter selection + open / resume
-@login_required
+@needs_any_perm('sales.add_sale', 'register.view_registersession', 'register.add_registersession')
 def register_open_view(request):
     """Counter selection screen. Each counter card either opens a new shift, or - when it already has an open shift -
     lets the right person continue it (so a logout / closed tab never strands a shift)."""
@@ -81,7 +82,7 @@ def register_open_view(request):
 
 
 # ---------------------------------------------------------------- close register
-@login_required
+@needs_any_perm('sales.add_sale', 'register.view_registersession', json=True)
 @require_GET
 def register_summary_api(request):
     session = get_active_session(request)
@@ -90,7 +91,7 @@ def register_summary_api(request):
     return JsonResponse({"ok": True, "summary": services.jsonable(services.session_summary(session))})
 
 
-@login_required
+@needs_any_perm('sales.add_sale', 'register.view_registersession', 'register.change_registersession')
 def register_close_view(request):
     session = get_active_session(request)
     if not session:
@@ -121,10 +122,11 @@ def register_close_view(request):
 
 
 # ---------------------------------------------------------------- shift history
-class RegisterSessionListView(PagedListMixin, LoginRequiredMixin, ListView):
+class RegisterSessionListView(PagedListMixin, LoginRequiredMixin, PermissionRequiredMixin, ListView):
     """Server-side filters / pagination."""
     filter_params = ("status", "register")
     model = RegisterSession
+    permission_required = "register.view_registersession"
     template_name = "dashboard/register_session_list.html"
     context_object_name = "sessions"
 
@@ -143,7 +145,7 @@ class RegisterSessionListView(PagedListMixin, LoginRequiredMixin, ListView):
         return ctx
 
 
-@login_required
+@needs_any_perm('register.view_registersession')
 def register_session_detail(request, pk):
     session = get_object_or_404(RegisterSession.objects.select_related("register", "opened_by", "closed_by"),
                                 pk=pk, register__store=request.store)

@@ -1,4 +1,6 @@
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.auth.decorators import login_required, permission_required
 from django.db import transaction
 from django.db.models import Q
@@ -15,10 +17,11 @@ from .models import PurchaseOrder, Supplier
 
 
 # ---------------------------------------------------------------- Supplier
-class SupplierListView(PagedListMixin, ListView):
+class SupplierListView(LoginRequiredMixin, PermissionRequiredMixin, PagedListMixin, ListView):
     """Server-side search / status filter / pagination."""
     filter_params = ("q", "status", "city")
     model = Supplier
+    permission_required = "suppliers.view_supplier"
     template_name = "suppliers/supplier_list.html"
     context_object_name = "suppliers"
 
@@ -73,10 +76,11 @@ class SupplierDeleteView(StoreCrudMixin, DeleteContextMixin, DeleteView):
 
 
 # ---------------------------------------------------------------- Purchase order
-class PurchaseOrderListView(PagedListMixin, ListView):
+class PurchaseOrderListView(LoginRequiredMixin, PermissionRequiredMixin, PagedListMixin, ListView):
     """Server-side search / status filter / pagination."""
     filter_params = ("q", "status", "pay", "warehouse", "df", "dt")
     model = PurchaseOrder
+    permission_required = "suppliers.view_purchaseorder"
     template_name = "suppliers/purchase_order_list.html"
     context_object_name = "orders"
 
@@ -239,7 +243,10 @@ def _receive_stock(purchase_order: PurchaseOrder, user=None):
 @permission_required("suppliers.view_purchaseorder", raise_exception=True)
 def purchase_order_detail(request, pk):
     order = get_object_or_404(PurchaseOrder, pk=pk, warehouse__store=request.store)
+    can_pay = request.user.has_perm("suppliers.add_purchasepayment")
     if request.method == "POST":
+        if not can_pay:                                        # viewing an order does not let you record money against it
+            raise PermissionDenied
         form = PurchasePaymentForm(request.POST)
         if form.is_valid():
             payment = form.save(commit=False)
@@ -258,7 +265,7 @@ def purchase_order_detail(request, pk):
     due = order.due_amount
     erp_managed = _managed_by_erp(order)
     return render(request, "suppliers/purchase_order_detail.html", {
-        "order": order, "payment_form": form, "returns": returns, "returned": order.returned_amount, "erp_managed": erp_managed,
+        "order": order, "payment_form": form, "can_pay": can_pay, "returns": returns, "returned": order.returned_amount, "erp_managed": erp_managed,
         "due_label": "Due" if due >= 0 else "Supplier owes you", "due_abs": abs(due),
         "can_return": order.status == "received" and not erp_managed and request.user.has_perm("suppliers.add_purchasereturn")
                       and any(l["can_send"] > 0 for l in pr.return_lines(order))})

@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% load ui billing_tags %}
+{% block title %}Invoices{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="page-header"><div class="min-w-0"><h1 class="page-title">Invoices <span class="ui-badge ui-badge-neutral no-dot" style="vertical-align:middle;margin-left:6px">{{ page.paginator.count }}</span></h1><p class="page-subtitle">Everything you have billed. Paid in this list: <b>{{ paid_total|price }}</b></p></div></div>
+  {% include "billing/platform/_nav.html" with active="invoices" %}
+  <form method="get" class="ui-toolbar">
+    <div class="ui-search"><label class="ui-label" for="i-q">Search</label>{% icon "search" "w-4 h-4" %}<input type="search" id="i-q" name="q" value="{{ q }}" placeholder="Invoice number or company" autocomplete="off"></div>
+    <div style="min-width:10rem"><label class="ui-label" for="i-s">Status</label><select id="i-s" name="status"><option value="">All</option>{% for key, label in statuses %}<option value="{{ key }}" {% if status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+    <div class="flex gap-2"><button class="ui-btn ui-btn-primary" type="submit">{% icon "filter" "w-4 h-4" %}<span>Apply</span></button>{% if q or status %}<a class="ui-btn ui-btn-secondary" href="{% url 'platform:invoices' %}">Reset</a>{% endif %}</div>
+  </form>
+  {% if page.object_list %}
+  <div class="ui-table-wrap"><table class="ui-table ui-table-cards">
+    <thead><tr><th>Invoice</th><th>Company</th><th>Plan</th><th>Status</th><th class="num">Total</th><th class="col-actions"><span class="sr-only">Actions</span></th></tr></thead>
+    <tbody>{% for inv in page.object_list %}
+      <tr>
+        <td data-label="Invoice"><div class="ui-cell-title">{{ inv.number }}</div><div class="ui-cell-sub">{{ inv.issued_at|date:"d M Y" }}</div></td>
+        <td data-label="Company"><a class="erp-link" href="{% url 'platform:company_detail' inv.company_id %}">{{ inv.company.name }}</a></td>
+        <td data-label="Plan">{{ inv.plan_name }} <span class="ui-muted">({{ inv.get_interval_display }})</span></td>
+        <td data-label="Status">{% if inv.status == "paid" %}{% badge "paid" label="Paid" %}{% elif inv.status == "void" %}{% badge "void" label="Cancelled" tone="neutral" %}{% elif inv.is_overdue %}{% badge "overdue" label="Overdue" tone="danger" %}{% else %}{% badge "open" label="Unpaid" tone="warning" %}{% endif %}</td>
+        <td data-label="Total" class="num"><strong>{{ inv.total|price:inv.currency }}</strong></td>
+        <td class="col-actions"><div class="ui-row-actions"><a class="icon-btn" href="{% url 'billing:invoice' inv.pk %}" target="_blank" rel="noopener" aria-label="Print {{ inv.number }}">{% icon "printer" "w-4 h-4" %}</a></div></td>
+      </tr>{% endfor %}</tbody></table></div>
+  {% ui "pagination" page_obj=page %}
+  {% else %}<div class="ui-card">{% ui "empty_state" icon="receipt" title="No invoices" %}</div>{% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,177 @@
+{% extends "base.html" %}{% load ui billing_tags %}
+{% block title %}Billing{% endblock %}
+{% block content %}
+{% with plan=subscription.plan %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0">
+      <h1 class="page-title">Billing and subscription</h1>
+      <p class="page-subtitle">Your plan, what you have used, invoices month by month and how to pay.</p>
+    </div>
+    <div class="page-actions"><span class="ui-badge ui-badge-{{ state|state_tone }}">{{ state|state_label }}</span></div>
+  </div>
+
+  {% if state == "pending" %}
+    {% ui "alert" tone="info" title="One step left: pay to open your ERP" message="Your account is ready. Pay the invoice below, or pick a different plan first. Card payments open the ERP at once; for bank, JazzCash or Easypaisa it opens as soon as we confirm your receipt." %}
+  {% elif state == "suspended" %}
+    {% ui "alert" tone="danger" title="Your account is suspended" message="Please contact support to get it switched on again." %}
+    {% if subscription.suspended_reason %}<p class="bp-muted">Reason: {{ subscription.suspended_reason }}</p>{% endif %}
+  {% elif state == "expired" %}
+    {% ui "alert" tone="danger" title="Your account is locked" message="Pay the open invoice below to unlock everything. Your data is safe and nothing is deleted." %}
+  {% elif state == "grace" %}
+    {% ui "alert" tone="warning" title="Payment overdue" message="Please pay the open invoice to avoid your account being locked." %}
+  {% endif %}
+
+  <div class="bp-status">
+    <section class="ui-card">
+      <div class="ui-card-body" style="display:grid;gap:14px">
+        <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start">
+          <div><div class="bp-muted">{% if state == "pending" %}Plan you chose{% else %}Current plan{% endif %}</div><div class="bp-big">{{ plan.name }}</div>
+            <div class="bp-muted">{{ subscription.get_interval_display }} billing &middot; {{ subscription.price|price:plan.currency }} per {% if subscription.interval == "yearly" %}year{% else %}month{% endif %}</div></div>
+          <div style="text-align:right">
+            {% if state == "pending" %}<div class="bp-muted">Status</div>
+            {% elif state == "trial" %}<div class="bp-muted">Free demo ends</div>
+            {% elif subscription.cancel_at_period_end %}<div class="bp-muted">Access ends</div>
+            {% elif state == "active" %}<div class="bp-muted">Renews on</div>
+            {% else %}<div class="bp-muted">Ended on</div>{% endif %}
+            <div class="bp-big" style="font-size:20px">{% if state == "pending" %}Not active yet{% else %}{{ subscription.paid_until|date:"d M Y" }}{% endif %}</div>
+            {% if days_left is not None and state != "pending" %}<div class="bp-muted">{% if days_left >= 0 %}{{ days_left }} day{{ days_left|pluralize }} left{% else %}{{ days_left|cut:"-" }} day{{ days_left|cut:"-"|pluralize }} ago{% endif %}</div>{% endif %}
+          </div>
+        </div>
+        <div class="bp-chips">{% for label in module_labels %}<span class="ui-badge ui-badge-brand no-dot">{{ label }}</span>{% endfor %}</div>
+        {% if can_change %}
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          {% if subscription.cancel_at_period_end %}
+            <form method="post" action="{% url 'billing:cancel' %}">{% csrf_token %}<input type="hidden" name="action" value="resume"><button class="ui-btn ui-btn-primary ui-btn-sm" type="submit">{% icon "refresh" "w-4 h-4" %}<span>Keep my plan (turn renewal back on)</span></button></form>
+          {% elif state == "active" or state == "trial" %}
+            <form method="post" action="{% url 'billing:cancel' %}" onsubmit="return confirm('Stop renewing? You keep access until the end of the paid period.')">{% csrf_token %}<button class="ui-btn ui-btn-ghost ui-btn-sm" type="submit">Do not renew</button></form>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="ui-card">
+      <div class="ui-card-header"><div class="ui-card-title">Usage</div></div>
+      <div class="ui-card-body bp-usage">
+        {% for r in limits %}
+        <div class="row">
+          <div class="top"><span>{{ r.label }}</span><span><b>{{ r.used }}</b>{% if r.unlimited %} &middot; unlimited{% else %} of {{ r.limit }}{% endif %}</span></div>
+          <div class="bp-meter {% if r.reached %}full{% elif r.percent >= 80 %}warn{% endif %}" role="img" aria-label="{{ r.label }} {{ r.percent }}% used"><i style="width:{% if r.unlimited %}6{% else %}{{ r.percent }}{% endif %}%"></i></div>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+
+  {% if open_invoice %}
+  <section class="ui-card" id="pay">
+    <div class="ui-card-header">
+      <div><div class="ui-card-title">Pay invoice {{ open_invoice.number }}</div>
+        <div class="bp-muted">{{ open_invoice.plan_name }} &middot; {{ open_invoice.get_interval_display }}{% if open_invoice.due_at %} &middot; due {{ open_invoice.due_at|date:"d M Y" }}{% endif %}</div></div>
+      <div class="bp-big">{{ open_invoice.total|price:open_invoice.currency }}</div>
+    </div>
+    <div class="ui-card-body" style="display:grid;gap:16px">
+      {% if pending_payment %}
+        {% ui "alert" tone="info" title="We are checking your payment" message="We received your payment details. Your plan is activated as soon as we confirm it." %}
+      {% endif %}
+      {% if can_pay %}
+      <div class="bp-pay-grid">
+        {% if stripe_on %}
+        <div class="bp-pay-box">
+          <b>{% icon "credit-card" "w-4 h-4" %} Pay by card</b>
+          <p class="bp-muted">Secure checkout by Stripe. Your plan turns on right away.</p>
+          <form method="post" action="{% url 'billing:pay_stripe' open_invoice.pk %}">{% csrf_token %}<button type="submit" class="ui-btn ui-btn-primary">{% icon "lock" "w-4 h-4" %}<span>Pay {{ open_invoice.total|price:open_invoice.currency }} by card</span></button></form>
+        </div>
+        {% endif %}
+        {% if manual_on %}
+        <div class="bp-pay-box">
+          <b>{% icon "cash" "w-4 h-4" %} Bank transfer, JazzCash or Easypaisa</b>
+          {% if settings_obj.bank_details %}<div><div class="bp-muted">Bank account</div><div class="bp-pre">{{ settings_obj.bank_details }}</div></div>{% endif %}
+          {% if settings_obj.jazzcash_number %}<div><div class="bp-muted">JazzCash</div><div class="bp-pre">{{ settings_obj.jazzcash_number }}</div></div>{% endif %}
+          {% if settings_obj.easypaisa_number %}<div><div class="bp-muted">Easypaisa</div><div class="bp-pre">{{ settings_obj.easypaisa_number }}</div></div>{% endif %}
+          {% if settings_obj.payment_instructions %}<p class="bp-muted" style="white-space:pre-line">{{ settings_obj.payment_instructions }}</p>{% endif %}
+          <p class="bp-muted">Send exactly <b>{{ open_invoice.total|price:open_invoice.currency }}</b> and put <b>{{ open_invoice.number }}</b> in the note. Then tell us below.</p>
+          <form method="post" enctype="multipart/form-data" action="{% url 'billing:pay_manual' open_invoice.pk %}" style="display:grid;gap:10px">
+            {% csrf_token %}
+            {% ui "field" field=payment_form.method %}
+            {% ui "field" field=payment_form.reference %}
+            {% ui "field" field=payment_form.proof %}
+            {% ui "field" field=payment_form.note %}
+            <button type="submit" class="ui-btn ui-btn-secondary">{% icon "upload" "w-4 h-4" %}<span>I have paid - send receipt</span></button>
+          </form>
+        </div>
+        {% endif %}
+        {% if not stripe_on and not manual_on %}<p class="bp-muted">Online payment is not set up yet. Please contact {{ settings_obj.support_email|default:"support" }}.</p>{% endif %}
+      </div>
+      {% else %}
+        <p class="bp-muted">Ask the person who manages billing for your company to pay this invoice.</p>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if can_change and plans %}
+  <section class="ui-card" id="plans">
+    <div class="ui-card-header"><div class="ui-card-title">{% if state == "pending" %}Choose your plan{% else %}Change plan{% endif %}</div><span class="bp-muted">{% if state == "pending" %}Pick the plan and period that fits you. You pay its invoice next.{% else %}The new plan starts after you pay its invoice.{% endif %}</span></div>
+    <div class="ui-card-body">
+      <div class="bp-plans">
+        {% for p in plans %}
+        <div class="bp-plan{% if p.pk == plan.pk %} is-picked{% endif %}">
+          <div><h3>{{ p.name }}{% if p.pk == plan.pk %} <span class="ui-badge ui-badge-brand no-dot">Current</span>{% endif %}</h3><p class="tag">{{ p.tagline }}</p></div>
+          <ul class="bp-list">
+            {% for line in p.limit_lines %}<li>{% icon "check" "w-4 h-4" %}<span>{{ line }}</span></li>{% endfor %}
+            <li>{% icon "check" "w-4 h-4" %}<span>{{ p.module_labels|join:", " }}</span></li>
+          </ul>
+          <form method="post" action="{% url 'billing:change_plan' %}" class="bp-cta" style="display:grid;gap:8px">
+            {% csrf_token %}<input type="hidden" name="plan" value="{{ p.pk }}">
+            <button class="ui-btn ui-btn-secondary" type="submit" name="interval" value="monthly">{{ p.price_monthly|price:p.currency }} / month</button>
+            <button class="ui-btn ui-btn-primary" type="submit" name="interval" value="yearly">{{ p.price_yearly|price:p.currency }} / year{% if p.yearly_saving_percent %} (save {{ p.yearly_saving_percent }}%){% endif %}</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="ui-card">
+    <div class="ui-card-header"><div class="ui-card-title">Invoice history</div><span class="bp-muted">Total paid: <b>{{ total_paid|price:plan.currency }}</b></span></div>
+    <div class="ui-card-body">
+      {% for m in months %}
+      <div class="bp-month">
+        <header><b>{{ m.label }}</b><div class="bp-chips"><span class="ui-badge ui-badge-success no-dot">Paid {{ m.paid|price:plan.currency }}</span>{% if m.due %}<span class="ui-badge ui-badge-warning no-dot">Unpaid {{ m.due|price:plan.currency }}</span>{% endif %}</div></header>
+        <div class="ui-table-wrap" style="border:0;box-shadow:none;border-radius:0">
+          <table class="ui-table ui-table-cards">
+            <thead><tr><th>Invoice</th><th>Plan</th><th>Period</th><th>Status</th><th class="num">Amount</th><th class="col-actions"><span class="sr-only">Actions</span></th></tr></thead>
+            <tbody>
+              {% for inv in m.invoices %}
+              <tr>
+                <td data-label="Invoice"><div class="ui-cell-title">{{ inv.number }}</div><div class="ui-cell-sub">{{ inv.issued_at|date:"d M Y" }} &middot; {{ inv.get_kind_display }}</div></td>
+                <td data-label="Plan">{{ inv.plan_name }} <span class="ui-muted">({{ inv.get_interval_display }})</span></td>
+                <td data-label="Period" class="ui-nowrap">{% if inv.period_start %}{{ inv.period_start|date:"d M Y" }} - {{ inv.period_end|date:"d M Y" }}{% else %}<span class="ui-muted">after payment</span>{% endif %}</td>
+                <td data-label="Status">{% if inv.status == "paid" %}{% badge "paid" label="Paid" %}{% elif inv.status == "void" %}{% badge "void" label="Cancelled" tone="neutral" %}{% elif inv.is_overdue %}{% badge "overdue" label="Overdue" tone="danger" %}{% else %}{% badge "open" label="Unpaid" tone="warning" %}{% endif %}
+                  {% for pay in inv.payments.all %}{% if pay.status == "pending" %}<div class="ui-cell-sub">Receipt being checked</div>{% elif pay.status == "rejected" %}<div class="ui-cell-sub" style="color:var(--ui-danger)">Payment rejected{% if pay.review_note %}: {{ pay.review_note }}{% endif %}</div>{% endif %}{% endfor %}</td>
+                <td data-label="Amount" class="num"><strong>{{ inv.total|price:inv.currency }}</strong>{% if inv.tax_amount %}<div class="ui-cell-sub">incl. tax {{ inv.tax_amount|price:inv.currency }}</div>{% endif %}</td>
+                <td class="col-actions"><div class="ui-row-actions"><a class="icon-btn" href="{% url 'billing:invoice' inv.pk %}" target="_blank" rel="noopener" data-tip="View / print" data-tip-pos="bottom" aria-label="View invoice {{ inv.number }}">{% icon "printer" "w-4 h-4" %}</a></div></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% empty %}
+      {% ui "empty_state" icon="receipt" title="No invoices yet" text="Your invoices appear here, month by month." %}
+      {% endfor %}
+    </div>
+  </section>
+
+  {% if events %}
+  <section class="ui-card">
+    <div class="ui-card-header"><div class="ui-card-title">Recent activity</div></div>
+    <div class="ui-card-body"><ul class="bp-list" style="gap:10px">{% for e in events %}<li>{% icon "clock" "w-4 h-4" %}<span>{{ e.message }} <span class="ui-muted">&middot; {{ e.created_at|date:"d M Y, H:i" }}</span></span></li>{% endfor %}</ul></div>
+  </section>
+  {% endif %}
+</div>
+{% endwith %}
+{% endblock %}

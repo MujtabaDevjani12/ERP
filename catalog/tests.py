@@ -1,12 +1,14 @@
 """Add/Edit product form and the barcode print page."""
 from decimal import Decimal
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
 from catalog.models import Category, Product, ProductVariant
 from core.pos_fixtures import PASSWORD, PosWorld, grant
 from inventory.models import StockItem
+from tenants.models import Store
 
 
 def variant_row(i, **kw):
@@ -184,7 +186,6 @@ class BarcodePageTests(TestCase):
         self.assertEqual(self.client.get(reverse("catalog:barcode_print")).status_code, 200)
 
     def test_store_isolation(self):
-        from tenants.models import Store
         other = Store.objects.create(name="Other", company=self.w.company)
         unit = self.w.unit.__class__.objects.create(store=other, name="Box", short_name="bx")
         p = Product.objects.create(store=other, unit=unit, name="Secret", sku="SEC")
@@ -309,6 +310,169 @@ class EditFormAndAttributeTests(TestCase):
         attr = ProductAttribute.objects.get()
         self.assertEqual(self.client.get(reverse("catalog:attribute_list")).status_code, 200)
         self.assertEqual(self.client.get(reverse("catalog:attribute_values", args=[attr.pk])).status_code, 200)
+
+
+class AttributeDeleteTests(TestCase):
+    def setUp(self):
+        self.w = PosWorld()
+        self.client.login(username="manager", password=PASSWORD)
+
+    make_attrs = EditFormAndAttributeTests.make_attrs
+
+    def test_unused_attribute_can_be_deleted_with_its_values(self):
+        from catalog.models import ProductAttribute, ProductAttributeValue
+        vals = self.make_attrs()
+        size = vals["S"].attribute
+        self.assertContains(self.client.get(reverse("catalog:attribute_list")), reverse("catalog:attribute_delete", args=[size.pk]))
+        page = self.client.get(reverse("catalog:attribute_delete", args=[size.pk]))
+        self.assertContains(page, "Delete")
+        r = self.client.post(reverse("catalog:attribute_delete", args=[size.pk]))
+        self.assertRedirects(r, reverse("catalog:attribute_list"))
+        self.assertFalse(ProductAttribute.objects.filter(pk=size.pk).exists())
+        self.assertFalse(ProductAttributeValue.objects.filter(pk=vals["S"].pk).exists())
+
+    def test_attribute_used_by_a_variant_cannot_be_deleted(self):
+        from catalog.models import ProductAttribute
+        vals = self.make_attrs()
+        self.w.tea.attribute_values.add(vals["M"])
+        size = vals["M"].attribute
+        r = self.client.post(reverse("catalog:attribute_delete", args=[size.pk]), follow=True)
+        self.assertTrue(ProductAttribute.objects.filter(pk=size.pk).exists())
+        self.assertContains(r, "cannot be deleted")
+        self.assertContains(self.client.get(reverse("catalog:attribute_delete", args=[size.pk])), "cannot be deleted yet")
+
+    def test_without_the_delete_permission_there_is_no_button_and_no_access(self):
+        from catalog.models import ProductAttribute
+        from core.pos_fixtures import grant
+        vals = self.make_attrs()
+        size = vals["S"].attribute
+        viewer = get_user_model().objects.create_user("viewer", "v@example.com", PASSWORD, store=self.w.store)
+        grant(viewer, "catalog.view_productattribute")
+        self.client.login(username="viewer", password=PASSWORD)
+        self.assertNotContains(self.client.get(reverse("catalog:attribute_list")), "/delete/")
+        self.assertEqual(self.client.post(reverse("catalog:attribute_delete", args=[size.pk])).status_code, 403)
+        self.assertTrue(ProductAttribute.objects.filter(pk=size.pk).exists())
+
+
+class CodesBulkDeleteAndEditorTests(TestCase):
+    """Category / brand codes, delete selected on the lists, product delete (single + bulk), force-delete of a used attribute and the description editor."""
+
+    def setUp(self):
+        self.w = PosWorld()
+        self.client.login(username="manager", password=PASSWORD)
+
+    def test_category_and_brand_get_a_code_and_codes_are_unique_per_store(self):
+        from catalog.models import Brand, Category
+        a = Category.objects.create(store=self.w.store, name="Grocery")
+        b = Category.objects.create(store=self.w.store, name="Groceries")
+        self.assertEqual((a.code, b.code), ("GRO-001", "GRO-002"))
+        self.assertEqual(Brand.objects.create(store=self.w.store, name="Nestle").code, "NES-001")
+        r = self.client.post(reverse("catalog:category_add"), {"name": "Dairy", "code": "gro-001", "is_active": "on"})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "already used")
+        self.assertRedirects(self.client.post(reverse("catalog:category_add"), {"name": "Dairy", "code": "dai-9", "is_active": "on"}), reverse("catalog:category_list"))
+        self.assertEqual(Category.objects.get(name="Dairy").code, "DAI-9")
+        self.assertRedirects(self.client.post(reverse("catalog:brand_add"), {"name": "Olpers", "code": ""}), reverse("catalog:brand_list"))
+        self.assertEqual(Brand.objects.get(name="Olpers").code, "OLP-001")
+        page = self.client.get(reverse("catalog:category_list"))
+        self.assertContains(page, "GRO-001")
+
+    def test_delete_selected_on_a_list_removes_only_the_ticked_rows(self):
+        from catalog.models import Category
+        keep = Category.objects.create(store=self.w.store, name="Keep me")
+        x = Category.objects.create(store=self.w.store, name="Old one")
+        y = Category.objects.create(store=self.w.store, name="Old two")
+        page = self.client.get(reverse("catalog:category_list"))
+        self.assertContains(page, "Delete selected")
+        r = self.client.post(reverse("catalog:category_list"), {"action": "bulk_delete", "ids": [x.pk, y.pk]}, follow=True)
+        self.assertContains(r, "Deleted 2 categories")
+        self.assertEqual(list(Category.objects.filter(store=self.w.store, pk__in=[keep.pk, x.pk, y.pk])), [keep])
+        self.assertContains(self.client.post(reverse("catalog:category_list"), {"action": "bulk_delete"}, follow=True), "Tick at least one")
+
+    def test_delete_selected_needs_the_delete_permission_and_stays_inside_the_store(self):
+        from catalog.models import Category
+        from core.pos_fixtures import grant
+        viewer = get_user_model().objects.create_user("viewer2", "v2@example.com", PASSWORD, store=self.w.store)
+        grant(viewer, "catalog.view_category")
+        c = Category.objects.create(store=self.w.store, name="Protected")
+        self.client.login(username="viewer2", password=PASSWORD)
+        self.assertEqual(self.client.post(reverse("catalog:category_list"), {"action": "bulk_delete", "ids": [c.pk]}).status_code, 403)
+        self.assertNotContains(self.client.get(reverse("catalog:category_list")), "Delete selected")
+        self.assertTrue(Category.objects.filter(pk=c.pk).exists())
+
+    def test_product_single_and_bulk_delete(self):
+        from unittest import mock
+        from django.db.models import ProtectedError
+        from catalog.models import Product
+        product = self.w.tea.product
+        page = self.client.get(reverse("catalog:product_list"))
+        self.assertContains(page, reverse("catalog:product_delete", args=[product.pk]))
+        self.assertContains(page, "Delete selected")
+        self.assertContains(self.client.get(reverse("catalog:product_delete", args=[product.pk])), "Delete this record")
+        self.assertRedirects(self.client.post(reverse("catalog:product_delete", args=[product.pk])), reverse("catalog:product_list"))
+        self.assertFalse(Product.objects.filter(pk=product.pk).exists())
+        self.assertContains(self.client.post(reverse("catalog:product_bulk_delete"), {}, follow=True), "Tick at least one")
+
+    def test_product_in_use_is_kept_with_a_clear_message(self):
+        from unittest import mock
+        from django.db.models import ProtectedError
+        from catalog.models import Product
+        product = self.w.tea.product
+        with mock.patch.object(Product, "delete", side_effect=ProtectedError("in use", [])):
+            r = self.client.post(reverse("catalog:product_delete", args=[product.pk]), follow=True)
+            self.assertContains(r, "cannot be deleted")
+            r = self.client.post(reverse("catalog:product_bulk_delete"), {"ids": [product.pk]}, follow=True)
+            self.assertContains(r, "could not be deleted")
+        self.assertTrue(Product.objects.filter(pk=product.pk).exists())
+
+    def test_product_delete_needs_permission(self):
+        from catalog.models import Product
+        from core.pos_fixtures import grant
+        viewer = get_user_model().objects.create_user("viewer3", "v3@example.com", PASSWORD, store=self.w.store)
+        grant(viewer, "catalog.view_product")
+        self.client.login(username="viewer3", password=PASSWORD)
+        pk = self.w.tea.product.pk
+        self.assertEqual(self.client.post(reverse("catalog:product_delete", args=[pk])).status_code, 403)
+        self.assertEqual(self.client.post(reverse("catalog:product_bulk_delete"), {"ids": [pk]}).status_code, 403)
+        self.assertNotContains(self.client.get(reverse("catalog:product_list")), "Delete selected")
+        self.assertTrue(Product.objects.filter(pk=pk).exists())
+
+    def test_used_attribute_can_be_force_deleted_and_bulk_delete_keeps_used_ones(self):
+        from catalog.models import ProductAttribute
+        vals = EditFormAndAttributeTests.make_attrs(self)
+        used = vals["M"].attribute
+        self.w.tea.attribute_values.add(vals["M"])
+        spare = ProductAttribute.objects.create(store=self.w.store, name="Spare")
+        page = self.client.get(reverse("catalog:attribute_list"))
+        self.assertContains(page, "Delete anyway")
+        self.assertContains(page, "used by 1 variant")
+        r = self.client.post(reverse("catalog:attribute_list"), {"action": "bulk_delete", "ids": [used.pk, spare.pk]}, follow=True)
+        self.assertTrue(ProductAttribute.objects.filter(pk=used.pk).exists())
+        self.assertFalse(ProductAttribute.objects.filter(pk=spare.pk).exists())
+        self.assertContains(r, "Kept")
+        r = self.client.post(reverse("catalog:attribute_delete", args=[used.pk]), {"force": "1"}, follow=True)
+        self.assertFalse(ProductAttribute.objects.filter(pk=used.pk).exists())
+        self.assertContains(r, "removed from 1 variant")
+        self.w.tea.refresh_from_db()
+        self.assertTrue(self.w.tea.pk)                                         # the variant itself is untouched
+
+    def test_description_editor_is_on_the_product_form_and_html_is_made_safe(self):
+        from core.richtext import plain_text, sanitize_html
+        page = self.client.get(reverse("catalog:product_add"))
+        self.assertContains(page, "data-rte")
+        self.assertContains(page, "richtext.js")
+        self.assertEqual(sanitize_html('<p onclick="x()">Hi <b>there</b><script>alert(1)</script></p>'), "<p>Hi <b>there</b></p>")
+        self.assertEqual(sanitize_html('<a href="javascript:alert(1)">x</a>'), "<a>x</a>")
+        self.assertIn('rel="noopener noreferrer"', sanitize_html('<a href="https://example.com">x</a>'))
+        self.assertEqual(sanitize_html("<div><br></div>"), "")
+        self.assertEqual(sanitize_html("Plain old text"), "Plain old text")
+        self.assertEqual(plain_text("<p>Hello <b>world</b></p><ul><li>one</li></ul>"), "Hello world one")
+
+    def test_saved_description_is_sanitised(self):
+        from catalog.forms import ProductForm
+        form = ProductForm(store=self.w.store)
+        form.cleaned_data = {"description": '<p>Nice <i>tea</i><img src=x onerror=alert(1)><script>bad()</script></p>'}
+        self.assertEqual(form.clean_description(), "<p>Nice <i>tea</i></p>")
 
 
 class PosQuickViewLookupTests(TestCase):

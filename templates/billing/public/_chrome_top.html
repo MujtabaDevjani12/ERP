@@ -1,0 +1,8 @@
+{% load ui %}
+<header class="bp-pub-top">
+  <a class="brand" href="{% url 'billing:plans' %}">{{ settings_obj.business_name|default:system_settings.site_name|default:"Multiple POS" }}</a>
+  <nav style="display:flex;gap:8px;align-items:center">
+    <a class="ui-btn ui-btn-ghost ui-btn-sm" href="{% url 'billing:plans' %}">Plans</a>
+    <a class="ui-btn ui-btn-secondary ui-btn-sm" href="{% url 'accounts:login' %}">Sign in</a>
+  </nav>
+</header>

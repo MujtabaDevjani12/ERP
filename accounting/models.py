@@ -270,3 +270,129 @@ class BudgetLine(models.Model):
     class Meta:
         ordering = ["budget", "account", "month_index"]
         constraints = [models.UniqueConstraint(fields=["budget", "account", "month_index"], name="uniq_budget_line")]
+
+
+# ---------------------------------------------------------------------------------------------- fiscal years
+class FiscalYear(TimeStampedModel):
+    """A named accounting year. Closing one locks the books through its last day (AccountingPeriodLock)."""
+    company = models.ForeignKey("company.Company", on_delete=models.CASCADE, related_name="fiscal_years")
+    name = models.CharField(max_length=40, help_text="e.g. FY 2026-27")
+    start_date = models.DateField()
+    end_date = models.DateField()
+    is_closed = models.BooleanField(default=False, editable=False)
+    closed_on = models.DateTimeField(null=True, blank=True, editable=False)
+    closed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+", editable=False)
+
+    class Meta:
+        ordering = ["company", "-start_date"]
+        constraints = [
+            models.UniqueConstraint(fields=["company", "name"], name="uniq_fiscal_year_name"),
+            models.CheckConstraint(check=models.Q(end_date__gt=models.F("start_date")), name="fiscal_year_dates_ordered"),
+        ]
+
+    def __str__(self):
+        return self.name
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.start_date and self.end_date and self.company_id:
+            if self.end_date <= self.start_date:
+                raise ValidationError("The end date must be after the start date.")
+            clash = FiscalYear.objects.filter(company_id=self.company_id, start_date__lte=self.end_date, end_date__gte=self.start_date)
+            if self.pk:
+                clash = clash.exclude(pk=self.pk)
+            if clash.exists():
+                raise ValidationError(f"These dates overlap {clash.first()}.")
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            was_closed = type(self).objects.filter(pk=self.pk).values_list("is_closed", flat=True).first()
+            if was_closed and self.is_closed:
+                old = type(self).objects.get(pk=self.pk)
+                if (old.start_date, old.end_date) != (self.start_date, self.end_date):
+                    raise ERPError("A closed fiscal year's dates cannot be changed. Reopen it first.")
+        super().save(*args, **kwargs)
+
+
+# ---------------------------------------------------------------------------------------------- cheques
+class Cheque(TimeStampedModel):
+    """Cheque register. Nothing is posted until the cheque CLEARS: then one balanced voucher moves the money
+    between the bank account's ledger account and the counter account (see accounting.cheques)."""
+    ISSUED, RECEIVED = "issued", "received"
+    TYPE_CHOICES = [(ISSUED, "Issued (we pay)"), (RECEIVED, "Received (we collect)")]
+    PENDING, CLEARED, BOUNCED, CANCELLED = "pending", "cleared", "bounced", "cancelled"
+    STATUS_CHOICES = [(PENDING, "Pending"), (CLEARED, "Cleared"), (BOUNCED, "Bounced / returned"), (CANCELLED, "Cancelled")]
+
+    company = models.ForeignKey("company.Company", on_delete=models.PROTECT, related_name="cheques")
+    cheque_type = models.CharField(max_length=10, choices=TYPE_CHOICES, default=ISSUED)
+    bank_account = models.ForeignKey(BankAccount, on_delete=models.PROTECT, related_name="cheques")
+    cheque_number = models.CharField(max_length=30)
+    party_name = models.CharField("Payee / drawer", max_length=150, help_text="Who we pay (issued) or who gave us the cheque (received).")
+    cheque_date = models.DateField(help_text="The date written on the cheque (a later date = post-dated cheque).")
+    amount = models.DecimalField(max_digits=16, decimal_places=2)
+    counter_account = models.ForeignKey(
+        Account, on_delete=models.PROTECT, related_name="+",
+        help_text="Issued: the account to debit (e.g. Accounts payable / an expense). Received: the account to credit (e.g. Accounts receivable).")
+    narration = models.CharField(max_length=255, blank=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=PENDING, db_index=True, editable=False)
+    cleared_on = models.DateField(null=True, blank=True, editable=False)
+    journal_entry = models.ForeignKey(JournalEntry, on_delete=models.PROTECT, null=True, blank=True, related_name="+", editable=False)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+", editable=False)
+
+    class Meta:
+        ordering = ["-cheque_date", "-id"]
+        constraints = [
+            models.CheckConstraint(check=models.Q(amount__gt=0), name="cheque_amount_positive"),
+            models.UniqueConstraint(fields=["bank_account", "cheque_type", "cheque_number"], name="uniq_cheque_number_per_bank"),
+        ]
+
+    def __str__(self):
+        return f"{self.get_cheque_type_display().split(' ')[0]} cheque {self.cheque_number}"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.bank_account_id and self.company_id and self.bank_account.company_id != self.company_id:
+            raise ValidationError("The bank account belongs to a different company.")
+        if self.counter_account_id and self.company_id and self.counter_account.company_id != self.company_id:
+            raise ValidationError("The counter account belongs to a different company.")
+
+
+# ---------------------------------------------------------------------------------------------- recurring journals
+class RecurringJournal(TimeStampedModel):
+    """A journal that repeats (rent, insurance, loan interest, monthly accruals ...). 'Generate due entries' posts
+    one real voucher for every period that has come due and moves the next date forward."""
+    MONTHLY, QUARTERLY, HALF_YEARLY, YEARLY = "monthly", "quarterly", "half_yearly", "yearly"
+    FREQUENCY_CHOICES = [(MONTHLY, "Every month"), (QUARTERLY, "Every 3 months"), (HALF_YEARLY, "Every 6 months"), (YEARLY, "Every year")]
+    MONTHS = {MONTHLY: 1, QUARTERLY: 3, HALF_YEARLY: 6, YEARLY: 12}
+
+    company = models.ForeignKey("company.Company", on_delete=models.CASCADE, related_name="recurring_journals")
+    name = models.CharField(max_length=120)
+    voucher_type = models.CharField(max_length=12, choices=JournalEntry.VOUCHER_CHOICES, default=JournalEntry.JV)
+    narration = models.CharField(max_length=255, blank=True)
+    frequency = models.CharField(max_length=12, choices=FREQUENCY_CHOICES, default=MONTHLY)
+    next_run_date = models.DateField(help_text="The date the next voucher will carry.")
+    end_date = models.DateField(null=True, blank=True, help_text="Leave blank to repeat until switched off.")
+    is_active = models.BooleanField(default=True)
+    last_run_date = models.DateField(null=True, blank=True, editable=False)
+
+    class Meta:
+        ordering = ["company", "name"]
+
+    def __str__(self):
+        return self.name
+
+
+class RecurringJournalLine(models.Model):
+    recurring = models.ForeignKey(RecurringJournal, on_delete=models.CASCADE, related_name="lines")
+    account = models.ForeignKey(Account, on_delete=models.PROTECT, related_name="+")
+    debit = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    credit = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    cost_center = models.ForeignKey(CostCenter, on_delete=models.PROTECT, null=True, blank=True, related_name="+")
+    description = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        ordering = ["id"]
+        constraints = [
+            models.CheckConstraint(check=models.Q(debit__gte=0) & models.Q(credit__gte=0), name="recurring_line_non_negative"),
+            models.CheckConstraint(check=models.Q(debit=0) | models.Q(credit=0), name="recurring_line_one_side_only"),
+        ]

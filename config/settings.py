@@ -55,6 +55,8 @@ LOCAL_APPS = [
     "documents",        # Invoice/email templates + send log (PDF/email/WhatsApp)
     "dashboard",        # server-rendered UI (POS screen, product pages, etc.)
     "reports",          # sales/purchase/stock reports + chart data, no models
+    "billing",          # SaaS, ERP side: sign-up, the company's own Billing page, plan limits, the lock until a plan is paid
+    "ownerconsole",     # SaaS, owner side: a SEPARATE site + database (plans, subscriptions, invoices, payments, gateways, e-mail)
 ]
 
 # ERP modules (accounting, stock ledger, procurement, production, wholesale, HR/payroll, POS upgrade, reports, API).
@@ -68,6 +70,10 @@ INSTALLED_APPS = DJANGO_APPS + LOCAL_APPS
 
 AUTH_USER_MODEL = "accounts.User"
 
+# Super Admins (is_superuser or the "Super Admin" role) pass every permission check;
+# everyone else is governed by their roles' permissions (Django's ModelBackend).
+AUTHENTICATION_BACKENDS = ["rbac.backends.SuperAdminBackend"]
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -79,6 +85,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "tenants.middleware.CurrentStoreMiddleware",   # attaches request.store
     "company.middleware.CurrentCompanyMiddleware", # attaches request.company
+    "billing.middleware.SubscriptionMiddleware",    # plan modules + expired/suspended lock (never touches the platform owner)
     "register.middleware.ActiveRegisterMiddleware",  # redirects POS to "open register" if none is open
 ]
 
@@ -104,6 +111,7 @@ TEMPLATES = [
 
 # The application shell (sidebar, notifications, command palette data) - see core/context_processors.py.
 TEMPLATES[0]["OPTIONS"]["context_processors"].append("core.context_processors.ui_shell")
+TEMPLATES[0]["OPTIONS"]["context_processors"].append("billing.context_processors.billing_shell")
 
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
@@ -118,6 +126,26 @@ DATABASES = {
         "NAME": BASE_DIR / "db.sqlite3",
     }
 }
+
+# --- Owner console: its own site, its own sign-in and its own database ---------
+# The ERP owner's console (plans, companies, payments, gateway keys, e-mail) is NOT part of the ERP. It lives in ownerconsole/ and
+# runs as a second site:  python manage.py runserver 8001 --settings=config.owner_settings
+# Its data sits in owner.sqlite3 (alias "owner"). OWNER_DB_SAME=True keeps it in the ERP database instead (the test-suite does this).
+import sys  # noqa: E402
+
+OWNER_DB_ALIAS = "default" if ("test" in sys.argv or os.environ.get("OWNER_DB_SAME", "False") == "True") else "owner"
+if OWNER_DB_ALIAS == "owner":
+    DATABASES["owner"] = {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": Path(os.environ.get("OWNER_DB_PATH", "")) if os.environ.get("OWNER_DB_PATH") else BASE_DIR / "owner.sqlite3",
+    }
+DATABASE_ROUTERS = ["ownerconsole.router.OwnerRouter"]
+OWNER_COOKIE_NAME = "owner_auth"                      # the signed sign-in cookie of the owner console
+OWNER_SESSION_HOURS = 12                              # sign-in lasts this long ...
+OWNER_REMEMBER_DAYS = 14                              # ... or this long with "Keep me signed in"
+OWNER_RESET_HOURS = 2                                 # forgot-password links
+OWNER_INVITE_HOURS = 48                               # links e-mailed to a new owner-team member
+OWNER_CONSOLE_URL = os.environ.get("OWNER_CONSOLE_URL", "http://127.0.0.1:8001")
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},

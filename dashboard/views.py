@@ -1,13 +1,14 @@
 import json
 from datetime import date, timedelta
 
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required
 from django.db.models import DecimalField, F, Sum
 from django.db.models.functions import TruncDate, TruncMonth
 from django.shortcuts import render
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 
+from core.ui_nav import plan_allows
 from expenses.models import Expense
 from payments.models import Payment
 from register.views import get_active_session
@@ -187,11 +188,16 @@ def home_view(request):
         ("Stock adjust", "inventory:quantity_adjustment", "inventory.add_stockadjustment", "archive"), ("Reports", "reports:dashboard", None, "chart"),
     ):
         url = _url(name)
-        if url and (perm is None or request.user.has_perm(perm)):
+        if url and (perm is None or request.user.has_perm(perm)) and plan_allows(request, "sales" if name == "dashboard:pos" else name.split(":")[0]):
             quick.append({"label": label, "url": url, "icon": icon})
 
     from customers.models import Customer
+    perm = request.user.has_perm
     context = {
+        "can_sales": perm("sales.view_sale") and plan_allows(request, "sales"),
+        "can_purchases": perm("suppliers.view_purchaseorder") and plan_allows(request, "suppliers"),
+        "can_expenses": perm("expenses.view_expense") and plan_allows(request, "expenses"),
+        "can_stock": perm("inventory.view_stockitem") and plan_allows(request, "inventory"),
         "today_total": today_total, "today_orders": today_orders,
         "today_change": _pct_change(today_total, yesterday_total),
         "pay_methods": pay_methods,
@@ -220,6 +226,7 @@ def home_view(request):
 
 
 @login_required
+@permission_required("sales.add_sale", raise_exception=True)
 def pos_view(request):
     """The billing screen. ActiveRegisterMiddleware guarantees an open register session exists by the time we get here.
     The cart itself is loaded by the page from the server (sales.pos_cart), so a refresh never loses it."""

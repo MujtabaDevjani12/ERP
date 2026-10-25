@@ -1,0 +1,36 @@
+{% extends "base.html" %}{% load ui billing_tags %}
+{% block title %}Plans{% endblock %}
+{% block content %}
+{% url 'platform:plan_add' as plan_add_url %}
+<div class="space-y-4">
+  <div class="page-header">
+    <div class="min-w-0"><h1 class="page-title">Plans</h1><p class="page-subtitle">What each plan includes and what it costs, monthly and yearly. Changes apply to new invoices; people already subscribed keep their current price until their next renewal.</p></div>
+    <div class="page-actions"><a class="ui-btn ui-btn-primary" href="{% url 'platform:plan_add' %}">{% icon "plus" "w-4 h-4" %}<span>New plan</span></a></div>
+  </div>
+  {% include "billing/platform/_nav.html" with active="plans" %}
+  {% if plans %}
+  <div class="bp-plans">
+    {% for plan in plans %}
+    <div class="bp-plan{% if plan.is_featured %} is-featured{% endif %}">
+      {% if plan.is_featured %}<span class="ribbon">Most popular</span>{% endif %}
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div><h3>{{ plan.name }}</h3><p class="tag">{{ plan.tagline }}</p></div>
+        <div class="bp-chips">{% if not plan.is_active %}<span class="ui-badge ui-badge-neutral no-dot">Off</span>{% elif not plan.is_public %}<span class="ui-badge ui-badge-info no-dot">Hidden</span>{% else %}<span class="ui-badge ui-badge-success no-dot">Live</span>{% endif %}</div></div>
+      <div class="bp-price"><b>{{ plan.price_monthly|price:plan.currency }}</b><small>/ month</small></div>
+      <div class="bp-muted" style="margin-top:-8px">{{ plan.price_yearly|price:plan.currency }} / year{% if plan.yearly_saving_percent %} &middot; saves {{ plan.yearly_saving_percent }}%{% endif %}</div>
+      <ul class="bp-list">
+        {% for line in plan.limit_lines %}<li>{% icon "check" "w-4 h-4" %}<span>{{ line }}</span></li>{% endfor %}
+        {% for label in plan.module_labels %}<li>{% icon "check" "w-4 h-4" %}<span>{{ label }}</span></li>{% endfor %}
+      </ul>
+      <div class="bp-muted">{{ plan.companies }} compan{{ plan.companies|pluralize:"y,ies" }} on this plan</div>
+      <div class="bp-cta" style="display:flex;gap:8px">
+        <a class="ui-btn ui-btn-secondary" href="{% url 'platform:plan_edit' plan.pk %}">{% icon "pencil" "w-4 h-4" %}<span>Edit</span></a>
+        <form method="post" action="{% url 'platform:plan_delete' plan.pk %}" onsubmit="return confirm('Remove {{ plan.name|escapejs }}? If companies use it, it will only be hidden.')">{% csrf_token %}<button class="ui-btn ui-btn-danger-soft" type="submit" aria-label="Delete {{ plan.name }}">{% icon "trash" "w-4 h-4" %}</button></form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="ui-card">{% ui "empty_state" icon="tag" title="No plans yet" text="Create your first plan, or run python manage.py seed_plans for Starter, Business and Enterprise." action_url=plan_add_url action_label="New plan" %}</div>
+  {% endif %}
+</div>
+{% endblock %}

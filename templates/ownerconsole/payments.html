@@ -1,0 +1,25 @@
+{% extends "ownerconsole/base.html" %}{% load owner_tags billing_tags %}
+{% block title %}Payments{% endblock %}
+{% block content %}
+<div class="oc-head"><div><h1>Payments</h1><p>Bank, JazzCash and Easypaisa receipts waiting for you to confirm, and card payments already received.</p></div></div>
+<section class="card">
+  <form method="get" class="toolbar"><div class="oc-field"><label for="p-s">Status</label><select id="p-s" name="status" onchange="this.form.submit()">{% for key, label in statuses %}<option value="{{ key }}" {% if status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div></form>
+  {% if page.object_list %}
+  <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Company</th><th>Invoice</th><th>Method</th><th>Reference</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead><tbody>
+    {% for p in page.object_list %}<tr>
+      <td><a href="{% url 'owner:company_detail' p.company_id %}"><b>{{ p.invoice.subscription.company_name }}</b></a><div class="sub">{{ p.created_at|date:"d M Y, H:i" }}{% if p.submitted_by_name %} &middot; {{ p.submitted_by_name }}{% endif %}</div></td>
+      <td>{{ p.invoice.number }}<div class="sub">{{ p.invoice.plan_name }} ({{ p.invoice.get_interval_display }})</div></td>
+      <td>{{ p.get_method_display }}</td>
+      <td>{{ p.reference|default:"-" }}{% if p.note %}<div class="sub">{{ p.note }}</div>{% endif %}{% if p.proof %}<div><a href="{% url 'owner:payment_proof' p.pk %}" target="_blank" rel="noopener">View receipt</a></div>{% endif %}</td>
+      <td class="num"><b>{{ p.amount|price:p.invoice.currency }}</b></td>
+      <td>{% if p.status == "succeeded" %}<span class="badge success">Received</span>{% elif p.status == "pending" %}<span class="badge warning">Waiting</span>{% else %}<span class="badge danger">{{ p.get_status_display }}</span>{% endif %}{% if p.review_note %}<div class="sub">{{ p.review_note }}</div>{% endif %}{% if p.reviewed_by %}<div class="sub">by {{ p.reviewed_by.name }}</div>{% endif %}</td>
+      <td>{% if p.status == "pending" and p.method != "stripe" %}
+        <form method="post" action="{% url 'owner:payment_review' p.pk %}" class="row" style="gap:6px;flex-wrap:nowrap">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <input type="text" name="note" class="oc-input" placeholder="Reason if rejecting" maxlength="200" style="width:11rem" aria-label="Reason if rejecting">
+          <button class="btn primary sm" type="submit" name="action" value="approve">Approve</button>
+          <button class="btn danger sm" type="submit" name="action" value="reject">Reject</button></form>{% endif %}</td>
+    </tr>{% endfor %}</tbody></table></div>
+  {% include "ownerconsole/_pager.html" %}
+  {% else %}<div class="empty">{% oicon "cash" %}<b>No payments here</b><span>Nothing with this status.</span></div>{% endif %}
+</section>
+{% endblock %}

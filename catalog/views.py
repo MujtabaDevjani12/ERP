@@ -1,27 +1,31 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.db.models import Count, F, Max, Min, Q, Sum
 from django.db.models import DecimalField, Value
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
+from core.decorators import needs_any_perm
+from django.core.exceptions import PermissionDenied
 from django.views.generic import CreateView, ListView, UpdateView, DeleteView
 
 from core.listing import PagedListMixin
 from core.mixins import DeleteContextMixin, SimpleListMixin, StoreCrudMixin, StoreScopedMixin
 from .forms import AttributeValueFormSet, BrandForm, CategoryForm, ProductAttributeForm, ProductForm, UnitForm, VariantFormSet, VariantFormSetEdit
+from core.richtext import plain_text
 from . import barcodes
 from .models import Brand, Category, ComboItem, Product, ProductAttribute, ProductVariant, Unit
 
 
 # ---------------------------------------------------------------- Product
-class ProductListView(PagedListMixin, LoginRequiredMixin, ListView):
+class ProductListView(PagedListMixin, LoginRequiredMixin, PermissionRequiredMixin, ListView):
     """Server-side search / filters / pagination. total_stock/min_price/max_price are annotated here (one query)
     instead of being computed per-row in the template, which would N+1."""
     filter_params = ("q", "category", "brand", "status", "stock")
     model = Product
+    permission_required = "catalog.view_product"
     template_name = "catalog/product_list.html"
     context_object_name = "products"
 
@@ -177,6 +181,14 @@ def product_form(request, pk=None):
     store = request.store
     instance = get_object_or_404(Product, pk=pk, store=store) if pk else None
     was_variant = bool(instance and instance.product_type == "variant")     # read before the form touches the instance
+    if instance is None:                                                    # plan limit: products
+        from billing.access import is_platform_owner, limit_reached
+        company = getattr(request, "company", None)
+        if company is not None and not is_platform_owner(request.user):
+            reached, why = limit_reached(company, "products")
+            if reached:
+                messages.error(request, why)
+                return redirect("catalog:product_list")
 
     if request.method == "POST":
         form = ProductForm(request.POST, request.FILES, instance=instance, store=store)
@@ -263,7 +275,7 @@ def product_form(request, pk=None):
     })
 
 
-@login_required
+@needs_any_perm('catalog.view_product')
 def variant_barcode_png(request, pk):
     from core.utils import generate_barcode_png
     variant = get_object_or_404(ProductVariant.objects.select_related("product"), pk=pk, product__store=request.store)
@@ -274,7 +286,7 @@ def variant_barcode_png(request, pk):
     return HttpResponse(png, content_type="image/png")
 
 
-@login_required
+@needs_any_perm('sales.add_sale', 'catalog.view_product', 'inventory.view_stockitem', json=True)
 def variant_lookup(request):
     """Used by the POS screen and the quantity-adjustment scanner: type or
     scan a barcode/SKU/name to search, and/or pass a category to filter —
@@ -367,10 +379,60 @@ def variant_lookup(request):
             "variant": "" if v.name.strip().lower() == "default" else v.name,
             "category": v.product.category.name if v.product.category_id else "",
             "brand": v.product.brand.name if v.product.brand_id else "",
-            "description": (v.product.description or "")[:240],
+            "description": plain_text(v.product.description, 240),
             "attrs": [{"name": av.attribute.name, "value": av.value} for av in sorted(v.attribute_values.all(), key=lambda a: a.attribute.name)],
         })
     return JsonResponse({"results": results})
+
+
+def _delete_product(request, product):
+    """Delete one product (with its variants / pictures). A product that sales, purchases or stock moves refer to is kept."""
+    from django.db import IntegrityError, transaction
+    from django.db.models import ProtectedError
+    try:
+        with transaction.atomic():
+            product.delete()
+        return True
+    except (ProtectedError, IntegrityError):
+        return False
+
+
+@login_required
+@permission_required("catalog.delete_product", raise_exception=True)
+def product_delete(request, pk):
+    product = get_object_or_404(Product, pk=pk, store=request.store)
+    if request.method == "POST":
+        name = product.name
+        if _delete_product(request, product):
+            messages.success(request, f"“{name}” was deleted.")
+        else:
+            messages.error(request, f"“{name}” cannot be deleted because sales, purchases or stock movements use it. Mark it inactive instead.")
+        return redirect("catalog:product_list")
+    return render(request, "partials/confirm_delete.html", {"object": product, "success_url": reverse("catalog:product_list"),
+                                                             "warning": "Products that were already sold or bought are refused - make them inactive instead."})
+
+
+@login_required
+@permission_required("catalog.delete_product", raise_exception=True)
+def product_bulk_delete(request):
+    if request.method != "POST":
+        return redirect("catalog:product_list")
+    ids = [i for i in request.POST.getlist("ids") if i.isdigit()]
+    if not ids:
+        messages.warning(request, "Tick at least one product first.")
+        return redirect("catalog:product_list")
+    deleted, kept = 0, []
+    for product in Product.objects.filter(store=request.store, pk__in=ids):
+        if _delete_product(request, product):
+            deleted += 1
+        else:
+            kept.append(product.name)
+    if deleted:
+        messages.success(request, f"Deleted {deleted} product{'s' if deleted != 1 else ''}.")
+    if kept:
+        shown = ", ".join(kept[:5]) + (f" and {len(kept) - 5} more" if len(kept) > 5 else "")
+        messages.error(request, f"{len(kept)} product{'s' if len(kept) != 1 else ''} could not be deleted because sales, purchases or stock movements use them (mark them inactive instead): {shown}.")
+    return redirect("catalog:product_list")
 
 
 # ---------------------------------------------------------------- Category / Brand / Unit
@@ -441,6 +503,11 @@ class BrandCreateView(StoreCrudMixin, CreateView):
     success_url = reverse_lazy("catalog:brand_list")
     permission_required = "catalog.add_brand"
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["store"] = self.request.store
+        return kwargs
+
     def get_context_data(self, **kwargs):
         return super().get_context_data(title="Add brand", back_url=self.success_url, **kwargs)
 
@@ -451,6 +518,11 @@ class BrandUpdateView(StoreCrudMixin, UpdateView):
     template_name = "partials/simple_form.html"
     success_url = reverse_lazy("catalog:brand_list")
     permission_required = "catalog.change_brand"
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["store"] = self.request.store
+        return kwargs
 
     def get_context_data(self, **kwargs):
         return super().get_context_data(title="Edit brand", back_url=self.success_url, **kwargs)
@@ -523,13 +595,33 @@ def _add_values(attribute, values):
     return made
 
 
-@login_required
-@permission_required("catalog.add_productattribute", raise_exception=True)
+@needs_any_perm("catalog.view_productattribute", "catalog.add_productattribute")
 def attribute_list(request):
     """Attributes are the questions a variant answers (Size, Color, Karat); each has its values (S, M, L). Both are added here:
     type the name and, optionally, its values separated by commas."""
     store = request.store
+    can_add = request.user.has_perm("catalog.add_productattribute")
+    if request.method == "POST" and request.POST.get("action") == "bulk_delete":
+        if not request.user.has_perm("catalog.delete_productattribute"):
+            raise PermissionDenied
+        ids = [i for i in request.POST.getlist("ids") if i.isdigit()]
+        deleted, kept = 0, []
+        for attr in ProductAttribute.objects.filter(store=store, pk__in=ids):
+            if ProductVariant.objects.filter(attribute_values__attribute=attr).exists():
+                kept.append(attr.name)
+            else:
+                attr.delete()
+                deleted += 1
+        if not ids:
+            messages.warning(request, "Tick at least one attribute first.")
+        if deleted:
+            messages.success(request, f"Deleted {deleted} attribute{'s' if deleted != 1 else ''}.")
+        if kept:
+            messages.error(request, f"Kept {', '.join(kept)} because variants use them. Delete one by one with “Delete anyway” if you really want it gone.")
+        return redirect("catalog:attribute_list")
     if request.method == "POST":
+        if not can_add:                                          # viewing the list does not allow creating
+            raise PermissionDenied
         form = ProductAttributeForm(request.POST)
         if form.is_valid():
             name = form.cleaned_data["name"].strip()
@@ -545,8 +637,35 @@ def attribute_list(request):
                 return redirect("catalog:attribute_list" if made else "catalog:attribute_values", **({} if made else {"pk": attr.pk}))
     else:
         form = ProductAttributeForm()
-    attributes = ProductAttribute.objects.filter(store=store).prefetch_related("values")
-    return render(request, "catalog/attribute_list.html", {"attributes": attributes, "form": form, "typed_values": request.POST.get("values", "")})
+    attributes = list(ProductAttribute.objects.filter(store=store).prefetch_related("values"))
+    for attr in attributes:                                      # how many variants use it (a delete then asks for a stronger "delete anyway")
+        attr.in_use = ProductVariant.objects.filter(attribute_values__attribute=attr).distinct().count()
+    return render(request, "catalog/attribute_list.html", {"attributes": attributes, "form": form, "can_add": can_add,
+                                                                     "can_change": request.user.has_perm("catalog.change_productattribute"),
+                                                                     "can_delete": request.user.has_perm("catalog.delete_productattribute"),
+                                                                     "typed_values": request.POST.get("values", "")})
+
+
+@login_required
+@permission_required("catalog.delete_productattribute", raise_exception=True)
+def attribute_delete(request, pk):
+    """Delete an attribute together with its values. Refused while any product variant still uses one of its values, so no variant
+    silently loses its Size / Color."""
+    attribute = get_object_or_404(ProductAttribute, pk=pk, store=request.store)
+    in_use = ProductVariant.objects.filter(attribute_values__attribute=attribute).distinct().count()
+    back = reverse("catalog:attribute_list")
+    if request.method == "POST":
+        if in_use and not request.POST.get("force"):
+            messages.error(request, f"“{attribute.name}” is used by {in_use} variant{'s' if in_use != 1 else ''}, so it cannot be deleted. "
+                                    "Remove it from those variants first, or choose “Delete anyway”.")
+            return redirect(back)
+        name = attribute.name
+        attribute.delete()                                       # only the Size / Color tags on variants go; variant names, stock and sales stay
+        messages.success(request, f"Attribute “{name}” deleted" + (f" and removed from {in_use} variant{'s' if in_use != 1 else ''}." if in_use else "."))
+        return redirect(back)
+    warning = (f"{in_use} variant{'s' if in_use != 1 else ''} use{'s' if in_use == 1 else ''} this attribute, so it cannot be deleted yet."
+               if in_use else f"Its {attribute.values.count()} value(s) will be deleted too.")
+    return render(request, "partials/confirm_delete.html", {"object": attribute, "success_url": back, "warning": warning})
 
 
 @login_required
@@ -565,4 +684,5 @@ def attribute_values(request, pk):
             return redirect("catalog:attribute_list")
     else:
         formset = AttributeValueFormSet(instance=attribute)
-    return render(request, "catalog/attribute_values.html", {"attribute": attribute, "formset": formset})
+    return render(request, "catalog/attribute_values.html", {"attribute": attribute, "formset": formset,
+                                                              "can_delete": request.user.has_perm("catalog.delete_productattribute")})

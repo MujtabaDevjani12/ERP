@@ -1,0 +1,31 @@
+{% extends "base.html" %}{% load ui billing_tags %}
+{% block title %}Payments{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="page-header"><div class="min-w-0"><h1 class="page-title">Payments</h1><p class="page-subtitle">Bank, JazzCash and Easypaisa receipts waiting for you to confirm, and card payments already received.</p></div></div>
+  {% include "billing/platform/_nav.html" with active="payments" %}
+  <form method="get" class="ui-toolbar">
+    <div style="min-width:11rem"><label class="ui-label" for="p-s">Status</label>
+      <select id="p-s" name="status" onchange="this.form.submit()">{% for key, label in statuses %}<option value="{{ key }}" {% if status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+  </form>
+  {% if page.object_list %}
+  <div class="ui-table-wrap"><table class="ui-table ui-table-cards">
+    <thead><tr><th>Company</th><th>Invoice</th><th>Method</th><th>Reference</th><th class="num">Amount</th><th>Status</th><th class="col-actions"><span class="sr-only">Actions</span></th></tr></thead>
+    <tbody>{% for p in page.object_list %}
+      <tr>
+        <td data-label="Company"><div class="ui-cell-title"><a class="erp-link" href="{% url 'platform:company_detail' p.company_id %}">{{ p.company.name }}</a></div><div class="ui-cell-sub">{{ p.created_at|date:"d M Y, H:i" }}{% if p.submitted_by %} &middot; {{ p.submitted_by.get_username }}{% endif %}</div></td>
+        <td data-label="Invoice">{{ p.invoice.number }}<div class="ui-cell-sub">{{ p.invoice.plan_name }} ({{ p.invoice.get_interval_display }})</div></td>
+        <td data-label="Method">{{ p.get_method_display }}</td>
+        <td data-label="Reference">{{ p.reference|default:"-" }}{% if p.note %}<div class="ui-cell-sub">{{ p.note }}</div>{% endif %}{% if p.proof %}<div><a class="erp-link" href="{{ p.proof.url }}" target="_blank" rel="noopener">View receipt</a></div>{% endif %}</td>
+        <td data-label="Amount" class="num"><strong>{{ p.amount|price:p.invoice.currency }}</strong></td>
+        <td data-label="Status">{% if p.status == "succeeded" %}{% badge "paid" label="Received" %}{% elif p.status == "pending" %}{% badge "pending" label="Waiting" tone="warning" %}{% else %}{% badge p.status label=p.get_status_display tone="danger" %}{% endif %}{% if p.review_note %}<div class="ui-cell-sub">{{ p.review_note }}</div>{% endif %}</td>
+        <td class="col-actions">{% if p.status == "pending" and p.method != "stripe" %}
+          <form method="post" action="{% url 'platform:payment_review' p.pk %}" class="ui-row-actions" style="gap:6px">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <input type="text" name="note" placeholder="Reason if rejecting" maxlength="200" style="width:11rem" aria-label="Reason if rejecting">
+            <button class="ui-btn ui-btn-primary ui-btn-sm" type="submit" name="action" value="approve">Approve</button>
+            <button class="ui-btn ui-btn-danger-soft ui-btn-sm" type="submit" name="action" value="reject">Reject</button></form>{% endif %}</td>
+      </tr>{% endfor %}</tbody></table></div>
+  {% ui "pagination" page_obj=page %}
+  {% else %}<div class="ui-card">{% ui "empty_state" icon="cash" title="No payments here" text="Nothing with this status." %}</div>{% endif %}
+</div>
+{% endblock %}

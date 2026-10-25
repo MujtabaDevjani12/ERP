@@ -1,0 +1,16 @@
+{% extends "ownerconsole/auth_base.html" %}{% load owner_tags %}
+{% block title %}Choose a new password{% endblock %}
+{% block card %}
+{% if invalid %}
+<div><h1>This link no longer works</h1><p class="lead muted">It was already used, it expired, or the account was switched off.</p></div>
+<a class="btn primary block" href="{% url 'owner:forgot' %}">Get a new link</a>
+{% else %}
+<div><h1>Choose a new password</h1><p class="lead muted">For {{ owner_email }}. Use at least 10 characters.</p></div>
+<form method="post" class="stack" novalidate>
+  {% csrf_token %}
+  {% include "ownerconsole/_field.html" with f=form.password1 %}
+  {% include "ownerconsole/_field.html" with f=form.password2 %}
+  <button class="btn primary lg block" type="submit">{% oicon "key" %}<span>Save password</span></button>
+</form>
+{% endif %}
+{% endblock %}

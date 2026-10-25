@@ -10,9 +10,13 @@
     </div>
     <div class="page-actions">
       <a class="ui-btn ui-btn-secondary" href="{% url 'accounts:staff_user_list' %}">{% icon "users" "w-4 h-4" %}<span class="hidden sm:inline">Staff users</span></a>
-      <a class="ui-btn ui-btn-primary" href="{{ add_url }}">{% icon "plus" "w-4 h-4" %}<span>New role</span></a>
+      {% if can_add %}<a class="ui-btn ui-btn-primary" href="{{ add_url }}">{% icon "plus" "w-4 h-4" %}<span>New role</span></a>{% endif %}
     </div>
   </div>
+  <form method="get" class="ui-toolbar">
+    <div class="ui-search"><label class="ui-label" for="r-q">Search</label>{% icon "search" "w-4 h-4" %}<input type="search" id="r-q" name="q" value="{{ q }}" placeholder="Role name" autocomplete="off"></div>
+    <div class="flex gap-2"><button type="submit" class="ui-btn ui-btn-primary">{% icon "filter" "w-4 h-4" %}<span>Apply</span></button>{% if q %}<a class="ui-btn ui-btn-secondary" href="{% url 'accounts:role_list' %}">Reset</a>{% endif %}</div>
+  </form>
   {% if roles %}
   <div class="ui-table-wrap">
     <table class="ui-table ui-table-cards">
@@ -20,12 +24,13 @@
       <tbody>
         {% for role in roles %}
         <tr class="is-clickable" data-href="{% url 'accounts:role_edit' role.pk %}">
-          <td data-label="Role"><div class="ui-cell"><span class="ui-avatar-sm">{% icon "shield" "w-4 h-4" %}</span><div class="ui-cell-title">{{ role.name }}</div></div></td>
-          <td data-label="Permissions" class="num">{{ role.permissions.count }}</td>
+          <td data-label="Role"><div class="ui-cell"><span class="ui-avatar-sm">{% icon "shield" "w-4 h-4" %}</span><div class="ui-cell-title">{{ role.name }}{% if role.name == super_role %} <span class="ui-badge ui-badge-info no-dot" style="margin-left:6px">Full access</span>{% endif %}</div></div></td>
+          <td data-label="Permissions" class="num">{% if role.name == super_role %}All ({{ total_permissions }}+){% else %}{{ role.perm_count }}{% endif %}</td>
           <td data-label="Users" class="num">{{ role.member_count }}</td>
           <td class="col-actions"><div class="ui-row-actions">
-            <a class="icon-btn" href="{% url 'accounts:role_edit' role.pk %}" data-tip="Edit role" data-tip-pos="bottom" aria-label="Edit role">{% icon "pencil" "w-4 h-4" %}</a>
-            <a class="icon-btn" href="{% url 'accounts:role_delete' role.pk %}" data-tip="Delete role" data-tip-pos="bottom" aria-label="Delete role" style="color:var(--ui-danger)">{% icon "trash" "w-4 h-4" %}</a>
+            {% if can_add and role.name != super_role %}<a class="icon-btn" href="{% url 'accounts:role_add' %}?copy={{ role.pk }}" data-tip="Duplicate role" data-tip-pos="bottom" aria-label="Duplicate role">{% icon "copy" "w-4 h-4" %}</a>{% endif %}
+            <a class="icon-btn" href="{% url 'accounts:role_edit' role.pk %}" data-tip="{% if role.name == super_role or not can_change %}View role{% else %}Edit role{% endif %}" data-tip-pos="bottom" aria-label="Edit role">{% icon "pencil" "w-4 h-4" %}</a>
+            {% if can_delete and role.name != super_role %}<a class="icon-btn" href="{% url 'accounts:role_delete' role.pk %}" data-tip="Delete role" data-tip-pos="bottom" aria-label="Delete role" style="color:var(--ui-danger)">{% icon "trash" "w-4 h-4" %}</a>{% endif %}
           </div></td>
         </tr>
         {% endfor %}
@@ -33,7 +38,7 @@
     </table>
   </div>
   {% else %}
-  <div class="ui-card">{% ui "empty_state" icon="shield" title="No roles yet" text="Create a role to start assigning permissions." action_url=add_url action_label="New role" %}</div>
+  <div class="ui-card">{% if q %}{% ui "empty_state" icon="search" title="No roles match your search" %}{% else %}{% ui "empty_state" icon="shield" title="No roles yet" text="Create a role to start assigning permissions." action_url=add_url action_label="New role" %}{% endif %}</div>
   {% endif %}
 </div>
 {% endblock %}

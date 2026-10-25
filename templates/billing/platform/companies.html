@@ -1,0 +1,29 @@
+{% extends "base.html" %}{% load ui billing_tags %}
+{% block title %}Companies{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="page-header"><div class="min-w-0"><h1 class="page-title">Companies <span class="ui-badge ui-badge-neutral no-dot" style="vertical-align:middle;margin-left:6px">{{ page.paginator.count }}</span></h1>
+    <p class="page-subtitle">Everyone using your ERP, their plan and when it ends.</p></div></div>
+  {% include "billing/platform/_nav.html" with active="companies" %}
+  <form method="get" class="ui-toolbar">
+    <div class="ui-search"><label class="ui-label" for="c-q">Search</label>{% icon "search" "w-4 h-4" %}<input type="search" id="c-q" name="q" value="{{ q }}" placeholder="Company name or email" autocomplete="off"></div>
+    <div style="min-width:11rem"><label class="ui-label" for="c-s">Status</label>
+      <select id="c-s" name="state"><option value="">All</option>{% for key, label in states %}<option value="{{ key }}" {% if state_filter == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+    <div class="flex gap-2"><button type="submit" class="ui-btn ui-btn-primary">{% icon "filter" "w-4 h-4" %}<span>Apply</span></button>{% if q or state_filter %}<a class="ui-btn ui-btn-secondary" href="{% url 'platform:companies' %}">Reset</a>{% endif %}</div>
+  </form>
+  {% if page.object_list %}
+  <div class="ui-table-wrap"><table class="ui-table ui-table-cards">
+    <thead><tr><th>Company</th><th>Plan</th><th>Status</th><th>Ends</th><th class="num">Price</th><th class="col-actions"><span class="sr-only">Actions</span></th></tr></thead>
+    <tbody>{% for r in page.object_list %}
+      <tr class="is-clickable" data-href="{% url 'platform:company_detail' r.company.pk %}">
+        <td data-label="Company"><div class="ui-cell-title"><a class="erp-link" href="{% url 'platform:company_detail' r.company.pk %}">{{ r.company.name }}</a></div><div class="ui-cell-sub">{{ r.company.email|default:"-" }} &middot; {{ r.company.user_count }} user{{ r.company.user_count|pluralize }}</div></td>
+        <td data-label="Plan">{% if r.sub %}{{ r.sub.plan.name }} <span class="ui-muted">({{ r.sub.get_interval_display }})</span>{% else %}<span class="ui-muted">-</span>{% endif %}</td>
+        <td data-label="Status">{% if r.sub %}<span class="ui-badge ui-badge-{{ r.state|state_tone }}">{{ r.state|state_label }}</span>{% else %}<span class="ui-badge ui-badge-neutral">No subscription</span>{% endif %}</td>
+        <td data-label="Ends" class="ui-nowrap">{% if r.sub %}{{ r.sub.paid_until|date:"d M Y" }}<div class="ui-cell-sub">{% if r.days is not None %}{% if r.days >= 0 %}{{ r.days }} day{{ r.days|pluralize }} left{% else %}ended{% endif %}{% endif %}</div>{% endif %}</td>
+        <td data-label="Price" class="num">{% if r.sub %}{{ r.sub.price|price:r.sub.plan.currency }}{% endif %}</td>
+        <td class="col-actions"><div class="ui-row-actions"><a class="icon-btn" href="{% url 'platform:company_detail' r.company.pk %}" data-tip="Manage" data-tip-pos="bottom" aria-label="Manage {{ r.company.name }}">{% icon "cog" "w-4 h-4" %}</a></div></td>
+      </tr>{% endfor %}</tbody></table></div>
+  {% ui "pagination" page_obj=page %}
+  {% else %}<div class="ui-card">{% ui "empty_state" icon="building" title="No companies match" text="Companies appear here as soon as they sign up." %}</div>{% endif %}
+</div>
+{% endblock %}

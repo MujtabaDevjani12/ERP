@@ -58,7 +58,7 @@
   {% ui "pagination" page_obj=page_obj %}
   {% else %}
   {% url 'customers:giftcard_add' as add_url %}
-  <div class="ui-card">{% if has_filters %}{% ui "empty_state" icon="search" title="No gift cards match" text="Try another number or status." %}{% else %}{% ui "empty_state" icon="gift" title="No gift cards yet" text="Create a card, then customers can pay with it at the POS." action_url=add_url action_label="New gift card" %}{% endif %}</div>
+  <div class="ui-card">{% if has_filters %}{% ui "empty_state" icon="search" title="No gift cards match" text="Try another number or status." %}{% elif perms.customers.add_giftcard %}{% ui "empty_state" icon="gift" title="No gift cards yet" text="Create a card, then customers can pay with it at the POS." action_url=add_url action_label="New gift card" %}{% else %}{% ui "empty_state" icon="gift" title="No gift cards yet" %}{% endif %}</div>
   {% endif %}
 </div>
 {% endblock %}

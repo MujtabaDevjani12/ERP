@@ -68,7 +68,7 @@
   </div>
   {% ui "pagination" page_obj=page_obj %}
   {% else %}
-  <div class="ui-card">{% url 'sales:delivery_add' as add_url %}{% if has_filters %}{% ui "empty_state" icon="search" title="No deliveries match these filters" text="Try another name, status or date range." %}{% else %}{% ui "empty_state" icon="truck" title="No deliveries yet" text="Open a completed sale and choose Create delivery, or start one here." action_url=add_url action_label="New delivery" %}{% endif %}</div>
+  <div class="ui-card">{% url 'sales:delivery_add' as add_url %}{% if has_filters %}{% ui "empty_state" icon="search" title="No deliveries match these filters" text="Try another name, status or date range." %}{% elif perms.sales.add_delivery %}{% ui "empty_state" icon="truck" title="No deliveries yet" text="Open a completed sale and choose Create delivery, or start one here." action_url=add_url action_label="New delivery" %}{% else %}{% ui "empty_state" icon="truck" title="No deliveries yet" %}{% endif %}</div>
   {% endif %}
 </div>
 {% endblock %}

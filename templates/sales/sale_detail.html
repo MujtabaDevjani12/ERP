@@ -16,7 +16,7 @@
       {% endcomponent %}
       {% if can_deliver and perms.sales.add_delivery %}<a class="ui-btn ui-btn-secondary" href="{% url 'sales:delivery_add' %}?sale={{ sale.pk }}">{% icon "truck" "w-4 h-4" %}<span>Delivery</span></a>{% endif %}
       {% if can_feedback %}<button type="button" class="ui-btn ui-btn-secondary" data-drawer-url="{% url 'sales:sale_feedback' sale.pk %}" data-drawer-title="Customer feedback · {{ sale.reference }}">{% icon "star" "w-4 h-4" %}<span>Feedback</span></button>{% endif %}
-      {% if sale.due_amount > 0 and sale.status != "held" and sale.status != "cancelled" %}{% if perms.payments.add_payment or perms.sales.change_sale %}<a class="ui-btn ui-btn-secondary" href="#add-payment">{% icon "cash" "w-4 h-4" %}<span>Add payment</span></a>{% endif %}{% endif %}
+      {% if sale.due_amount > 0 and sale.status != "held" and sale.status != "cancelled" %}{% if perms.payments.add_payment %}<a class="ui-btn ui-btn-secondary" href="#add-payment">{% icon "cash" "w-4 h-4" %}<span>Add payment</span></a>{% endif %}{% endif %}
       {% if sale.status == "completed" or sale.status == "partially_returned" %}{% if perms.sales.add_salereturn %}
       <a class="ui-btn ui-btn-secondary" href="{% url 'sales:sale_return' sale.pk %}?exchange=1">{% icon "refresh" "w-4 h-4" %}<span>Exchange</span></a>
       <a class="ui-btn ui-btn-danger-soft" href="{% url 'sales:sale_return' sale.pk %}">{% icon "arrow-left" "w-4 h-4" %}<span>Return items</span></a>
@@ -116,7 +116,7 @@
       </section>
 
       {% if sale.due_amount > 0 and sale.status != "held" and sale.status != "cancelled" %}
-      {% if perms.payments.add_payment or perms.sales.change_sale %}
+      {% if perms.payments.add_payment %}
       <form id="add-payment" method="post" action="{% url 'sales:sale_add_payment' sale.pk %}" class="ui-card">
         {% csrf_token %}
         <div class="ui-card-header"><h3 class="ui-card-title">Add a payment</h3></div>

@@ -8,7 +8,7 @@
       <h1 class="page-title">Currencies</h1>
       <p class="page-subtitle">Your own currency is the base. Add other currencies with an exchange rate to show prices in them, for example on barcode labels.</p>
     </div>
-    <div class="page-actions"><a class="ui-btn ui-btn-primary" href="{{ add_url }}">{% icon "plus" "w-4 h-4" %}<span>Add currency</span></a></div>
+    <div class="page-actions">{% if perms.configuration.add_currency %}<a class="ui-btn ui-btn-primary" href="{{ add_url }}">{% icon "plus" "w-4 h-4" %}<span>Add currency</span></a>{% endif %}</div>
   </div>
 
   <div class="ui-table-wrap">
@@ -29,8 +29,8 @@
           <td class="num ui-nowrap">1 {{ c.code }} = {{ c.rate|floatformat:"-4" }} {{ current_store.currency_code }}</td>
           <td>{% if c.is_active %}{% badge "active" label="Active" %}{% else %}{% badge "inactive" label="Inactive" tone="neutral" %}{% endif %}</td>
           <td class="col-actions"><div class="ui-row-actions">
-            <a class="icon-btn" href="{% url 'configuration:currency_edit' c.pk %}" data-tip="Edit" data-tip-pos="bottom" aria-label="Edit">{% icon "pencil" "w-4 h-4" %}</a>
-            <a class="icon-btn" href="{% url 'configuration:currency_delete' c.pk %}" data-tip="Delete" data-tip-pos="bottom" aria-label="Delete" style="color:var(--ui-danger)">{% icon "trash" "w-4 h-4" %}</a>
+            {% if perms.configuration.change_currency %}<a class="icon-btn" href="{% url 'configuration:currency_edit' c.pk %}" data-tip="Edit" data-tip-pos="bottom" aria-label="Edit">{% icon "pencil" "w-4 h-4" %}</a>{% endif %}
+            {% if perms.configuration.delete_currency %}<a class="icon-btn" href="{% url 'configuration:currency_delete' c.pk %}" data-tip="Delete" data-tip-pos="bottom" aria-label="Delete" style="color:var(--ui-danger)">{% icon "trash" "w-4 h-4" %}</a>{% endif %}
           </div></td>
         </tr>
         {% endfor %}

@@ -1,0 +1,28 @@
+{% extends "ownerconsole/base.html" %}{% load owner_tags billing_tags %}
+{% block title %}Companies{% endblock %}
+{% block content %}
+<div class="oc-head"><div><h1>Companies <span class="badge">{{ page.paginator.count }}</span></h1><p>Everyone using your ERP, their plan and when it ends.</p></div></div>
+<section class="card">
+  <form method="get" class="toolbar">
+    <div class="oc-field grow"><label for="q">Search</label><input type="search" id="q" name="q" value="{{ q }}" placeholder="Company name or e-mail" autocomplete="off"></div>
+    <div class="oc-field"><label for="st">Status</label><select id="st" name="state"><option value="">All</option>{% for key, label in states %}<option value="{{ key }}" {% if state_filter == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+    <div class="row"><button class="btn primary" type="submit">{% oicon "search" %}<span>Apply</span></button>{% if q or state_filter %}<a class="btn" href="{% url 'owner:companies' %}">Reset</a>{% endif %}</div>
+  </form>
+  {% if page.object_list %}
+  <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Company</th><th>Plan</th><th>Status</th><th>Access ends</th><th class="num">Price</th><th></th></tr></thead><tbody>
+    {% for r in page.object_list %}<tr>
+      <td><a href="{% url 'owner:company_detail' r.sub.company_id %}"><b>{{ r.sub.company_name }}</b></a><div class="sub">{{ r.sub.company_email|default:"-" }}{% if r.users is not None %} &middot; {{ r.users }} user{{ r.users|pluralize }}{% endif %}</div></td>
+      <td>{{ r.sub.plan.name }} <span class="faint">({{ r.sub.get_interval_display }})</span></td>
+      <td><span class="badge {{ r.state|state_tone }}">{{ r.state|state_label }}</span></td>
+      <td class="nowrap">{% if r.sub.paid_until %}{{ r.sub.paid_until|date:"d M Y" }}<div class="sub">{% if r.days is not None %}{% if r.days >= 0 %}{{ r.days }} day{{ r.days|pluralize }} left{% else %}ended{% endif %}{% endif %}</div>{% else %}<span class="faint">-</span>{% endif %}</td>
+      <td class="num">{{ r.sub.price|price:r.sub.plan.currency }}</td>
+      <td class="right"><a class="icon-btn" href="{% url 'owner:company_detail' r.sub.company_id %}" aria-label="Manage {{ r.sub.company_name }}">{% oicon "cog" %}</a></td>
+    </tr>{% endfor %}</tbody></table></div>
+  {% include "ownerconsole/_pager.html" %}
+  {% else %}<div class="empty">{% oicon "building" %}<b>No companies match</b><span>Companies appear here as soon as they sign up in the ERP.</span></div>{% endif %}
+</section>
+{% if unmanaged %}
+<section class="card"><header><h2>ERP companies without a subscription</h2><span class="small muted">No limits, no payments. Start a subscription to bill them.</span></header>
+  <div class="body">{% for c in unmanaged %}<div class="list-row"><div><b>{{ c.name }}</b><div class="small muted">{{ c.email|default:"-" }}</div></div><a class="btn sm" href="{% url 'owner:company_detail' c.pk %}">Set up subscription</a></div>{% endfor %}</div></section>
+{% endif %}
+{% endblock %}

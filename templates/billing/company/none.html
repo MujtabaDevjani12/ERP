@@ -1,0 +1,8 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Billing{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="page-header"><div class="min-w-0"><h1 class="page-title">Billing and subscription</h1></div></div>
+  <div class="ui-card">{% ui "empty_state" icon="credit-card" title="No subscription on this company" text="This company is not billed through the platform, so everything is available and there is nothing to pay." %}</div>
+</div>
+{% endblock %}

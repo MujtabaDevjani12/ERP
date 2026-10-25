@@ -1,0 +1,29 @@
+{% extends "ownerconsole/base.html" %}{% load owner_tags %}
+{% block title %}E-mail settings{% endblock %}
+{% block content %}
+<div class="oc-head"><div><div class="crumb"><a href="{% url 'owner:settings' %}">Settings</a> / E-mail</div><h1>E-mail settings</h1><p>The mail server the console uses for password resets, invoices, payment receipts, reminders and owner alerts.</p></div>
+  <a class="btn" href="{% url 'owner:emails' %}">{% oicon "mail" %}<span>E-mail log</span></a></div>
+
+{% if obj.smtp_ready %}<div class="alert success">{% oicon "check" %}<div>SMTP is set up ({{ obj.email_host }}:{{ obj.email_port }}). Send a test message below to be sure.</div></div>
+{% else %}<div class="alert warning">{% oicon "alert" %}<div><b>No SMTP server saved.</b> Messages are only printed in the server console, so nobody receives them. Fill the form below (for Gmail: smtp.gmail.com, port 587, STARTTLS, your address and an <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">App password</a>).</div></div>{% endif %}
+
+<form method="post" novalidate class="card"><div class="body">{% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert error">{% oicon "alert" %}<div>{{ form.non_field_errors }}</div></div>{% endif %}
+  <div class="section"><div><h3>SMTP server</h3><p class="why">Choose STARTTLS for port 587 or SSL for port 465, not both.</p></div>
+    <div class="grid g2">{% include "ownerconsole/_field.html" with f=form.email_host %}{% include "ownerconsole/_field.html" with f=form.email_port %}{% include "ownerconsole/_field.html" with f=form.email_username %}{% include "ownerconsole/_field.html" with f=form.email_password %}
+      {% include "ownerconsole/_field.html" with f=form.email_use_tls %}{% include "ownerconsole/_field.html" with f=form.email_use_ssl %}</div></div>
+  <div class="section"><div><h3>Sender</h3><p class="why">What customers see in their inbox.</p></div>
+    <div class="grid g2">{% include "ownerconsole/_field.html" with f=form.email_from_name %}{% include "ownerconsole/_field.html" with f=form.email_from_address %}{% include "ownerconsole/_field.html" with f=form.email_reply_to %}</div></div>
+  <div class="section"><div><h3>Who gets e-mail</h3></div>
+    <div class="stack">{% include "ownerconsole/_field.html" with f=form.send_company_emails %}{% include "ownerconsole/_field.html" with f=form.email_owners %}</div></div>
+  <div class="row" style="justify-content:flex-end"><button class="btn primary" type="submit" name="action" value="save">{% oicon "check" %}<span>Save e-mail settings</span></button></div>
+</div></form>
+
+<section class="card"><header><h2>Send a test message</h2></header>
+  <form method="post" class="body row" style="align-items:flex-end">{% csrf_token %}<input type="hidden" name="action" value="test">
+    <div class="oc-field" style="min-width:18rem;flex:1">{{ test.to.label_tag }}{{ test.to }}{% for e in test.to.errors %}<p class="oc-err">{{ e }}</p>{% endfor %}</div>
+    <button class="btn" type="submit">{% oicon "send" %}<span>Send test</span></button></form></section>
+
+{% if recent %}<section class="card"><header><h2>Latest messages</h2><a class="btn sm" href="{% url 'owner:emails' %}">All</a></header>
+  <div class="body">{% for e in recent %}<div class="list-row"><div><b>{{ e.subject }}</b><div class="small muted">{{ e.to_email }} &middot; {{ e.created_at|date:"d M, H:i" }}</div></div>{% if e.status == "sent" %}<span class="badge success">Sent</span>{% else %}<span class="badge danger" title="{{ e.error }}">{{ e.get_status_display }}</span>{% endif %}</div>{% endfor %}</div></section>{% endif %}
+{% endblock %}

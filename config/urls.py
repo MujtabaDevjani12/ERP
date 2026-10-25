@@ -20,6 +20,7 @@ URL layout
 /settings/...           POS Configuration / System Configuration / numbering (configuration app)
 /reports/...            sales/purchase/stock reports + chart data
 /erp/                   ERP dashboard + report pages (Excel/PDF)     /notifications/  alerts inbox     /api/v1/  read-only REST API
+/plans/ /signup/ /billing/   sign-up and each company's own Billing page   (the owner console is a separate site: config/owner_urls.py)
 /admin/                 Django admin — also today's home for Roles (Groups) & full data access
 """
 from django.conf import settings
@@ -30,6 +31,7 @@ from django.urls import include, path
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("accounts/", include("accounts.urls")),
+    path("", include("billing.urls")),                      # /plans/ /signup/ /billing/ (each company's own billing)
 
     path("", include("dashboard.urls")),
     path("register/", include("register.urls")),

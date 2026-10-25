@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% load ui %}
 {% block title %}{% if staff_user %}Edit user{% else %}New user{% endif %}{% endblock %}
 {% block content %}
-<div class="ui-form-wrap space-y-4" style="max-width:56rem">
+<div class="ui-form-wrap space-y-4">
   <div class="page-header">
     <div class="min-w-0">
       <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{% url 'accounts:staff_user_list' %}">Staff users</a><span class="sep">/</span><span>{% if staff_user %}{{ staff_user.username }}{% else %}New{% endif %}</span></nav>
@@ -41,6 +41,10 @@
           {% ui "field" field=form.is_staff %}
           {% ui "field" field=form.is_active %}
         </div>
+        {% if form.is_super_admin %}
+        <div class="ui-alert ui-alert-warning" role="note" style="align-items:flex-start">{% icon "shield" "w-4 h-4" %}
+          <div style="flex:1">{% ui "field" field=form.is_super_admin %}</div></div>
+        {% endif %}
         <div>
           <div class="ui-label">Roles</div>
           <div class="flex flex-wrap gap-2" style="margin-top:6px">
