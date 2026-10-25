@@ -10,7 +10,7 @@ Differences from the ERP (config/settings.py, which this file builds on):
   * messages are kept in a cookie (no ERP session table needed)
 """
 from .settings import *  # noqa: F401,F403
-from .settings import BASE_DIR, INSTALLED_APPS, MIDDLEWARE, TEMPLATES  # noqa: F401
+from .settings import BASE_DIR, INSTALLED_APPS, MIDDLEWARE as ERP_MIDDLEWARE, TEMPLATES  # noqa: F401
 
 ROOT_URLCONF = "config.owner_urls"
 # Django's admin needs ERP sign-in middleware and sessions; this site has no admin and its own sign-in, so the app is left out.
@@ -22,8 +22,12 @@ CSRF_COOKIE_NAME = "owner_csrftoken"
 CSRF_COOKIE_HTTPONLY = False
 MESSAGE_STORAGE = "django.contrib.messages.storage.cookie.CookieStorage"
 
+# If the ERP serves its static files with WhiteNoise (production gunicorn), this site must too, or its CSS/JS give 404.
+_STATIC_MIDDLEWARE = [m for m in ERP_MIDDLEWARE if "whitenoise" in m.lower()]
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    *_STATIC_MIDDLEWARE,
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
