@@ -988,3 +988,8 @@ html select option { font-size: 14px; padding: 6px 10px; }
   .st-split { display: grid; grid-template-columns: minmax(0, 1fr) 440px; align-items: start; }
   .rp-preview { border-top: 0; border-left: 1px solid var(--ui-border, #e5e7eb); position: sticky; top: 1rem; }
 }
+
+/* No up/down arrows inside any number box (POS quantity, discount, payment ...) - the - / + buttons do the stepping. */
+input[type="number"], .pos-qty input { -moz-appearance: textfield !important; appearance: textfield !important; }
+input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button,
+.pos-qty input::-webkit-outer-spin-button, .pos-qty input::-webkit-inner-spin-button { -webkit-appearance: none !important; appearance: none !important; margin: 0 !important; display: none !important; }

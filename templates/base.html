@@ -46,10 +46,10 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family={{ google_font_query|default:'Inter:wght@400;500;600;700;800' }}&display=swap">
-  <link rel="stylesheet" href="{% static 'css/erp-ui.css' %}?v=20261025c">
-  <link rel="stylesheet" href="{% static 'css/fx-skin.css' %}?v=20261025b">
+  <link rel="stylesheet" href="{% static 'css/erp-ui.css' %}?v=20261026a">
+  <link rel="stylesheet" href="{% static 'css/fx-skin.css' %}?v=20261026a">
   <link rel="stylesheet" href="{% static 'css/layout-unify.css' %}?v=20261025a">
-  <link rel="stylesheet" href="{% static 'css/billing.css' %}?v=20261025c">
+  <link rel="stylesheet" href="{% static 'css/billing.css' %}?v=20261026a">
   <style>
     :root {
       --brand-50: {{ brand_shades.50|default:"#eef2ff" }}; --brand-100: {{ brand_shades.100|default:"#e0e7ff" }};
@@ -149,29 +149,28 @@
         </div>
       {% endif %}
       {% if billing_plan %}
-        <div class="sbp {{ billing_plan.tone }}" data-tip="{{ billing_plan.name }} · {{ billing_plan.label }}" data-tip-collapsed>
-          <a class="sbp-head" href="{% url 'billing:home' %}">
-            <span class="sbp-ico">{% icon "credit-card" "w-4 h-4" %}</span>
-            <span class="sbp-text">
+        {% url 'billing:home' as bp_go %}
+        <div class="sbp {{ billing_plan.tone }}" x-data="{ open: false }" @keydown.escape.window="open = false" @click.outside="open = false">
+          <div class="sbp-panel" x-show="open" x-cloak x-transition.opacity.duration.120ms>
+            <div class="sbp-top">
               <span class="sbp-name">{{ billing_plan.name }} plan</span>
               <span class="sbp-state"><i class="sbp-dot"></i>{{ billing_plan.label }}</span>
-            </span>
-          </a>
-          <div class="sbp-body">
+            </div>
             {% if billing_plan.line %}<div class="sbp-line">{{ billing_plan.line }}</div>{% endif %}
             <div class="sbp-meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ billing_plan.pct }}"><span style="width:{{ billing_plan.pct }}%"></span></div>
             {% for r in billing_plan.usage %}
               <div class="sbp-use"><span>{{ r.label }}</span><b>{{ r.used }}/{{ r.limit }}</b></div>
               <div class="sbp-meter sm{% if r.reached %} full{% endif %}"><span style="width:{{ r.percent }}%"></span></div>
             {% endfor %}
-            {% if billing_plan.locked and billing_plan.can_view %}
-              <a class="sbp-btn primary" href="{% url 'billing:home' %}#pay">Pay now</a>
-            {% elif billing_plan.can_upgrade %}
-              <a class="sbp-btn" href="{% url 'billing:home' %}#plans">Upgrade plan</a>
-            {% elif billing_plan.can_view %}
-              <a class="sbp-btn" href="{% url 'billing:home' %}">Open billing</a>
-            {% endif %}
+            {% if billing_plan.can_view %}<a class="sbp-more" href="{{ bp_go }}">Billing &amp; invoices</a>{% endif %}
           </div>
+          {% if billing_plan.locked and billing_plan.can_view %}
+            <button type="button" class="sbp-bar primary" @click="open = !open" :aria-expanded="open" data-tip="Pay now" data-tip-collapsed>{% icon "credit-card" "w-4 h-4" %}<span class="nav-label">Pay now</span><i class="sbp-dot"></i></button>
+          {% elif billing_plan.can_upgrade %}
+            <button type="button" class="sbp-bar" @click="open = !open" :aria-expanded="open" data-tip="{{ billing_plan.name }} · {{ billing_plan.label }}" data-tip-collapsed>{% icon "star" "w-4 h-4" %}<span class="nav-label">Upgrade plan</span><i class="sbp-dot"></i></button>
+          {% elif billing_plan.can_view %}
+            <button type="button" class="sbp-bar" @click="open = !open" :aria-expanded="open" data-tip="{{ billing_plan.name }} · {{ billing_plan.label }}" data-tip-collapsed>{% icon "credit-card" "w-4 h-4" %}<span class="nav-label">{{ billing_plan.name }} plan</span><i class="sbp-dot"></i></button>
+          {% endif %}
         </div>
       {% endif %}
       <a href="{% url 'dashboard:pos' %}" class="fx-cta" data-tip="Open POS" data-tip-collapsed>{% icon "bolt" "w-5 h-5" %}<span class="nav-label">Open POS</span></a>
