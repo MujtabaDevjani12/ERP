@@ -1,0 +1,33 @@
+{% extends "registration/_auth_shell.html" %}{% load ui %}
+{% block title %}{{ title }}{% endblock %}
+{% block lx_title %}{{ title }}{% endblock %}
+{% block lx_lead %}{{ lead }} We sent a 6-digit code to <b>{{ masked }}</b>. It works for 10 minutes.{% endblock %}
+{% block lx_form %}
+<form method="post" novalidate class="lx-form" autocomplete="off">
+  {% csrf_token %}
+  {% if error %}<div class="ui-alert ui-alert-danger" role="alert">{% icon "error" "w-4 h-4" %}<div>{{ error }}</div></div>{% endif %}
+  {% if notice %}<div class="ui-alert ui-alert-success" role="status">{% icon "check-mark" "w-4 h-4" %}<div>{{ notice }}</div></div>{% endif %}
+  <div class="lx-field">
+    <label for="id_code">Verification code</label>
+    <div class="lx-input"><span class="lx-in-ico">{% icon "key" "w-4 h-4" %}</span>
+      <input type="text" name="code" id="id_code" inputmode="numeric" pattern="[0-9]*" maxlength="6" required autofocus
+             autocomplete="one-time-code" placeholder="123456" style="letter-spacing:.35em;font-size:20px;font-weight:700"></div>
+  </div>
+  <button type="submit" class="lx-btn">{% icon "check-mark" "w-4 h-4" %}<span>Verify</span></button>
+</form>
+<form method="post" class="lx-form" style="margin-top:10px">
+  {% csrf_token %}<input type="hidden" name="action" value="resend">
+  <button type="submit" class="lx-btn lx-btn-ghost" id="resend-btn"{% if wait %} disabled{% endif %}>{% icon "mail" "w-4 h-4" %}<span id="resend-label">{% if wait %}Send a new code in {{ wait }}s{% else %}Send a new code{% endif %}</span></button>
+</form>
+<a href="{{ back_url }}" class="lx-back">{% icon "arrow-left" "w-4 h-4" %}<span>{{ back_label }}</span></a>
+<p class="lx-help" style="margin-top:10px">Nothing in your inbox? Look in the spam folder.</p>
+{% if wait %}<script>
+  (function () {
+    var left = {{ wait }}, b = document.getElementById('resend-btn'), l = document.getElementById('resend-label');
+    var t = setInterval(function () {
+      left -= 1;
+      if (left <= 0) { clearInterval(t); b.disabled = false; l.textContent = 'Send a new code'; } else { l.textContent = 'Send a new code in ' + left + 's'; }
+    }, 1000);
+  })();
+</script>{% endif %}
+{% endblock %}

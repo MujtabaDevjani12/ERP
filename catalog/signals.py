@@ -10,6 +10,8 @@ def ensure_default_variant(sender, instance: Product, created, **kwargs):
     price/stock/barcode off of. If none exists yet (e.g. created through
     the admin without one), make it — 'variant' products are left alone,
     their variants are added explicitly on the product form."""
+    if kwargs.get("raw"):                                          # loading a backup: its own variants come with it
+        return
     if getattr(instance, "_skip_default_variant", False):      # the product form creates the variants itself
         return
     if instance.product_type != "single":

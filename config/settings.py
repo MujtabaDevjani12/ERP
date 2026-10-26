@@ -207,6 +207,20 @@ HR_WEEKLY_OFF_DAYS = tuple(int(d) for d in os.environ.get("HR_WEEKLY_OFF_DAYS", 
 PRODUCTION_ISSUE_TOLERANCE_PERCENT = int(os.environ.get("PRODUCTION_ISSUE_TOLERANCE_PERCENT", "0"))
 # Wholesale discount above this % needs a manager's approval when no approval workflow is configured.
 SALES_MAX_DISCOUNT_PERCENT = int(os.environ.get("SALES_MAX_DISCOUNT_PERCENT", "10"))
+# Errors go to the console / service log even when DEBUG is off, so `journalctl -u erp` / `-u owner-console` shows the real traceback
+# behind an "Internal Server Error" page (Django's default prints it only in DEBUG mode).
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {"plain": {"format": "%(asctime)s %(levelname)s %(name)s: %(message)s"}},
+    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "plain"}},
+    "root": {"handlers": ["console"], "level": "WARNING"},
+    "loggers": {
+        "django.request": {"handlers": ["console"], "level": "ERROR", "propagate": False},
+        "django.security": {"handlers": ["console"], "level": "WARNING", "propagate": False},
+    },
+}
+
 # E-mail notifications (in-app notifications are always on). Needs the EMAIL_* settings above.
 NOTIFY_BY_EMAIL = os.environ.get("NOTIFY_BY_EMAIL", "False") == "True"
 

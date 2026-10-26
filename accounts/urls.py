@@ -14,8 +14,10 @@ urlpatterns = [
         name="password_change",
     ),
 
-    # Forgot password (emails a one-time link; mail settings: Settings > Email delivery + EMAIL_* in .env)
+    # Forgot password: e-mail -> 6-digit code -> new password (mail: Owner console > Settings > E-mail, else the EMAIL_* variables in .env)
     path("password-reset/", signin.ResetRequestView.as_view(), name="password_reset"),
+    path("password-reset/verify/", signin.reset_verify, name="password_reset_verify"),
+    path("password-reset/new/", signin.reset_new_password, name="password_reset_new"),
     path("password-reset/sent/", signin.ResetDoneView.as_view(), name="password_reset_done"),
     path("reset/<uidb64>/<token>/", signin.ResetConfirmView.as_view(), name="password_reset_confirm"),
     path("reset/done/", signin.ResetCompleteView.as_view(), name="password_reset_complete"),

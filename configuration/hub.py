@@ -81,6 +81,8 @@ SECTIONS = [
     dict(slug="whatsapp", label="WhatsApp", icon="chat", kind="form", perm=SYS, scope="system", form=F.WhatsAppForm, extra="whatsapp",
          desc="Send invoices to customers on WhatsApp.",
          layout=[("Message", ["whatsapp_country_code", "whatsapp_message"], 1)]),
+    dict(slug="backup", label="Data backup", icon="database", kind="backup", perm=SYS,
+         desc="Download all of this company's data, or restore it from a backup file."),
     dict(slug="shortcuts", label="Keyboard shortcuts", icon="keyboard", kind="shortcuts", perm=None, desc="Faster billing without the mouse."),
 ]
 BY_SLUG = {s["slug"]: s for s in SECTIONS}
@@ -352,6 +354,11 @@ def hub_section(request, section="business"):
             return resp
     elif kind == "shortcuts":
         ctx["shortcut_groups"] = SHORTCUT_GROUPS
+    elif kind == "backup":
+        from core import backup
+        company = getattr(request, "company", None)
+        ctx["company"] = company
+        ctx["saved_copies"] = backup.saved_copies("company", backup.SAFE_NAME.sub("-", company.name).strip("-").lower()) if company else []
 
     ctx.update(_extra_context(request, sec, store))
     ctx["can_edit"] = _can(request.user, sec["perm"])

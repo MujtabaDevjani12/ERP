@@ -3,12 +3,15 @@ import json
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model, login
+from django.contrib.auth.hashers import make_password
 from django.db import DatabaseError
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
+from accounts import otp
+from accounts.otp_views import verify_page
 from core.errors import ERPError
 from ownerconsole.models import Plan, Subscription
 from . import access, services
@@ -60,19 +63,42 @@ def signup(request):
         if form.is_valid():
             d = form.cleaned_data
             try:
-                company, user, sub = services.create_company_with_owner(
-                    company_name=d["company_name"], owner_name=d["owner_name"], email=d["email"], password=d["password1"],
-                    phone=d["phone"], plan=d["plan"], interval=d["interval"])
-            except ERPError as exc:
+                # nothing is created yet: the company is made only after the e-mail address is confirmed with the 6-digit code
+                otp.start(request, "signup", d["email"], {
+                    "company_name": d["company_name"], "owner_name": d["owner_name"], "phone": d["phone"], "plan": d["plan"].pk,
+                    "interval": d["interval"], "password_hash": make_password(d["password1"])})
+            except otp.OtpError as exc:
                 form.add_error(None, str(exc))
             else:
-                login(request, user, backend=BACKEND)
-                return redirect(_after_signup(request, sub))
+                return redirect("billing:signup_verify")
     else:
         form = SignupForm(initial=initial)
     return render(request, "billing/public/signup.html", {"form": form, "plans": plans, "settings_obj": s, "trial_days": s.trial_days,
                                                            "google_client_id": s.google_client_id if s.google_ready else "",
                                                            "signup_open": s.allow_public_signup})
+
+
+def _create_verified(request, state):
+    """The code was right: now the company, its admin login and the subscription are created and the person is signed in."""
+    p = state["payload"]
+    plan = Plan.objects.filter(pk=p.get("plan") or 0, is_active=True, is_public=True).first() or services.default_plan()
+    interval = p.get("interval") if p.get("interval") in ("monthly", "yearly") else Subscription.MONTHLY
+    try:
+        company, user, sub = services.create_company_with_owner(
+            company_name=p["company_name"], owner_name=p["owner_name"], email=state["email"], phone=p.get("phone", ""), plan=plan,
+            interval=interval, password_hash=p.get("password_hash", ""), google_sub=p.get("google_sub", ""))
+    except ERPError as exc:
+        messages.error(request, str(exc))
+        return redirect("billing:signup")
+    login(request, user, backend=BACKEND)
+    return redirect(_after_signup(request, sub))
+
+
+def signup_verify(request):
+    if request.user.is_authenticated:
+        return redirect("billing:home")
+    return verify_page(request, "signup", title="Confirm your email", lead="Almost done - to create your account,",
+                       back_url=reverse("billing:signup"), back_label="Back to sign up", on_success=_create_verified)
 
 
 @require_POST
@@ -101,13 +127,13 @@ def google_auth(request):
         interval = data.get("interval") if data.get("interval") in ("monthly", "yearly") else Subscription.MONTHLY
         name = (data.get("company_name") or "").strip() or f"{info['name'] or info['email'].split('@')[0]}'s company"
         try:
-            company, user, sub = services.create_company_with_owner(
-                company_name=name, owner_name=info["name"] or info["email"], email=info["email"], plan=plan, interval=interval,
-                google_sub=info["sub"])
-        except ERPError as exc:
+            # Google already vouches for the address, but we still e-mail a code first: the company is created only after it is typed in
+            otp.start(request, "signup", info["email"], {
+                "company_name": name, "owner_name": info["name"] or info["email"], "plan": plan.pk if plan else 0,
+                "interval": interval, "google_sub": info["sub"]})
+        except otp.OtpError as exc:
             return JsonResponse({"ok": False, "error": str(exc)}, status=400)
-        login(request, user, backend=BACKEND)
-        return JsonResponse({"ok": True, "redirect": _after_signup(request, sub)})
+        return JsonResponse({"ok": True, "redirect": reverse("billing:signup_verify")})
 
     if not user.is_active:
         return JsonResponse({"ok": False, "error": "This account is switched off. Please contact your administrator."}, status=403)

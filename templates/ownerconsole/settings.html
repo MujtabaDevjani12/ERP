@@ -5,7 +5,7 @@
   <a class="btn" href="{% url 'owner:email_settings' %}">{% oicon "mail" %}<span>E-mail settings</span></a></div>
 <nav class="jump no-print" aria-label="Jump to a settings section">
   <a href="#business">Business</a><a href="#billing">Billing rules</a><a href="#invoicing">Invoices</a><a href="#stripe">Stripe</a><a href="#manual">Manual payments</a>
-  <a href="#google">Google</a><a href="#announce">Announcement</a><a href="#signup">Sign-up page</a><a href="#security">Security</a><a href="#data">Data export</a>
+  <a href="#google">Google</a><a href="#announce">Announcement</a><a href="#signup">Sign-up page</a><a href="#security">Security</a><a href="#data">Data export</a><a href="#backup">Backup &amp; restore</a>
 </nav>
 <form method="post" novalidate class="card"><div class="body">{% csrf_token %}
   {% if form.non_field_errors %}<div class="alert error">{% oicon "alert" %}<div>{{ form.non_field_errors }}</div></div>{% endif %}
@@ -61,4 +61,18 @@
 
   <div class="row" style="justify-content:flex-end"><button class="btn primary" type="submit">{% oicon "check" %}<span>Save settings</span></button></div>
 </div></form>
+
+<div class="card" style="margin-top:16px"><div class="body" id="backup">
+  <div class="section"><div><h3>Backup &amp; restore</h3><p class="why">One .zip with the whole owner database: plans, companies' subscriptions, invoices, payments (with receipts), your team, these settings and the e-mail log. Companies' own ERP data is not in it - each company backs that up from its own Settings.</p></div>
+    <div class="stack"><div class="row"><a class="btn primary" href="{% url 'owner:backup_download' %}">{% oicon "download" %}<span>Download backup</span></a></div></div></div>
+  <div class="section"><div><h3>Restore from a backup</h3><p class="why"><b>This replaces everything in the owner database</b> with the file. Anything added after the backup was made is lost. A safety copy of the current data is saved on the server first; if something fails nothing changes. Your sign-in stays only if your account is in the backup.</p></div>
+    <form method="post" action="{% url 'owner:backup_import' %}" enctype="multipart/form-data" class="stack" style="max-width:480px">{% csrf_token %}
+      <label class="small">Backup file (.zip)<input type="file" name="backup_file" accept=".zip,application/zip" required></label>
+      <label class="small">Type RESTORE to confirm<input type="text" name="confirm" autocomplete="off" placeholder="RESTORE" required></label>
+      <label class="small">Your password<input type="password" name="password" autocomplete="current-password" required></label>
+      <div class="row"><button class="btn danger" type="submit" onclick="return confirm('Replace the owner database with this backup?')">{% oicon "upload" %}<span>Restore backup</span></button></div>
+    </form></div>
+  {% if saved_copies %}<div class="section"><div><h3>Safety copies on the server</h3><p class="why">Made automatically just before each restore.</p></div>
+    <div class="stack">{% for c in saved_copies %}<div class="row small" style="justify-content:space-between"><span>{{ c.name }} &middot; {{ c.when|date:"d M Y H:i" }} &middot; {{ c.size|filesizeformat }}</span><a class="btn" href="{% url 'owner:backup_saved' c.name %}">{% oicon "download" %}<span>Download</span></a></div>{% endfor %}</div></div>{% endif %}
+</div></div>
 {% endblock %}

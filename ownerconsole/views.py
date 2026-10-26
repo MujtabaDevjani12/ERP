@@ -1,5 +1,6 @@
 """The owner console: sign-in, forgot / reset password, dashboard, companies, plans, payments, invoices, settings, e-mail, team, account."""
 import csv
+import logging
 import mimetypes
 import secrets
 from datetime import timedelta
@@ -8,6 +9,7 @@ from types import SimpleNamespace
 from django.conf import settings as dj_settings
 from django.contrib import messages
 from django.core.paginator import Paginator
+from django.db import DatabaseError
 from django.db.models import Count, Q
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -37,6 +39,8 @@ def nav_for(owner):
              ("settings", "Settings", "owner:settings", "cog", True)]
     return [{"key": k, "label": label, "url": reverse(url), "icon": icon} for k, label, url, icon, admin_only in items
             if owner.is_admin or not admin_only]
+
+logger = logging.getLogger(__name__)
 
 
 def page(request, template, ctx=None, *, active="", status=200):
@@ -473,10 +477,18 @@ def settings_view(request):
     obj = PlatformSettings.get()
     form = PlatformSettingsForm(request.POST or None, instance=obj)
     if request.method == "POST" and form.is_valid():
-        form.save()
+        try:
+            form.save()
+        except DatabaseError as exc:                                  # e.g. "attempt to write a readonly database": show the reason instead of a 500 page
+            logger.exception("Owner settings could not be saved")
+            messages.error(request, f"The settings could not be saved: {exc}. If it says 'readonly database', give the web service's user write "
+                                    "access to owner.sqlite3 and to the folder it is in (for example: sudo chown -R ubuntu:ubuntu ~/ERP).")
+            return redirect("owner:settings")
         messages.success(request, "Settings saved.")
         return redirect("owner:settings")
-    return page(request, "ownerconsole/settings.html", {"form": form, "obj": obj, "erp_url": obj.erp_base_url or "http://127.0.0.1:8000"}, active="settings")
+    from core import backup
+    return page(request, "ownerconsole/settings.html", {"form": form, "obj": obj, "erp_url": obj.erp_base_url or "http://127.0.0.1:8000",
+                                                        "saved_copies": backup.saved_copies("owner")}, active="settings")
 
 
 @owner_required(admin=True)
@@ -503,6 +515,55 @@ def email_settings(request):
             return redirect("owner:email_settings")
     return page(request, "ownerconsole/email_settings.html", {"form": form, "test": test, "obj": obj,
                                                               "recent": EmailLog.objects.all()[:6]}, active="settings")
+
+
+# ---------------------------------------------------------------- backup & restore of the owner database
+@owner_required(admin=True)
+def backup_download(request):
+    from core import backup
+    from . import db
+    data, manifest = backup.owner_backup(db.alias())
+    resp = HttpResponse(data, content_type="application/zip")
+    resp["Content-Disposition"] = f'attachment; filename="{backup.filename_for(manifest)}"'
+    return resp
+
+
+@owner_required(admin=True)
+@require_POST
+def backup_import(request):
+    from core import backup
+    from . import db
+    upload = request.FILES.get("backup_file")
+    if upload is None:
+        messages.error(request, "Choose the backup .zip file first.")
+    elif (request.POST.get("confirm") or "").strip().upper() != "RESTORE":
+        messages.error(request, "Type the word RESTORE to confirm. Nothing was changed.")
+    elif not request.owner.check_password(request.POST.get("password") or ""):
+        messages.error(request, "Your password is not correct. Nothing was changed.")
+    else:
+        try:
+            backup.read_backup(upload, kind="owner")                 # a wrong file is refused before anything is touched
+            upload.seek(0)
+            current, manifest = backup.owner_backup(db.alias())
+            safety = backup.save_safety_copy(current, manifest)
+            counts = backup.restore_owner(upload, db.alias())
+            messages.success(request, f"Backup restored: {sum(counts.values())} records in {len(counts)} tables. Your previous owner data was saved first as {safety.name}. "
+                                      "If your own account is not in the backup you will be asked to sign in again.")
+        except backup.BackupError as exc:
+            messages.error(request, str(exc))
+    return redirect(reverse("owner:settings") + "#backup")
+
+
+@owner_required(admin=True)
+def backup_saved(request, name):
+    from core import backup
+    try:
+        path = backup.saved_copy_path(name)
+    except backup.BackupError:
+        raise Http404
+    if "-owner-" not in path.name:
+        raise Http404
+    return FileResponse(open(path, "rb"), as_attachment=True, filename=path.name)
 
 
 @owner_required

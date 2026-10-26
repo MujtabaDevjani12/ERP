@@ -37,6 +37,13 @@ def pay(sub, by=None):
     return inv
 
 
+def last_code():
+    """The 6-digit verification code in the newest e-mail the test outbox holds."""
+    import re
+    from django.core import mail
+    return re.match(r"(\d{6})", mail.outbox[-1].subject).group(1)
+
+
 def make_owner(email="boss@owner.test", role=OwnerAccount.ADMIN, name="Boss", password=OWNER_PASSWORD):
     acct = OwnerAccount(email=email, name=name, role=role)
     acct.set_password(password)

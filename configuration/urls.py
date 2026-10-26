@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import hub, views
+from . import backup_views, hub, views
 
 app_name = "configuration"
 
@@ -15,5 +15,8 @@ urlpatterns = [
     path("currencies/<int:pk>/edit/", views.CurrencyUpdateView.as_view(), name="currency_edit"),
     path("currencies/<int:pk>/delete/", views.CurrencyDeleteView.as_view(), name="currency_delete"),
     path("receipt-preview/", hub.receipt_preview, name="receipt_preview"),
+    path("backup/download/", backup_views.download, name="backup_download"),
+    path("backup/import/", backup_views.import_view, name="backup_import"),
+    path("backup/saved/<str:name>/", backup_views.saved, name="backup_saved"),
     path("<slug:section>/", hub.hub_section, name="hub_section"),
 ]

@@ -42,7 +42,7 @@ def unique_username(base):
 
 @transaction.atomic
 def create_company_with_owner(*, company_name, owner_name, email, password=None, phone="", plan=None, interval=Subscription.MONTHLY,
-                              google_sub="", business_type="general"):
+                              google_sub="", business_type="general", password_hash=""):
     """Sign-up: a new Company + first branch + warehouse + chart of accounts + the admin login, then the subscription.
 
     The subscription starts "pending" (or with demo days if the owner offers them): the ERP stays locked until the first invoice is paid.
@@ -72,7 +72,9 @@ def create_company_with_owner(*, company_name, owner_name, email, password=None,
     first, _, last = (owner_name or "").strip().partition(" ")
     user = User(username=unique_username(email), email=email, first_name=first[:150], last_name=last[:150], phone=phone,
                 store=store, is_biller=True, is_staff=False)
-    if password:
+    if password_hash:                                              # already hashed (sign-up keeps only the hash while the e-mail is verified)
+        user.password = password_hash
+    elif password:
         user.set_password(password)
     else:
         user.set_unusable_password()

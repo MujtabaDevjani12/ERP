@@ -9,6 +9,7 @@ urlpatterns = [
     # public
     path("plans/", public.plans_page, name="plans"),
     path("signup/", public.signup, name="signup"),
+    path("signup/verify/", public.signup_verify, name="signup_verify"),
     path("signup/google/", public.google_auth, name="google_auth"),
     # a company's own billing
     path("billing/", company.home, name="home"),

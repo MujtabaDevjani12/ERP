@@ -1,9 +1,18 @@
 """Sign-in and forgot-password screens. The pages themselves live in templates/registration/ (two-panel "lx" layout)."""
 import logging
+import time
 
+from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.contrib.auth import views as auth_views
+from django.contrib.auth.forms import SetPasswordForm
 from django.core.cache import cache
-from django.urls import reverse_lazy
+from django.shortcuts import redirect, render
+from django.urls import reverse, reverse_lazy
+from django.views.decorators.http import require_http_methods
+
+from . import otp
+from .otp_views import verify_page
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +35,7 @@ class ResetRequestView(auth_views.PasswordResetView):
     email_template_name = "registration/password_reset_email.txt"
     html_email_template_name = "registration/password_reset_email.html"
     subject_template_name = "registration/password_reset_subject.txt"
-    success_url = reverse_lazy("accounts:password_reset_done")
+    success_url = reverse_lazy("accounts:password_reset_verify")
 
     def _throttled(self):
         ip = (self.request.META.get("REMOTE_ADDR") or "unknown")
@@ -38,20 +47,55 @@ class ResetRequestView(auth_views.PasswordResetView):
         return False
 
     def form_valid(self, form):
-        from configuration.mailing import sender_identity
-        from configuration.models import SystemConfiguration
-
         if self._throttled():
             form.add_error(None, "Too many requests from this device. Please try again in an hour.")
             return self.form_invalid(form)
-        self.from_email = sender_identity()[0]                              # Settings > Email delivery
-        self.extra_email_context = {"site_name": SystemConfiguration.get().site_name}
+        email = form.cleaned_data["email"].strip().lower()
+        users = list(form.get_users(email))
         try:
-            return super().form_valid(form)
-        except Exception:                                                   # noqa: BLE001 — mail server down / not configured
-            logger.exception("Password reset email could not be sent")
-            form.add_error(None, "We could not send the email right now. Please try again later, or ask an administrator to reset your password.")
+            # an unknown address gets exactly the same screens (nothing is sent) so the form cannot be used to find out who has an account
+            otp.start(self.request, "reset", email, {"uid": users[0].pk} if users else {}, real=bool(users))
+        except otp.OtpError as exc:
+            form.add_error(None, str(exc))
             return self.form_invalid(form)
+        return redirect("accounts:password_reset_verify")
+
+
+RESET_OK = "reset_ok"
+RESET_OK_SECONDS = 15 * 60
+
+
+def _reset_verified(request, state):
+    uid = (state.get("payload") or {}).get("uid")
+    if not uid:
+        messages.error(request, "That code could not be used. Please start again.")
+        return redirect("accounts:password_reset")
+    request.session[RESET_OK] = {"uid": uid, "exp": time.time() + RESET_OK_SECONDS}
+    return redirect("accounts:password_reset_new")
+
+
+@require_http_methods(["GET", "POST"])
+def reset_verify(request):
+    """Step 2 of forgot-password: type the 6-digit code that was e-mailed."""
+    return verify_page(request, "reset", title="Enter your code", lead="To reset your password,", back_url=reverse("accounts:password_reset"),
+                       back_label="Use a different email", on_success=_reset_verified)
+
+
+@require_http_methods(["GET", "POST"])
+def reset_new_password(request):
+    """Step 3: choose the new password (only reachable right after a correct code)."""
+    ok = request.session.get(RESET_OK)
+    user = get_user_model().objects.filter(pk=ok["uid"], is_active=True).first() if ok and ok["exp"] > time.time() else None
+    if user is None:
+        request.session.pop(RESET_OK, None)
+        messages.error(request, "Please confirm your email with a code first.")
+        return redirect("accounts:password_reset")
+    form = SetPasswordForm(user, request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        request.session.pop(RESET_OK, None)
+        return redirect("accounts:password_reset_complete")
+    return render(request, "registration/password_reset_confirm.html", {"form": form, "validlink": True})
 
 
 class ResetConfirmView(auth_views.PasswordResetConfirmView):

@@ -308,33 +308,65 @@ class SignInAndPasswordResetTests(TestCase):
         self.assertFalse(self.client.session.get_expire_at_browser_close())
 
     def test_full_reset_flow(self):
+        import re
         cfg = SystemConfiguration.get()
         cfg.email_from_name, cfg.email_from_address = "Gold Diamond", "no-reply@gd.pk"
         cfg.save()
         r = self.client.post(reverse("accounts:password_reset"), {"email": "owner@example.com"})
-        self.assertRedirects(r, reverse("accounts:password_reset_done"))
+        self.assertRedirects(r, reverse("accounts:password_reset_verify"))
         self.assertEqual(len(mail.outbox), 1)
         msg = mail.outbox[0]
         self.assertEqual(msg.to, ["owner@example.com"])
         self.assertEqual(msg.from_email, "Gold Diamond <no-reply@gd.pk>")
-        self.assertIn("owner", msg.body)
-        import re
-        link = re.search(r"/accounts/reset/[^/\s]+/[^/\s]+/", msg.body).group(0)
-        page = self.client.get(link, follow=True)
+        code = re.match(r"(\d{6})", msg.subject).group(1)
+        # the new-password page cannot be opened without the code
+        self.assertRedirects(self.client.get(reverse("accounts:password_reset_new")), reverse("accounts:password_reset"))
+        wrong = self.client.post(reverse("accounts:password_reset_verify"), {"code": "000000" if code != "000000" else "111111"})
+        self.assertContains(wrong, "not correct")
+        ok = self.client.post(reverse("accounts:password_reset_verify"), {"code": code})
+        self.assertRedirects(ok, reverse("accounts:password_reset_new"))
+        page = self.client.get(reverse("accounts:password_reset_new"))
         self.assertContains(page, "Choose a new password")
-        post_url = page.redirect_chain[-1][0] if page.redirect_chain else link
-        done = self.client.post(post_url, {"new_password1": "Br4nd-new-pass!", "new_password2": "Br4nd-new-pass!"})
+        done = self.client.post(reverse("accounts:password_reset_new"), {"new_password1": "Br4nd-new-pass!", "new_password2": "Br4nd-new-pass!"})
         self.assertRedirects(done, reverse("accounts:password_reset_complete"))
         self.assertTrue(self.client.login(username="owner", password="Br4nd-new-pass!"))
-        # the link only works once
-        from django.test import Client
-        again = Client().get(link, follow=True)
-        self.assertContains(again, "Link not valid")
+        # the code works once, and the new-password page closes after use
+        self.assertRedirects(self.client.get(reverse("accounts:password_reset_new")), reverse("accounts:password_reset"))
+        self.assertRedirects(self.client.post(reverse("accounts:password_reset_verify"), {"code": code}), reverse("accounts:password_reset"))
+
+    def test_five_wrong_codes_throw_the_code_away(self):
+        self.client.post(reverse("accounts:password_reset"), {"email": "owner@example.com"})
+        for _ in range(4):
+            self.assertContains(self.client.post(reverse("accounts:password_reset_verify"), {"code": "000000"}), "not correct")
+        r = self.client.post(reverse("accounts:password_reset_verify"), {"code": "000000"}, follow=True)
+        self.assertContains(r, "Too many wrong codes")
+        self.assertRedirects(self.client.get(reverse("accounts:password_reset_verify")), reverse("accounts:password_reset"))
+
+    def test_resend_has_a_cool_down(self):
+        self.client.post(reverse("accounts:password_reset"), {"email": "owner@example.com"})
+        r = self.client.post(reverse("accounts:password_reset_verify"), {"action": "resend"})
+        self.assertContains(r, "Please wait")
+        self.assertEqual(len(mail.outbox), 1)
+        s = self.client.session
+        s["otp:reset"]["last"] -= 100
+        s.save()
+        r = self.client.post(reverse("accounts:password_reset_verify"), {"action": "resend"})
+        self.assertContains(r, "new code is on its way")
+        self.assertEqual(len(mail.outbox), 2)
+
+    def test_code_expires(self):
+        self.client.post(reverse("accounts:password_reset"), {"email": "owner@example.com"})
+        s = self.client.session
+        s["otp:reset"]["exp"] -= 3600
+        s.save()
+        self.assertRedirects(self.client.get(reverse("accounts:password_reset_verify")), reverse("accounts:password_reset"))
 
     def test_unknown_email_gets_the_same_answer_and_no_mail(self):
         r = self.client.post(reverse("accounts:password_reset"), {"email": "ghost@example.com"})
-        self.assertRedirects(r, reverse("accounts:password_reset_done"))
+        self.assertRedirects(r, reverse("accounts:password_reset_verify"))           # identical screens: nobody can probe for accounts
         self.assertEqual(len(mail.outbox), 0)
+        r = self.client.post(reverse("accounts:password_reset_verify"), {"code": "123456"})
+        self.assertContains(r, "not correct")
 
     def test_reset_requests_are_rate_limited(self):
         from django.core.cache import cache

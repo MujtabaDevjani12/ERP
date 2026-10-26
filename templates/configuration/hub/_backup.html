@@ -1,0 +1,34 @@
+{% load ui %}
+<div class="st-body">
+  {% if not company %}
+    <div class="ui-alert ui-alert-warning" role="alert">{% icon "warning" "w-4 h-4" %}<div>Your account is not attached to a company yet, so there is nothing to back up.</div></div>
+  {% else %}
+  <fieldset class="st-group">
+    <legend>Download a backup</legend>
+    <p class="ui-help" style="margin:0 0 12px">One .zip file with everything that belongs to <b>{{ company.name }}</b>: branches, products, stock, sales, purchases, accounts, HR and settings, plus uploaded pictures. It does not contain user passwords, roles or your subscription. Keep the file somewhere safe (it holds your business data).</p>
+    <a class="ui-btn ui-btn-primary" href="{% url 'configuration:backup_download' %}">{% icon "download" "w-4 h-4" %}<span>Download backup</span></a>
+  </fieldset>
+
+  <fieldset class="st-group">
+    <legend>Restore from a backup</legend>
+    <div class="ui-alert ui-alert-warning" role="alert" style="margin-bottom:12px">{% icon "warning" "w-4 h-4" %}<div><b>This replaces the current data of {{ company.name }}</b> with the data in the file. Anything entered after the backup was made is removed. A safety copy of the current data is saved on the server first, and if anything goes wrong nothing is changed. It only accepts a backup made from this same company.</div></div>
+    <form method="post" action="{% url 'configuration:backup_import' %}" enctype="multipart/form-data" class="grid" style="gap:12px;max-width:520px">
+      {% csrf_token %}
+      <div><label class="ui-label" for="bk-file">Backup file (.zip)</label><input id="bk-file" type="file" name="backup_file" accept=".zip,application/zip" required></div>
+      <div><label class="ui-label" for="bk-confirm">Type RESTORE to confirm</label><input id="bk-confirm" type="text" name="confirm" autocomplete="off" required placeholder="RESTORE"></div>
+      <div><label class="ui-label" for="bk-pw">Your password</label><input id="bk-pw" type="password" name="password" autocomplete="current-password" required></div>
+      <div><button type="submit" class="ui-btn ui-btn-danger" onclick="return confirm('Replace the current data with this backup?')">{% icon "upload" "w-4 h-4" %}<span>Restore backup</span></button></div>
+    </form>
+  </fieldset>
+
+  {% if saved_copies %}
+  <fieldset class="st-group">
+    <legend>Safety copies kept on the server</legend>
+    <p class="ui-help" style="margin:0 0 8px">Made automatically just before each restore. Download one and restore it above to go back.</p>
+    {% for c in saved_copies %}
+      <div class="st-key"><span>{{ c.name }} &middot; {{ c.when|date:"d M Y H:i" }} &middot; {{ c.size|filesizeformat }}</span><a class="ui-btn" href="{% url 'configuration:backup_saved' c.name %}">{% icon "download" "w-4 h-4" %}<span>Download</span></a></div>
+    {% endfor %}
+  </fieldset>
+  {% endif %}
+  {% endif %}
+</div>

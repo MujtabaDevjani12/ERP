@@ -19,7 +19,7 @@ from django.utils import timezone
 from billing import access, bridge, services, stripe_gateway
 from billing.google_auth import GoogleAuthError, verify_id_token
 from billing.tenancy import scope_queryset
-from billing.testkit import BillingBase, User, make_owner, make_plans, pay, signup
+from billing.testkit import BillingBase, User, last_code, make_owner, make_plans, pay, signup
 from company.models import Company
 from core.errors import ERPError
 from core.pos_fixtures import PASSWORD, grant
@@ -358,6 +358,9 @@ class AuthPageTests(BillingBase):
         r = self.client.post(reverse("billing:signup"), {
             "company_name": "Web Co", "owner_name": "Web Owner", "email": "web@example.com", "phone": "0300", "password1": PASSWORD, "password2": PASSWORD,
             "plan": self.starter.pk, "interval": "monthly", "accept": "on"})
+        self.assertRedirects(r, reverse("billing:signup_verify"), fetch_redirect_response=False)
+        self.assertEqual(Company.objects.count(), 0)                         # nothing exists until the e-mail is confirmed
+        r = self.client.post(reverse("billing:signup_verify"), {"code": last_code()})
         self.assertRedirects(r, reverse("billing:home"), fetch_redirect_response=False)
         sub = Subscription.objects.get(company_name="Web Co")
         self.assertEqual(sub.status, Subscription.PENDING)
@@ -371,6 +374,8 @@ class AuthPageTests(BillingBase):
         r = self.client.post(reverse("billing:signup"), {
             "company_name": "Demo Co", "owner_name": "Demo Owner", "email": "demo@example.com", "password1": PASSWORD, "password2": PASSWORD,
             "plan": self.starter.pk, "interval": "monthly", "accept": "on"})
+        self.assertRedirects(r, reverse("billing:signup_verify"), fetch_redirect_response=False)
+        r = self.client.post(reverse("billing:signup_verify"), {"code": last_code()})
         self.assertRedirects(r, reverse("dashboard:home"), fetch_redirect_response=False)
 
     def test_signup_validates(self):
@@ -633,7 +638,12 @@ class GoogleTests(BillingBase):
             r = self._post({"credential": "x", "mode": "signup", "plan": self.pro.pk, "interval": "yearly", "company_name": "Gina Mart"})
         data = r.json()
         self.assertTrue(data["ok"])
-        self.assertEqual(data["redirect"], reverse("billing:home"))
+        self.assertEqual(data["redirect"], reverse("billing:signup_verify"))
+        self.assertEqual(Company.objects.count(), 0)                         # Google sign-up also waits for the e-mailed code
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertEqual(mail.outbox[-1].to, ["gina@example.com"])
+        r = self.client.post(reverse("billing:signup_verify"), {"code": last_code()})
+        self.assertRedirects(r, reverse("billing:home"), fetch_redirect_response=False)
         sub = Subscription.objects.get(company_name="Gina Mart")
         self.assertEqual((sub.plan, sub.interval, sub.state()), (self.pro, "yearly", "pending"))
         self.assertIn("_auth_user_id", self.client.session)
