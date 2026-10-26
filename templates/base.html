@@ -46,10 +46,10 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family={{ google_font_query|default:'Inter:wght@400;500;600;700;800' }}&display=swap">
-  <link rel="stylesheet" href="{% static 'css/erp-ui.css' %}?v=20261026a">
-  <link rel="stylesheet" href="{% static 'css/fx-skin.css' %}?v=20261026a">
+  <link rel="stylesheet" href="{% static 'css/erp-ui.css' %}?v=20261027e">
+  <link rel="stylesheet" href="{% static 'css/fx-skin.css' %}?v=20261027e">
   <link rel="stylesheet" href="{% static 'css/layout-unify.css' %}?v=20261025a">
-  <link rel="stylesheet" href="{% static 'css/billing.css' %}?v=20261026a">
+  <link rel="stylesheet" href="{% static 'css/billing.css' %}?v=20261027e">
   <style>
     :root {
       --brand-50: {{ brand_shades.50|default:"#eef2ff" }}; --brand-100: {{ brand_shades.100|default:"#e0e7ff" }};
@@ -188,7 +188,7 @@
         <button type="button" class="icon-btn fx-sbtoggle" @click="$store.ui.toggleSidebar()" :aria-expanded="!$store.ui.collapsed" aria-controls="app-sidebar" :aria-label="$store.ui.collapsed ? 'Expand menu' : 'Collapse menu'" :data-tip="$store.ui.collapsed ? 'Expand menu' : 'Collapse menu'" data-tip-pos="bottom">{% icon "sidebar" "w-5 h-5" %}</button>
         <a href="{% url 'dashboard:home' %}" class="fx-brand" aria-label="{{ system_settings.site_name|default:'Home' }}">
           {% if system_settings.site_logo %}<img src="{{ system_settings.site_logo.url }}" alt="" class="fx-logo">{% else %}<span class="fx-logo fx-logo-letter">{{ system_settings.site_name|default:"P"|slice:":1"|upper }}</span>{% endif %}
-          <span class="fx-brand-text"><span class="fx-brand-name">{{ system_settings.site_name|default:"Multiple POS" }}</span>{% if current_store %}<span class="fx-brand-sub">{{ current_store.name }}</span>{% else %}<span class="fx-brand-sub">ERP &amp; POS</span>{% endif %}</span>
+          <span class="fx-brand-text"><span class="fx-brand-name">{{ system_settings.site_name|default:"ERP" }}</span>{% if current_store %}<span class="fx-brand-sub">{{ current_store.name }}</span>{% else %}<span class="fx-brand-sub">ERP &amp; POS</span>{% endif %}</span>
         </a>
       </div>
 

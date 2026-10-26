@@ -10,7 +10,7 @@
   </fieldset>
 
   <fieldset class="st-group">
-    <legend>Restore from a backup</legend>
+    <legend>Restore from a file on your computer</legend>
     <div class="ui-alert ui-alert-warning" role="alert" style="margin-bottom:12px">{% icon "warning" "w-4 h-4" %}<div><b>This replaces the current data of {{ company.name }}</b> with the data in the file. Anything entered after the backup was made is removed. A safety copy of the current data is saved on the server first, and if anything goes wrong nothing is changed. It only accepts a backup made from this same company.</div></div>
     <form method="post" action="{% url 'configuration:backup_import' %}" enctype="multipart/form-data" class="grid" style="gap:12px;max-width:520px">
       {% csrf_token %}
@@ -21,14 +21,33 @@
     </form>
   </fieldset>
 
-  {% if saved_copies %}
   <fieldset class="st-group">
-    <legend>Safety copies kept on the server</legend>
-    <p class="ui-help" style="margin:0 0 8px">Made automatically just before each restore. Download one and restore it above to go back.</p>
-    {% for c in saved_copies %}
-      <div class="st-key"><span>{{ c.name }} &middot; {{ c.when|date:"d M Y H:i" }} &middot; {{ c.size|filesizeformat }}</span><a class="ui-btn" href="{% url 'configuration:backup_saved' c.name %}">{% icon "download" "w-4 h-4" %}<span>Download</span></a></div>
-    {% endfor %}
+    <legend>Saved backups</legend>
+    <p class="ui-help" style="margin:0 0 10px">Every time you press <b>Download backup</b> a copy is also kept here on the server (the newest 30), together with an automatic safety copy before each restore. Press <b>Restore</b> on any row to go back to that moment. It asks for your password.</p>
+    {% if saved_copies %}
+    <div class="st-table-wrap"><table class="st-table">
+      <thead><tr><th>Made on</th><th>Type</th><th>Records</th><th>Size</th><th>Took</th><th>Download</th><th>Restore</th></tr></thead>
+      <tbody>
+      {% for c in saved_copies %}
+        <tr>
+          <td data-label="Made on"><b>{{ c.when|date:"d M Y" }}</b> &middot; {{ c.when|date:"h:i:s A" }}<br><small class="ui-help">{{ c.when|timesince }} ago</small></td>
+          <td data-label="Type">{% if c.safety %}Safety copy (before a restore){% else %}Backup{% endif %}</td>
+          <td data-label="Records">{{ c.records }}</td>
+          <td data-label="Size">{{ c.size|filesizeformat }}</td>
+          <td data-label="Took">{% if c.seconds != None %}{{ c.seconds }} s{% else %}-{% endif %}</td>
+          <td data-label="Download"><a class="ui-btn" href="{% url 'configuration:backup_saved' c.name %}">{% icon "download" "w-4 h-4" %}<span>Download</span></a></td>
+          <td data-label="Restore">
+            <form method="post" action="{% url 'configuration:backup_restore_saved' c.name %}" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+              {% csrf_token %}
+              <input type="password" name="password" required autocomplete="current-password" placeholder="Your password" aria-label="Your password" style="max-width:150px">
+              <button type="submit" class="ui-btn ui-btn-danger" data-when="{{ c.when|date:'d M Y h:i A' }}" onclick="return confirm('Replace the current data with the backup made on ' + this.dataset.when + '?')">{% icon "upload" "w-4 h-4" %}<span>Restore</span></button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% else %}<p class="ui-help" style="margin:0">No backup yet. Press <b>Download backup</b> above to make the first one.</p>{% endif %}
   </fieldset>
-  {% endif %}
   {% endif %}
 </div>

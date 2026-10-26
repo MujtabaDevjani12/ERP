@@ -111,7 +111,7 @@ class EngineTests(BackupBase):
     def test_safety_copy_is_listed(self):
         data, manifest = backup.company_backup(self.world.company)
         path = backup.save_safety_copy(data, manifest)
-        listed = backup.saved_copies("company")
+        listed = backup.saved_copies("company", company_id=self.world.company.pk)
         self.assertEqual([c["name"] for c in listed], [path.name])
         self.assertEqual(backup.saved_copy_path(path.name), path)
         with self.assertRaises(backup.BackupError):
@@ -159,7 +159,7 @@ class ErpPageTests(BackupBase):
         resp = self.upload(data)
         self.assertIn("Milk", self.names(self.world.company))
         self.assertContains(resp, "Backup restored")
-        self.assertEqual(len(backup.saved_copies("company")), 1)             # the safety copy of the data as it was before
+        self.assertEqual(len(backup.saved_copies("company", company_id=self.world.company.pk)), 1)   # the safety copy of the data as it was before
 
     def test_restore_rejects_bad_file(self):
         self.login()
@@ -167,16 +167,66 @@ class ErpPageTests(BackupBase):
         resp = self.upload(b"junk")
         self.assertContains(resp, "not a backup file")
         self.assertEqual(self.names(self.world.company), before)
-        self.assertEqual(backup.saved_copies("company"), [])
+        self.assertEqual(backup.saved_copies("company", company_id=self.world.company.pk), [])
 
     def test_safety_copy_download_only_for_own_company(self):
         self.login()
         data, manifest = backup.company_backup(self.rival)
         theirs = backup.save_safety_copy(data, manifest)
-        self.assertEqual(self.client.get(reverse("configuration:backup_saved", args=[theirs.name])).status_code, 403)
+        refused = self.client.get(reverse("configuration:backup_saved", args=[theirs.name]))
+        self.assertEqual(refused.status_code, 302)                                       # not handed over: back to the page with a message
         mine_data, mine_manifest = backup.company_backup(self.world.company)
         mine = backup.save_safety_copy(mine_data, mine_manifest)
         self.assertEqual(self.client.get(reverse("configuration:backup_saved", args=[mine.name])).status_code, 200)
+
+    def test_download_keeps_a_copy_in_the_history_with_date_and_duration(self):
+        self.login()
+        resp = self.client.get(reverse("configuration:backup_download"))
+        names = [c["name"] for c in backup.saved_copies("company", company_id=self.world.company.pk)]
+        self.assertEqual(len(names), 1)
+        self.assertIn(names[0], resp["Content-Disposition"])
+        page = self.client.get(reverse("configuration:hub_section", args=["backup"]))
+        self.assertContains(page, "Saved backups")
+        self.assertContains(page, names[0])
+        self.assertContains(page, reverse("configuration:backup_restore_saved", args=[names[0]]))
+        copy = backup.saved_copies("company", company_id=self.world.company.pk)[0]
+        self.assertIsNotNone(copy["seconds"])
+        self.assertGreater(copy["records"], 0)
+        self.assertFalse(copy["safety"])
+
+    def test_restore_button_on_a_saved_backup(self):
+        self.login()
+        self.client.get(reverse("configuration:backup_download"))
+        name = backup.saved_copies("company", company_id=self.world.company.pk)[0]["name"]
+        Product.objects.filter(name="Milk").delete()
+        wrong = self.client.post(reverse("configuration:backup_restore_saved", args=[name]), {"password": "nope"}, follow=True)
+        self.assertContains(wrong, "not correct")
+        self.assertNotIn("Milk", self.names(self.world.company))
+        ok = self.client.post(reverse("configuration:backup_restore_saved", args=[name]), {"password": PASSWORD}, follow=True)
+        self.assertContains(ok, "restored")
+        self.assertIn("Milk", self.names(self.world.company))
+        kinds = [c["safety"] for c in backup.saved_copies("company", company_id=self.world.company.pk)]
+        self.assertIn(True, kinds)                                                       # the safety copy made before restoring is in the list
+
+    def test_another_companys_saved_backup_cannot_be_restored_here(self):
+        self.login()
+        data, manifest = backup.company_backup(self.rival)
+        theirs = backup.save_copy(data, manifest)
+        before = self.names(self.world.company)
+        r = self.client.post(reverse("configuration:backup_restore_saved", args=[theirs.name]), {"password": PASSWORD}, follow=True)
+        self.assertContains(r, "does not belong")
+        self.assertEqual(self.names(self.world.company), before)
+        self.assertEqual(self.names(self.rival), ["Rival Tea"])
+
+    def test_history_is_trimmed_to_the_newest_copies(self):
+        data, manifest = backup.company_backup(self.world.company)
+        with override_settings():
+            old_keep = backup.KEEP
+            backup.KEEP = 3
+            self.addCleanup(setattr, backup, "KEEP", old_keep)
+            for i in range(5):
+                path = backup.save_copy(data, dict(manifest, label=f"x{i}"))
+        self.assertEqual(len(backup.saved_copies("company", company_id=self.world.company.pk)), 3)
 
 
 class OwnerBackupTests(TestCase):
@@ -218,9 +268,18 @@ class OwnerBackupTests(TestCase):
             self.assertTrue(Plan.objects.filter(slug="pro").exists())
             self.assertEqual(Plan.objects.get(slug="starter").name, "Starter")
             self.assertTrue(OwnerAccount.objects.filter(email="boss@owner.test").exists())
-            self.assertEqual(len(backup.saved_copies("owner")), 1)
+            self.assertEqual(len(backup.saved_copies("owner")), 2)          # the download's own copy + the safety copy made by the restore
             resp = self.client.get(reverse("owner:settings"))
-            self.assertContains(resp, "Safety copies on the server")
+            self.assertContains(resp, "Saved backups")
+            name = [c for c in backup.saved_copies("owner") if not c["safety"]][0]["name"]
+            self.assertContains(resp, name)
+            Plan.objects.filter(slug="pro").delete()
+            bad = self.client.post(reverse("owner:backup_restore_saved", args=[name]), {"password": "x"}, follow=True)
+            self.assertContains(bad, "not correct")
+            self.assertFalse(Plan.objects.filter(slug="pro").exists())
+            good = self.client.post(reverse("owner:backup_restore_saved", args=[name]), {"password": self.password}, follow=True)
+            self.assertContains(good, "restored")
+            self.assertTrue(Plan.objects.filter(slug="pro").exists())
 
     def test_company_backup_is_refused_by_owner_restore(self):
         from ownerconsole.tests import OWNER_SITE, sign_in

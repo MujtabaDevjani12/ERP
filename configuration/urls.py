@@ -18,5 +18,6 @@ urlpatterns = [
     path("backup/download/", backup_views.download, name="backup_download"),
     path("backup/import/", backup_views.import_view, name="backup_import"),
     path("backup/saved/<str:name>/", backup_views.saved, name="backup_saved"),
+    path("backup/saved/<str:name>/restore/", backup_views.restore_saved, name="backup_restore_saved"),
     path("<slug:section>/", hub.hub_section, name="hub_section"),
 ]

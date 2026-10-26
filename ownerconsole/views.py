@@ -523,8 +523,12 @@ def backup_download(request):
     from core import backup
     from . import db
     data, manifest = backup.owner_backup(db.alias())
+    try:
+        name = backup.save_copy(data, manifest).name                  # kept on the server too: it appears in the history on the settings page
+    except backup.BackupError:
+        name = backup.filename_for(manifest)
     resp = HttpResponse(data, content_type="application/zip")
-    resp["Content-Disposition"] = f'attachment; filename="{backup.filename_for(manifest)}"'
+    resp["Content-Disposition"] = f'attachment; filename="{name}"'
     return resp
 
 
@@ -555,13 +559,32 @@ def backup_import(request):
 
 
 @owner_required(admin=True)
+@require_POST
+def backup_restore_saved(request, name):
+    from core import backup
+    from . import db
+    if not request.owner.check_password(request.POST.get("password") or ""):
+        messages.error(request, "Your password is not correct. Nothing was changed.")
+    else:
+        try:
+            path = backup.saved_copy_path(name, "owner")
+            current, manifest = backup.owner_backup(db.alias())
+            safety = backup.save_safety_copy(current, manifest)
+            with open(path, "rb") as fh:
+                counts = backup.restore_owner(fh, db.alias())
+            messages.success(request, f"Backup {name} restored: {sum(counts.values())} records in {len(counts)} tables. Your previous owner data was saved first as "
+                                      f"{safety.name}. If your own account is not in that backup you will be asked to sign in again.")
+        except backup.BackupError as exc:
+            messages.error(request, str(exc))
+    return redirect(reverse("owner:settings") + "#backup")
+
+
+@owner_required(admin=True)
 def backup_saved(request, name):
     from core import backup
     try:
-        path = backup.saved_copy_path(name)
+        path = backup.saved_copy_path(name, "owner")
     except backup.BackupError:
-        raise Http404
-    if "-owner-" not in path.name:
         raise Http404
     return FileResponse(open(path, "rb"), as_attachment=True, filename=path.name)
 

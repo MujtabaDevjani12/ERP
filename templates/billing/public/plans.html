@@ -3,21 +3,25 @@
 {% block auth_content %}
 <div class="bp-pub">
   {% include "billing/public/_chrome_top.html" %}
-  <main class="bp-pub-main" id="main">
-    <div class="bp-hero">
+  <main class="pp-main" id="main">
+    <div class="pp-hero">
+      <span class="pp-eyebrow">{% icon "tag" "w-4 h-4" %}Simple pricing in PKR</span>
       <h1>Pick the plan that fits your business</h1>
-      <p>Simple monthly or yearly pricing in PKR. Create your account, pick a plan, pay, and your ERP is ready. Upgrade, downgrade or cancel whenever you like.</p>
-      <div class="bp-toggle" role="group" aria-label="Billing period">
-        <a href="?interval=monthly" class="{% if interval == 'monthly' %}on{% endif %}">Monthly</a>
-        <a href="?interval=yearly" class="{% if interval == 'yearly' %}on{% endif %}">Yearly <span class="bp-save">save more</span></a>
+      <p>Create your account, choose a plan and your workspace is ready. Upgrade, downgrade or cancel whenever you like.</p>
+      <div class="pp-center">
+        <div class="pp-seg" role="group" aria-label="Billing period">
+          <a href="?interval=monthly" style="text-decoration:none"><span style="{% if interval == 'monthly' %}background:var(--ui-surface);color:var(--ui-text);box-shadow:0 1px 3px rgba(0,0,0,.18){% endif %}">Monthly</span></a>
+          <a href="?interval=yearly" style="text-decoration:none"><span style="{% if interval == 'yearly' %}background:var(--ui-surface);color:var(--ui-text);box-shadow:0 1px 3px rgba(0,0,0,.18){% endif %}">Yearly <em>save more</em></span></a>
+        </div>
       </div>
     </div>
     {% if plans %}
-    <div class="bp-plans">{% for plan in plans %}{% include "billing/public/_plan_card.html" with cta=True %}{% endfor %}</div>
+    <div class="pp-plans-grid">{% for plan in plans %}{% include "billing/public/_plan_card.html" with cta=True %}{% endfor %}</div>
     {% else %}
-    <div class="ui-card">{% ui "empty_state" icon="tag" title="Plans are being set up" text="Please check back soon." %}</div>
+    <div class="pp-card"><div class="pp-card-body">{% ui "empty_state" icon="tag" title="Plans are being set up" text="Please check back soon." %}</div></div>
     {% endif %}
-    <p class="bp-muted" style="text-align:center;margin-top:24px">Already have an account? <a class="erp-link" href="{% url 'accounts:login' %}">Sign in</a>{% if settings_obj.support_email %} &middot; Questions? <a class="erp-link" href="mailto:{{ settings_obj.support_email }}">{{ settings_obj.support_email }}</a>{% endif %}</p>
+    <p class="pp-small" style="margin-top:28px">Already have an account? <a class="erp-link" href="{% url 'accounts:login' %}">Sign in</a>{% if settings_obj.support_email %} &middot; Questions? <a class="erp-link" href="mailto:{{ settings_obj.support_email }}">{{ settings_obj.support_email }}</a>{% endif %}</p>
   </main>
+  {% include "billing/public/_chrome_foot.html" %}
 </div>
 {% endblock %}

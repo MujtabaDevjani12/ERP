@@ -59,7 +59,7 @@ def _deliver(email, code, purpose):
     from ownerconsole import emailing
 
     s = access.platform_settings()
-    business = s.business_name or "Multiple POS"
+    business = s.business_name or "ERP"
     action = WHAT.get(purpose, "continue")
     text, html = emailing.render(
         "Your verification code",

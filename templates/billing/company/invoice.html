@@ -16,7 +16,7 @@
 <div class="bp-invoice">
   <div class="row">
     <div><h1 style="margin:0">Invoice</h1><div>{{ invoice.number }}</div></div>
-    <div style="text-align:right"><b>{{ settings_obj.business_name|default:"Multiple POS" }}</b>{% if settings_obj.support_email %}<br>{{ settings_obj.support_email }}{% endif %}{% if settings_obj.support_phone %}<br>{{ settings_obj.support_phone }}{% endif %}</div>
+    <div style="text-align:right"><b>{{ settings_obj.business_name|default:"ERP" }}</b>{% if settings_obj.support_email %}<br>{{ settings_obj.support_email }}{% endif %}{% if settings_obj.support_phone %}<br>{{ settings_obj.support_phone }}{% endif %}</div>
   </div>
   <div class="row" style="margin-top:24px">
     <div><div style="color:#64748b;font-size:12px">Billed to</div><b>{{ company.name }}</b>{% if company.address %}<br>{{ company.address }}{% endif %}{% if company.email %}<br>{{ company.email }}{% endif %}</div>

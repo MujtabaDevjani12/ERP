@@ -358,7 +358,7 @@ def hub_section(request, section="business"):
         from core import backup
         company = getattr(request, "company", None)
         ctx["company"] = company
-        ctx["saved_copies"] = backup.saved_copies("company", backup.SAFE_NAME.sub("-", company.name).strip("-").lower()) if company else []
+        ctx["saved_copies"] = backup.saved_copies("company", company_id=company.pk) if company else []
 
     ctx.update(_extra_context(request, sec, store))
     ctx["can_edit"] = _can(request.user, sec["perm"])

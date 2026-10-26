@@ -1,8 +1,16 @@
 {% load ui %}
-<header class="bp-pub-top">
-  <a class="brand" href="{% url 'billing:plans' %}">{{ settings_obj.business_name|default:system_settings.site_name|default:"Multiple POS" }}</a>
-  <nav style="display:flex;gap:8px;align-items:center">
-    <a class="ui-btn ui-btn-ghost ui-btn-sm" href="{% url 'billing:plans' %}">Plans</a>
-    <a class="ui-btn ui-btn-secondary ui-btn-sm" href="{% url 'accounts:login' %}">Sign in</a>
-  </nav>
+{% with name=settings_obj.business_name|default:system_settings.site_name|default:"ERP" %}
+<header class="pp-top">
+  <div class="pp-top-in">
+    <a class="pp-brand" href="{% url 'billing:plans' %}" aria-label="{{ name }} - plans">
+      {% if system_settings.site_logo %}<img class="pp-logo" src="{{ system_settings.site_logo.url }}" alt="">{% else %}<span class="pp-mark" aria-hidden="true">{{ name|slice:":1"|upper }}</span>{% endif %}
+      <span>{{ name }}</span>
+    </a>
+    <nav class="pp-nav" aria-label="Main">
+      <a class="pp-link" href="{% url 'billing:plans' %}">Plans</a>
+      {% if signup_open %}<a class="pp-link" href="{% url 'billing:signup' %}">Create account</a>{% endif %}
+      <a class="pp-btn-line" href="{% url 'accounts:login' %}">Sign in</a>
+    </nav>
+  </div>
 </header>
+{% endwith %}

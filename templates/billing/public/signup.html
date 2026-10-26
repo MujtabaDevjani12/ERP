@@ -1,85 +1,121 @@
 {% extends "base.html" %}{% load ui billing_tags %}
 {% block title %}Create your company{% endblock %}
 {% block auth_content %}
-{% with sel_plan=form.plan.value|default:""|stringformat:"s" sel_int=form.interval.value|default:"monthly" %}
+{% with sel_plan=form.plan.value|default:""|stringformat:"s" sel_int=form.interval.value|default:"monthly" brand=settings_obj.business_name|default:"ERP" %}
 <div class="bp-pub">
   {% include "billing/public/_chrome_top.html" %}
-  <main class="bp-pub-main" id="main">
-    <div class="bp-hero">
-      <h1>Create your account</h1>
-      <p>Sign up with Google or your e-mail, then choose a plan and pay. {% if trial_days %}You get {{ trial_days }} free day{{ trial_days|pluralize }} to look around first.{% else %}Your ERP opens as soon as your first payment is confirmed.{% endif %}</p>
-      <div style="max-width:340px;margin:16px auto 0">{% include "billing/public/_auth_tabs.html" with active="signup" %}</div>
+  <main class="pp-main" id="main">
+    <div class="pp-hero">
+      {% if trial_days %}<span class="pp-eyebrow">{% icon "star" "w-4 h-4" %}{{ trial_days }}-day free demo &middot; no card needed</span>{% else %}<span class="pp-eyebrow">{% icon "bolt" "w-4 h-4" %}Ready in minutes</span>{% endif %}
+      <h1>Create your {{ brand }} account</h1>
+      <p>Choose a plan, confirm your email with a one-time code and start running your business. {% if trial_days %}Look around free for {{ trial_days }} day{{ trial_days|pluralize }} first.{% else %}Your workspace opens as soon as your first payment is confirmed.{% endif %}</p>
+      <ol class="pp-steps" aria-label="Steps">
+        <li class="on"><span>Choose a plan</span></li>
+        <li class="on"><span>Your details</span></li>
+        <li><span>Verify email</span></li>
+        <li><span>{% if trial_days %}Start{% else %}Pay &amp; start{% endif %}</span></li>
+      </ol>
+      <div class="pp-tabs">{% include "billing/public/_auth_tabs.html" with active="signup" %}</div>
     </div>
 
     {% if not settings_obj.allow_public_signup %}
-      <div class="ui-card">{% ui "empty_state" icon="lock" title="Sign-up is closed right now" text="Please contact us to get an account." %}</div>
+      <div class="pp-card"><div class="pp-card-body">{% ui "empty_state" icon="lock" title="Sign-up is closed right now" text="Please contact us to get an account." %}</div></div>
     {% else %}
-    <form method="post" novalidate class="bp-signup" id="signup-form">
+    <form method="post" novalidate class="pp-grid" id="signup-form">
       {% csrf_token %}
-      <section class="ui-card">
-        <div class="ui-card-header"><div class="ui-card-title">1. Choose a plan</div>
-          <div class="bp-toggle" role="radiogroup" aria-label="Billing period" style="margin:0">
+      <section class="pp-card" aria-labelledby="pp-h-plan">
+        <div class="pp-card-head">
+          <h2 id="pp-h-plan">1. Choose your plan<small>You can change or cancel it any time.</small></h2>
+          <div class="pp-seg" role="radiogroup" aria-label="Billing period">
             {% for value, label in form.fields.interval.choices %}
-            <label style="cursor:pointer"><input type="radio" name="interval" value="{{ value }}" class="sr-only" {% if sel_int == value %}checked{% endif %} onchange="bpInterval(this.value)"><span class="bp-ivl {% if sel_int == value %}on{% endif %}" data-v="{{ value }}" style="display:inline-block;padding:7px 16px;border-radius:999px;font-size:13px;font-weight:600">{{ label }}</span></label>
+            <label><input type="radio" name="interval" value="{{ value }}" class="sr-only" {% if sel_int == value %}checked{% endif %} onchange="bpInterval(this.value)"><span>{{ label }}{% if value == "yearly" %} <em>save more</em>{% endif %}</span></label>
             {% endfor %}
           </div>
         </div>
-        <div class="ui-card-body">
-          {% if form.plan.errors %}<p class="ui-error">{{ form.plan.errors.0 }}</p>{% endif %}
-          <div class="bp-plans" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr))">
+        <div class="pp-card-body">
+          {% if form.plan.errors %}<p class="ui-error" role="alert">{{ form.plan.errors.0 }}</p>{% endif %}
+          <div class="pp-plans">
             {% for plan in plans %}
-            <label class="bp-pick">
-              <input type="radio" name="plan" value="{{ plan.pk }}" {% if sel_plan == plan.pk|stringformat:"s" %}checked{% endif %}>
-              <div class="bp-plan{% if plan.is_featured %} is-featured{% endif %}" style="height:100%">
-                {% if plan.is_featured %}<span class="ribbon">Most popular</span>{% endif %}
-                <div><h3>{{ plan.name }}</h3><p class="tag">{{ plan.tagline }}</p></div>
-                <div class="bp-price">
-                  <span data-ivl="monthly"><b>{{ plan.price_monthly|price:plan.currency }}</b> <small>/ month</small></span>
-                  <span data-ivl="yearly" hidden><b>{{ plan.price_yearly|price:plan.currency }}</b> <small>/ year</small>{% if plan.yearly_saving_percent %} <span class="ui-badge ui-badge-success no-dot">Save {{ plan.yearly_saving_percent }}%</span>{% endif %}</span>
-                </div>
-                <ul class="bp-list">
+            <label class="pp-plan">
+              <input type="radio" name="plan" value="{{ plan.pk }}" data-name="{{ plan.name }}" data-monthly="{{ plan.price_monthly|price:plan.currency }}" data-yearly="{{ plan.price_yearly|price:plan.currency }}" {% if sel_plan == plan.pk|stringformat:"s" %}checked{% endif %}>
+              <span class="pp-plan-card">
+                <span class="pp-plan-name">{{ plan.name }}{% if plan.is_featured %}<span class="pp-pop">Most popular</span>{% endif %}</span>
+                <span class="pp-plan-tag">{{ plan.tagline }}</span>
+                <span class="pp-plan-price">
+                  <span data-ivl="monthly"><b>{{ plan.price_monthly|price:plan.currency }}</b><small>per month</small></span>
+                  <span data-ivl="yearly" hidden><b>{{ plan.price_yearly|price:plan.currency }}</b><small>per year</small>{% if plan.yearly_saving_percent %}<br><span class="pp-save">Save {{ plan.yearly_saving_percent }}%</span>{% endif %}</span>
+                </span>
+                <ul class="pp-feat">
                   {% for line in plan.limit_lines %}<li>{% icon "check" "w-4 h-4" %}<span>{{ line }}</span></li>{% endfor %}
-                  <li>{% icon "check" "w-4 h-4" %}<span>{{ plan.module_labels|join:", " }}</span></li>
+                  <li class="wide">{% icon "layers" "w-4 h-4" %}<span>Includes: {{ plan.module_labels|join:", " }}</span></li>
                 </ul>
-              </div>
+                <span class="pp-selected">{% icon "check" "w-4 h-4" %}Selected</span>
+              </span>
             </label>
+            {% empty %}
+            <p class="pp-small">No plan has been published yet. Please contact us.</p>
             {% endfor %}
           </div>
         </div>
       </section>
 
-      <section class="ui-card">
-        <div class="ui-card-header"><div class="ui-card-title">2. About you</div></div>
-        <div class="ui-card-body" style="display:grid;gap:14px">
+      <section class="pp-card pp-sticky" aria-labelledby="pp-h-you">
+        <div class="pp-card-head"><h2 id="pp-h-you">2. Your details<small>We will email a 6-digit code to confirm your address.</small></h2></div>
+        <div class="pp-card-body pp-form">
           {% if form.non_field_errors %}<div class="ui-alert ui-alert-danger" role="alert">{% icon "error" "w-4 h-4" %}<div>{% for e in form.non_field_errors %}{{ e }} {% endfor %}</div></div>{% endif %}
           {% if google_client_id %}
-          <div class="bp-google" id="g-btn"></div>
-          <div class="bp-gerror" id="g-err" role="alert" hidden></div>
-          <div class="bp-or">or sign up with your email</div>
+          <div class="pp-google" id="g-btn"></div>
+          <div class="pp-err" id="g-err" role="alert" hidden></div>
+          <div class="pp-or">or sign up with your email</div>
           {% endif %}
           {% ui "field" field=form.company_name %}
           {% ui "field" field=form.owner_name %}
           <div class="ui-grid ui-grid-2">{% ui "field" field=form.email %}{% ui "field" field=form.phone %}</div>
           <div class="ui-grid ui-grid-2">{% ui "field" field=form.password1 %}{% ui "field" field=form.password2 %}</div>
           {% ui "field" field=form.accept %}
-          {% if settings_obj.terms_url or settings_obj.privacy_url %}<p class="bp-muted" style="margin:-4px 0 0">Read our {% if settings_obj.terms_url %}<a class="erp-link" href="{{ settings_obj.terms_url }}" target="_blank" rel="noopener">Terms of service</a>{% endif %}{% if settings_obj.terms_url and settings_obj.privacy_url %} and {% endif %}{% if settings_obj.privacy_url %}<a class="erp-link" href="{{ settings_obj.privacy_url }}" target="_blank" rel="noopener">Privacy policy</a>{% endif %}.</p>{% endif %}
-          <button type="submit" class="ui-btn ui-btn-primary ui-btn-lg">{% icon "bolt" "w-4 h-4" %}<span>Create account{% if trial_days %} and start free demo{% else %} and continue to payment{% endif %}</span></button>
-          <p class="bp-muted" style="text-align:center">Already registered? <a class="erp-link" href="{% url 'accounts:login' %}">Sign in</a></p>
+          <div class="pp-summary" aria-live="polite">
+            <div><small>Your plan</small><b id="pp-sum-name">-</b></div>
+            <div class="right"><b id="pp-sum-price">-</b><small id="pp-sum-per"></small></div>
+          </div>
+          <p class="pp-note">{% icon "shield" "w-4 h-4" %}<span>{% if trial_days %}Your {{ trial_days }}-day free demo starts right after you confirm your email. No payment is taken now.{% else %}After you confirm your email you will pay your first invoice and your workspace opens as soon as it is confirmed.{% endif %}</span></p>
+          <button type="submit" class="ui-btn ui-btn-primary ui-btn-lg pp-submit">{% icon "mail" "w-4 h-4" %}<span>Continue - send my code</span></button>
+          <p class="pp-small">Already registered? <a class="erp-link" href="{% url 'accounts:login' %}">Sign in</a></p>
         </div>
       </section>
     </form>
+
+    <div class="pp-trust">
+      <div>{% icon "shield" "w-4 h-4" %}<p style="margin:0"><b>Your data stays yours</b><span>Every company is kept completely separate from every other.</span></p></div>
+      <div>{% icon "mail" "w-4 h-4" %}<p style="margin:0"><b>Verified by email</b><span>A one-time code makes sure the account belongs to you.</span></p></div>
+      <div>{% icon "refresh" "w-4 h-4" %}<p style="margin:0"><b>Change or cancel any time</b><span>Upgrade, downgrade or stop whenever your business needs.</span></p></div>
+      <div>{% icon "clock" "w-4 h-4" %}<p style="margin:0"><b>Set up in minutes</b><span>Your branch, warehouse and chart of accounts are created for you.</span></p></div>
+    </div>
     {% endif %}
   </main>
+  {% include "billing/public/_chrome_foot.html" %}
 </div>
 {% endwith %}
-<style>.bp-toggle label:has(input:checked) .bp-ivl{background:var(--ui-primary);color:var(--ui-on-primary)}</style>
 <script>
+  function bpSummary() {
+    var plan = document.querySelector('input[name=plan]:checked');
+    var ivl = document.querySelector('input[name=interval]:checked');
+    var yearly = ivl && ivl.value === 'yearly';
+    var n = document.getElementById('pp-sum-name'), p = document.getElementById('pp-sum-price'), per = document.getElementById('pp-sum-per');
+    if (!n) { return; }
+    if (!plan) { n.textContent = 'Choose a plan'; p.textContent = '-'; per.textContent = ''; return; }
+    n.textContent = plan.dataset.name;
+    p.textContent = yearly ? plan.dataset.yearly : plan.dataset.monthly;
+    per.textContent = yearly ? 'per year' : 'per month';
+  }
   function bpInterval(v) {
     document.querySelectorAll('[data-ivl]').forEach(function (el) { el.hidden = el.dataset.ivl !== v; });
+    bpSummary();
   }
+  document.querySelectorAll('input[name=plan]').forEach(function (el) { el.addEventListener('change', bpSummary); });
   (function () {
     var checked = document.querySelector('input[name=interval]:checked');
     bpInterval(checked ? checked.value : 'monthly');
+    bpSummary();
   })();
 </script>
 {% if google_client_id and settings_obj.allow_public_signup %}

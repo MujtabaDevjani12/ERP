@@ -77,7 +77,7 @@ class Command(BaseCommand):
 
     def _system_config(self, warehouse):
         config = SystemConfiguration.get()
-        config.site_name = "Multiple POS"
+        config.site_name = "ERP"
         config.default_email = "store@example.com"
         config.default_warehouse = warehouse
         config.save()

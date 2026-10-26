@@ -74,7 +74,7 @@ class SystemConfiguration(TimeStampedModel):
     BARCODE_CHOICES = [("code128", "Code 128"), ("code39", "Code 39"), ("qr", "QR Code")]
     FONT_CHOICES = [(name, name) for name in ["Inter", "Poppins", "Roboto", "Nunito", "Manrope", "Lato", "Work Sans"]]
 
-    site_name = models.CharField(max_length=150, default="My POS")
+    site_name = models.CharField(max_length=150, default="ERP")
 
     # Branding — drives the whole app's look: base.html generates a full
     # Tailwind color scale from primary_color (see core.utils.generate_color_shades)

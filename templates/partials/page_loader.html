@@ -54,7 +54,7 @@
     <div class="pl-mark">
       <div class="pl-logo">{% if system_settings.site_logo %}<img src="{{ system_settings.site_logo.url }}" alt="">{% else %}{{ system_settings.site_name|default:"P"|slice:":1"|upper }}{% endif %}</div>
     </div>
-    <div class="pl-name">{{ system_settings.site_name|default:"Multiple POS" }}</div>
+    <div class="pl-name">{{ system_settings.site_name|default:"ERP" }}</div>
     {% if current_store %}<div class="pl-sub">{{ current_store.name }}</div>{% endif %}
     <div class="pl-bar"></div>
   </div>

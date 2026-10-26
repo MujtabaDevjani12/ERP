@@ -10,7 +10,7 @@ Child templates fill {% block lx_title %}, {% block lx_lead %} and {% block lx_f
       <div class="lx-brand">
         {% if system_settings.site_logo %}<img src="{{ system_settings.site_logo.url }}" alt="" class="lx-logo">
         {% else %}<span class="lx-logo lx-logo-letter">{{ system_settings.site_name|default:"P"|slice:":1"|upper }}</span>{% endif %}
-        <span class="lx-brand-name">{{ system_settings.site_name|default:"Multiple POS" }}</span>
+        <span class="lx-brand-name">{{ system_settings.site_name|default:"ERP" }}</span>
       </div>
       <div class="lx-pitch">
         <p class="lx-eyebrow">{{ system_settings.tagline|default:"Retail management suite" }}</p>
@@ -21,7 +21,7 @@ Child templates fill {% block lx_title %}, {% block lx_lead %} and {% block lx_f
           <li><span>{% icon "chart" "w-4 h-4" %}</span><div><b>Clear reports</b><small>Sales, purchases and profit at a glance</small></div></li>
         </ul>
       </div>
-      <p class="lx-copy">&copy; {% now "Y" %} {{ system_settings.site_name|default:"Multiple POS" }}. All rights reserved.</p>
+      <p class="lx-copy">&copy; {% now "Y" %} {{ system_settings.site_name|default:"ERP" }}. All rights reserved.</p>
     </div>
   </aside>
 
@@ -30,7 +30,7 @@ Child templates fill {% block lx_title %}, {% block lx_lead %} and {% block lx_f
       <div class="lx-card-brand">
         {% if system_settings.site_logo %}<img src="{{ system_settings.site_logo.url }}" alt="" class="lx-logo">
         {% else %}<span class="lx-logo lx-logo-letter">{{ system_settings.site_name|default:"P"|slice:":1"|upper }}</span>{% endif %}
-        <span class="lx-brand-name">{{ system_settings.site_name|default:"Multiple POS" }}</span>
+        <span class="lx-brand-name">{{ system_settings.site_name|default:"ERP" }}</span>
       </div>
       <h1 class="lx-title">{% block lx_title %}{% endblock %}</h1>
       <p class="lx-lead">{% block lx_lead %}{% endblock %}</p>

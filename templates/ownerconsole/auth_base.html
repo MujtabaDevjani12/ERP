@@ -10,7 +10,7 @@
 <body>
 <div class="auth">
   <section class="auth-art" aria-hidden="true">
-    <div class="oc-brand" style="padding:0"><span class="mark">{% oicon "shield" %}</span><span>{{ biz.business_name|default:"Multiple POS" }}<small>Owner console</small></span></div>
+    <div class="oc-brand" style="padding:0"><span class="mark">{% oicon "shield" %}</span><span>{{ biz.business_name|default:"ERP" }}<small>Owner console</small></span></div>
     <div>
       <h2>Your plans, companies and payments in one private place.</h2>
       <p>This site is separate from the ERP your customers use. Only owner accounts can sign in here.</p>
@@ -20,7 +20,7 @@
         <li><span class="ic">{% oicon "mail" %}</span><div><b>E-mail built in</b><small>Invoices, reminders and password reset</small></div></li>
       </ul>
     </div>
-    <small style="color:#9aa1d6">&copy; {% now "Y" %} {{ biz.business_name|default:"Multiple POS" }}</small>
+    <small style="color:#9aa1d6">&copy; {% now "Y" %} {{ biz.business_name|default:"ERP" }}</small>
   </section>
   <main class="auth-main">
     <div class="auth-card">

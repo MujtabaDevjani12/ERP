@@ -1,0 +1,12 @@
+{% with name=settings_obj.business_name|default:system_settings.site_name|default:"ERP" %}
+<footer class="pp-foot">
+  <div class="pp-foot-in">
+    <span>&copy; {% now "Y" %} {{ name }}. All rights reserved.</span>
+    <span>
+      {% if settings_obj.terms_url %}<a href="{{ settings_obj.terms_url }}" target="_blank" rel="noopener">Terms of service</a>{% endif %}
+      {% if settings_obj.privacy_url %}<a href="{{ settings_obj.privacy_url }}" target="_blank" rel="noopener">Privacy policy</a>{% endif %}
+      {% if settings_obj.support_email %}<a href="mailto:{{ settings_obj.support_email }}">{{ settings_obj.support_email }}</a>{% endif %}
+    </span>
+  </div>
+</footer>
+{% endwith %}

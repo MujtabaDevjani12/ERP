@@ -77,7 +77,7 @@ class OwnerAccount(TimeStampedModel):
 # ---------------------------------------------------------------------------------------------------------- settings
 class PlatformSettings(models.Model):
     """The single settings row (pk=1). Use PlatformSettings.get() to edit, PlatformSettings.peek() to read without writing."""
-    business_name = models.CharField(max_length=150, default="Multiple POS", help_text="Shown on invoices, e-mails and plan pages.")
+    business_name = models.CharField(max_length=150, default="ERP", help_text="Shown on invoices, e-mails and plan pages.")
     support_email = models.EmailField(blank=True)
     support_phone = models.CharField(max_length=40, blank=True)
     invoice_footer = models.CharField(max_length=255, blank=True)

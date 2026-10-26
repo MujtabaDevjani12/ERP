@@ -1,5 +1,5 @@
 /* ==========================================================================
-   FX skin — the "floating" look for Multiple POS.
+   FX skin — the "floating" look for the ERP.
    Loaded AFTER erp-ui.css (and after nothing else): it only re-themes the design tokens and re-lays-out the
    application shell. No behaviour lives here, and removing the <link> in base.html / pos.html brings back
    the previous look exactly.

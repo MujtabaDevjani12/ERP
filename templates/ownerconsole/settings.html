@@ -72,7 +72,18 @@
       <label class="small">Your password<input type="password" name="password" autocomplete="current-password" required></label>
       <div class="row"><button class="btn danger" type="submit" onclick="return confirm('Replace the owner database with this backup?')">{% oicon "upload" %}<span>Restore backup</span></button></div>
     </form></div>
-  {% if saved_copies %}<div class="section"><div><h3>Safety copies on the server</h3><p class="why">Made automatically just before each restore.</p></div>
-    <div class="stack">{% for c in saved_copies %}<div class="row small" style="justify-content:space-between"><span>{{ c.name }} &middot; {{ c.when|date:"d M Y H:i" }} &middot; {{ c.size|filesizeformat }}</span><a class="btn" href="{% url 'owner:backup_saved' c.name %}">{% oicon "download" %}<span>Download</span></a></div>{% endfor %}</div></div>{% endif %}
+  <div class="section"><div><h3>Saved backups</h3><p class="why">Every <b>Download backup</b> also keeps a copy here on the server (the newest 30), plus an automatic safety copy before each restore. <b>Restore</b> on any row takes the owner database back to that moment; it asks for your password.</p></div>
+    {% if saved_copies %}<div class="stack">{% for c in saved_copies %}
+      <div class="row small" style="justify-content:space-between;gap:10px;flex-wrap:wrap;border-bottom:1px solid var(--line,#e5e7eb);padding-bottom:8px">
+        <span><b>{{ c.when|date:"d M Y" }}</b> &middot; {{ c.when|date:"h:i:s A" }} <span class="muted">({{ c.when|timesince }} ago)</span><br>
+          {% if c.safety %}Safety copy before a restore{% else %}Backup{% endif %} &middot; {{ c.records }} records &middot; {{ c.size|filesizeformat }} &middot; took {% if c.seconds != None %}{{ c.seconds }} s{% else %}-{% endif %}</span>
+        <span class="row" style="gap:6px;flex-wrap:wrap">
+          <a class="btn" href="{% url 'owner:backup_saved' c.name %}">{% oicon "download" %}<span>Download</span></a>
+          <form method="post" action="{% url 'owner:backup_restore_saved' c.name %}" class="row" style="gap:6px">{% csrf_token %}
+            <input type="password" name="password" required autocomplete="current-password" placeholder="Your password" aria-label="Your password" style="max-width:150px">
+            <button class="btn danger" type="submit" data-when="{{ c.when|date:'d M Y h:i A' }}" onclick="return confirm('Replace the owner database with the backup made on ' + this.dataset.when + '?')">{% oicon "upload" %}<span>Restore</span></button>
+          </form></span>
+      </div>{% endfor %}</div>
+    {% else %}<p class="small muted">No backup yet. Press Download backup above to make the first one.</p>{% endif %}</div>
 </div></div>
 {% endblock %}
