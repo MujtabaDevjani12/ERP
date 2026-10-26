@@ -55,6 +55,14 @@ class ProductFormTests(TestCase):
         v = Product.objects.get(name="Rice").variants.get()
         self.assertEqual(self.w.stock_of(v), Decimal("12"))
 
+    def test_opening_stock_value_reaches_the_ledger(self):
+        from django.core.management import call_command
+        from accounting.models import JournalEntry
+        call_command("seed_chart_of_accounts", company=self.w.company.name, verbosity=0)
+        self.post(variant_row(0, opening_stock="12", cost_price="10"))
+        entry = JournalEntry.objects.get(company=self.w.company, source_type="opening_stock")
+        self.assertEqual(entry.total_debit, Decimal("120.00"))
+
     def test_without_opening_stock_no_stock_row_quantity(self):
         self.post(variant_row(0))
         v = Product.objects.get(name="Rice").variants.get()

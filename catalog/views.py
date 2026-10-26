@@ -248,6 +248,8 @@ def product_form(request, pk=None):
                             item, _ = StockItem.objects.get_or_create(variant=f.instance, warehouse=warehouse)
                             item.adjust(qty, reference_type="OPENING_STOCK", reference_no=product.sku, user=request.user,
                                         remarks="Opening stock", unit_cost=f.instance.cost_price)
+                            from stock.gl import post_opening_stock
+                            post_opening_stock(warehouse, f.instance, qty, f.instance.cost_price, reference_no=product.sku, user=request.user)
                 _save_pictures(product, form)
             count = product.variants.filter(is_active=True).count()
             msg = f"Product “{product.name}” saved with {count} active variant(s)."

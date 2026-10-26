@@ -27,6 +27,8 @@ class ApprovalEngineTests(TestCase):
         ApprovalLevel.objects.create(workflow=wf, level=2, approver_group=self.group)
         self.wf = wf
         self.events = []
+        saved = dict(ap._handlers)                                   # the real handlers (procurement ...) must survive this test class
+        self.addCleanup(lambda: (ap._handlers.clear(), ap._handlers.update(saved)))
         ap.register_handler(
             "purchase_order",
             on_approved=lambda r: self.events.append("approved"),

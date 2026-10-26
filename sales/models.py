@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.conf import settings
 from django.db import models
 
@@ -47,17 +49,49 @@ class Sale(TimeStampedModel):
 
     @property
     def paid_amount(self):
-        return sum((p.amount for p in self.payments.all()), start=0)
+        return sum((p.amount for p in self.payments.all() if p.status != "voided"), start=0)
+
+    @property
+    def returned_amount(self):
+        """Value of the goods that came back (price - discount + tax). Zero for a sale nobody returned anything from."""
+        if self.status not in ("partially_returned", "returned"):
+            return Decimal("0")
+        from .returns import refund_value
+        total = Decimal("0")
+        for item in self.items.all():
+            back = sum((r.quantity for r in item.return_items.all()), Decimal("0"))
+            if back:
+                total += refund_value(item, back)
+        return total
+
+    @property
+    def refunded_amount(self):
+        if self.status not in ("partially_returned", "returned"):
+            return Decimal("0")
+        return sum((r.amount for r in self.refunds.all()), start=Decimal("0"))
+
+    @property
+    def net_total(self):
+        """What the customer really owes for after returns."""
+        return self.total_amount - self.returned_amount
+
+    @property
+    def net_paid(self):
+        """What the shop really keeps of the payments after refunds."""
+        return self.paid_amount - self.refunded_amount
 
     @property
     def due_amount(self):
+        if self.status in ("partially_returned", "returned"):
+            return max(Decimal("0"), self.net_total - self.net_paid)
         return self.total_amount - self.paid_amount
 
     @property
     def payment_status(self):
-        if self.paid_amount <= 0:
-            return "due"
-        if self.paid_amount < self.total_amount:
+        paid, total = (self.net_paid, self.net_total) if self.status in ("partially_returned", "returned") else (self.paid_amount, self.total_amount)
+        if paid <= 0:
+            return "due" if total > 0 else "paid"
+        if paid < total:
             return "partial"
         return "paid"
 

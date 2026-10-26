@@ -402,6 +402,15 @@ def _norm_invoice_no(value):
 
 
 @transaction.atomic
+def _on_open_invoices(grn_line, exclude=None):
+    """Quantity of this receipt line already typed onto draft / pending invoices (they are only counted as invoiced once posted,
+    but a second invoice for the same goods must not be allowed to start)."""
+    qs = PurchaseInvoiceLine.objects.filter(grn_line=grn_line, invoice__status__in=(PurchaseInvoice.DRAFT, PurchaseInvoice.PENDING))
+    if exclude is not None:
+        qs = qs.exclude(invoice=exclude)
+    return qs.aggregate(t=Sum("quantity"))["t"] or ZERO
+
+
 def create_purchase_invoice(company, supplier, vendor_invoice_no, invoice_date, lines, *, user=None, due_date=None,
                             tax_rate=None, purchase_order=None, note=""):
     """lines: [{"grn_line": gl, "quantity": 10, "unit_price": 12.5}]       (stock, matched to a receipt)
@@ -415,6 +424,8 @@ def create_purchase_invoice(company, supplier, vendor_invoice_no, invoice_date, 
         raise ERPError("Add at least one invoice line.")
     if company_of_store(supplier.store).pk != company.pk:
         raise ERPError("The vendor belongs to a different company.")
+    if purchase_order is not None and (purchase_order.supplier_id != supplier.pk or company_of_warehouse(purchase_order.warehouse).pk != company.pk):
+        raise ERPError(f"Purchase order {purchase_order.reference} was placed with another vendor, so this invoice cannot be tied to it.")
 
     clean, subtotal = [], ZERO
     consumed = {}
@@ -430,8 +441,9 @@ def create_purchase_invoice(company, supplier, vendor_invoice_no, invoice_date, 
             if gl.grn.status == GoodsReceipt.REVERSED:
                 raise ERPError(f"Receipt {gl.grn.reference} was reversed and cannot be invoiced.")
             consumed[gl.pk] = consumed.get(gl.pk, ZERO) + qty
-            if consumed[gl.pk] > gl.uninvoiced_quantity:
-                raise ERPError(f"{gl.variant}: invoiced {consumed[gl.pk]} but only {gl.uninvoiced_quantity} accepted and not yet invoiced.")
+            room = gl.uninvoiced_quantity - _on_open_invoices(gl)
+            if consumed[gl.pk] > room:
+                raise ERPError(f"{gl.variant}: invoiced {consumed[gl.pk]} but only {max(room, ZERO)} accepted and not yet invoiced.")
             clean.append({"grn_line": gl, "variant": gl.variant, "description": str(gl.variant)[:255], "quantity": qty, "unit_price": price})
         else:
             if l.get("account") is None:
@@ -745,8 +757,9 @@ def recompute_invoice(invoice):
             if gl.grn.supplier_id != inv.supplier_id:
                 raise ERPError("A receipt line belongs to a different vendor.")
             consumed[gl.pk] = consumed.get(gl.pk, ZERO) + l.quantity
-            if consumed[gl.pk] > gl.uninvoiced_quantity:
-                raise ERPError(f"{gl.variant}: only {gl.uninvoiced_quantity} accepted and not yet invoiced.")
+            room = gl.uninvoiced_quantity - _on_open_invoices(gl, exclude=inv)
+            if consumed[gl.pk] > room:
+                raise ERPError(f"{gl.variant}: only {max(room, ZERO)} accepted and not yet invoiced.")
             l.variant = gl.variant
         elif l.account_id is None:
             raise ERPError("A non-stock line needs an expense account.")

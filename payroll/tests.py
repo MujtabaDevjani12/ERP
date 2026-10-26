@@ -43,7 +43,7 @@ class PayrollTests(TestCase):
             elif day == 8:
                 hr.record_attendance(self.emp, d, check_in=time(9), check_out=time(21))      # 12h -> 4h overtime
             else:
-                hr.record_attendance(self.emp, d, check_in=time(9), check_out=time(17, 30))
+                hr.record_attendance(self.emp, d, check_in=time(9), check_out=time(17, 0))
 
     def test_calculation_numbers(self):
         self.fill_september()

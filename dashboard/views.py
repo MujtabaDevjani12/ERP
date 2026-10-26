@@ -13,6 +13,7 @@ from expenses.models import Expense
 from payments.models import Payment
 from register.views import get_active_session
 from sales.models import Sale, SaleItem
+from sales.stats import COUNTED, returned_items, returns_total, unpaid_total
 from suppliers.models import PurchaseOrderItem
 
 
@@ -46,9 +47,10 @@ def home_view(request):
     last_start, last_end = _month_bounds(last_month_day)
 
     def sales_total(start, end):
-        return Sale.objects.filter(
-            store=store, status="completed", created_at__date__gte=start, created_at__date__lt=end,
+        gross = Sale.objects.filter(
+            store=store, status__in=COUNTED, created_at__date__gte=start, created_at__date__lt=end,
         ).aggregate(t=Sum("total_amount"))["t"] or 0
+        return gross - returns_total(store, start, end - timedelta(days=1))["value"]      # minus goods returned in that period
 
     def purchases_total(start, end):
         return PurchaseOrderItem.objects.filter(
@@ -58,11 +60,10 @@ def home_view(request):
 
     def due_total(start, end):
         month_sales = Sale.objects.filter(
-            store=store, status="completed", created_at__date__gte=start, created_at__date__lt=end,
+            store=store, status__in=COUNTED, created_at__date__gte=start, created_at__date__lt=end,
         )
-        total = month_sales.aggregate(t=Sum("total_amount"))["t"] or 0
-        paid = Payment.objects.filter(sale__in=month_sales).aggregate(t=Sum("amount"))["t"] or 0
-        return max(0, total - paid)
+        paid = Payment.objects.filter(sale__in=month_sales).exclude(status="voided").aggregate(t=Sum("amount"))["t"] or 0
+        return unpaid_total(month_sales, paid)
 
     def expenses_total(start, end):
         return Expense.objects.filter(
@@ -89,13 +90,20 @@ def home_view(request):
     sales_by_month = {
         row["month"]: row
         for row in (
-            Sale.objects.filter(store=store, status="completed", created_at__date__gte=chart_start)
+            Sale.objects.filter(store=store, status__in=COUNTED, created_at__date__gte=chart_start)
             .annotate(month=TruncMonth("created_at"))
             .values("month")
             .annotate(total=Sum("total_amount"), tax=Sum("tax_amount"))
             .order_by("month")
         )
     }
+    for r in returned_items(store, chart_start):                       # goods returned in a month come off that month
+        key = r["day"].replace(day=1)
+        row = next((v for k, v in sales_by_month.items() if k is not None and (k.date() if hasattr(k, "date") else k) == key), None)
+        if row is None:
+            row = sales_by_month.setdefault(key, {"total": 0, "tax": 0})
+        row["total"] = (row["total"] or 0) - r["value"]
+        row["tax"] = (row["tax"] or 0) - r["tax"]
     purchases_by_month = {
         row["month"]: row["total"]
         for row in (
@@ -118,8 +126,8 @@ def home_view(request):
     # --- Payment status donut: this month's completed sales, using the
     # same Due/Partial/Paid classification the POS payment flow shows live. ---
     month_sales = Sale.objects.filter(
-        store=store, status="completed", created_at__date__gte=today.replace(day=1),
-    ).prefetch_related("payments")
+        store=store, status__in=COUNTED, created_at__date__gte=today.replace(day=1),
+    ).prefetch_related("payments", "refunds", "items__return_items")
     status_paid = status_partial = status_due = 0
     for s in month_sales:
         st = s.payment_status
@@ -131,17 +139,18 @@ def home_view(request):
             status_due += 1
 
     # --- Everything below only feeds the extra dashboard widgets (read-only aggregates). ---
-    completed = Sale.objects.filter(store=store, status="completed")
+    completed = Sale.objects.filter(store=store, status__in=COUNTED)
 
-    today_total = completed.filter(created_at__date=today).aggregate(t=Sum("total_amount"))["t"] or 0
+    today_total = (completed.filter(created_at__date=today).aggregate(t=Sum("total_amount"))["t"] or 0) - returns_total(store, today, today)["value"]
     today_orders = completed.filter(created_at__date=today).count()
-    yesterday_total = completed.filter(created_at__date=today - timedelta(days=1)).aggregate(t=Sum("total_amount"))["t"] or 0
+    yesterday_total = (completed.filter(created_at__date=today - timedelta(days=1)).aggregate(t=Sum("total_amount"))["t"] or 0) - returns_total(
+        store, today - timedelta(days=1), today - timedelta(days=1))["value"]
 
     # payment methods used this month
     from payments.models import PaymentMethod
     labels = PaymentMethod.label_map(store) if store else {}
     pay_rows = (
-        Payment.objects.filter(sale__store=store, sale__status="completed", paid_at__date__gte=this_start)
+        Payment.objects.filter(sale__store=store, sale__status__in=COUNTED, paid_at__date__gte=this_start)
         .exclude(status="voided").values("method").annotate(t=Sum("amount")).order_by("-t")
     )
     pay_methods = [{"label": labels.get(r["method"], str(r["method"]).title()), "total": r["t"] or 0} for r in pay_rows][:4]
@@ -159,7 +168,7 @@ def home_view(request):
 
     # top products (30 days)
     top_products = list(
-        SaleItem.objects.filter(sale__store=store, sale__status="completed", sale__created_at__date__gte=d30_start)
+        SaleItem.objects.filter(sale__store=store, sale__status__in=COUNTED, sale__created_at__date__gte=d30_start)
         .values("variant__product__name").annotate(qty=Sum("quantity"), revenue=Sum(F("quantity") * F("unit_price"), output_field=DecimalField()))
         .order_by("-revenue")[:6]
     )

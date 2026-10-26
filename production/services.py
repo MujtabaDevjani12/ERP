@@ -136,6 +136,7 @@ def create_work_order(bom, planned_quantity, source_warehouse, fg_warehouse, *, 
     planned_quantity = q3(planned_quantity)
     if planned_quantity <= 0:
         raise ERPError("Planned quantity must be greater than zero.")
+    bom = BOM.objects.get(pk=bom.pk)                                  # the caller's copy may be stale (status changed meanwhile)
     if bom.status != BOM.ACTIVE:
         raise ERPError("A work order needs an ACTIVE BOM.")
     company = bom.company

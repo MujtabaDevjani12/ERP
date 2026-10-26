@@ -46,7 +46,8 @@ class NextReferenceTests(TestCase):
         other = Company.objects.create(name="Other", fiscal_year_start_month=1)
         d = date(2026, 1, 5)
         self.assertEqual(next_reference(self.company, "goods_receipt", on_date=d), "GRN-2026-00001")
-        self.assertEqual(next_reference(other, "goods_receipt", on_date=d), "GRN-2026-00001")
+        # each company counts from 1 on its own, but the text differs (references are unique across the whole database)
+        self.assertEqual(next_reference(other, "goods_receipt", on_date=d), f"GRNC{other.pk}-2026-00001")
 
     def test_admin_can_edit_next_number(self):
         d = date(2026, 1, 5)
@@ -59,3 +60,25 @@ class NextReferenceTests(TestCase):
             next_reference(self.company, "banana")
         with self.assertRaises(ValueError):
             next_reference(None, "purchase_order")
+
+
+class TwoCompaniesTests(TestCase):
+    """Document references are unique across the whole database, so two companies must never be handed the same number."""
+
+    def test_second_company_gets_its_own_prefix(self):
+        a = Company.objects.create(name="A", fiscal_year_start_month=1)
+        b = Company.objects.create(name="B", fiscal_year_start_month=1)
+        d = date(2026, 5, 1)
+        ra, rb = next_reference(a, "purchase_order", on_date=d), next_reference(b, "purchase_order", on_date=d)
+        self.assertEqual(ra, "PO-2026-00001")
+        self.assertNotEqual(ra, rb)
+        self.assertTrue(rb.startswith("POC"))
+        self.assertEqual(next_reference(b, "purchase_order", on_date=d), rb[:-1] + "2")
+
+    def test_new_year_keeps_the_prefix_of_the_company(self):
+        a = Company.objects.create(name="A", fiscal_year_start_month=1)
+        b = Company.objects.create(name="B", fiscal_year_start_month=1)
+        next_reference(a, "purchase_order", on_date=date(2026, 5, 1))
+        next_reference(b, "purchase_order", on_date=date(2026, 5, 1))
+        self.assertEqual(next_reference(a, "purchase_order", on_date=date(2027, 1, 2)), "PO-2027-00001")
+        self.assertTrue(next_reference(b, "purchase_order", on_date=date(2027, 1, 2)).startswith("POC"))

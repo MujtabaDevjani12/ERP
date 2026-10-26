@@ -58,7 +58,15 @@ def round_total(total, mode):
     return rounded, rounded - total
 
 
-def price_cart(store, items, order_discount=None, shipping=0):
+MAX_FREE_DISCOUNT_PCT = Decimal("20")      # a cashier may give up to this much off the bill; more needs a manager (sales.change_sale)
+
+
+def can_override_prices(user) -> bool:
+    """Selling below the shelf price or discounting heavily is a manager's call (sales.change_sale / approve rights)."""
+    return bool(user is None or user.has_perm("sales.change_sale") or user.has_perm("rbac.approve_document"))
+
+
+def price_cart(store, items, order_discount=None, shipping=0, *, can_override=True):
     """Validates every line and prices the cart.
     items: [{variant_id, quantity, unit_price?, discount_amount?}], order_discount: {type: 'amount'|'percent', value}.
     shipping: a delivery charge added on top (never discounted or taxed). The total is then rounded as the branch configured.
@@ -74,12 +82,17 @@ def price_cart(store, items, order_discount=None, shipping=0):
         except (ProductVariant.DoesNotExist, ValueError, TypeError):
             raise CartError("A product in the cart is no longer available. Please review your cart.", "stock_changed")
         quantity = to_decimal(row.get("quantity"), f"Quantity of '{variant}'", positive=True)
+        unit = getattr(variant.product, "unit", None)
+        if unit is not None and not unit.allow_decimal and quantity != quantity.to_integral_value():
+            raise CartError(f"'{variant}' is sold in whole {unit.short_name or unit.name} only - {quantity} is not allowed.")
         unit_price = money(to_decimal(row.get("unit_price", variant.current_price), f"Price of '{variant}'", minimum=Decimal("0")))
         discount = money(to_decimal(row.get("discount_amount", 0), f"Discount on '{variant}'", minimum=Decimal("0")))
         line_subtotal = money(quantity * unit_price)
         if discount > line_subtotal:
             raise CartError(f"Discount on '{variant}' is more than the line total.")
         if unit_price != variant.current_price:
+            if unit_price < variant.current_price and not can_override:
+                raise CartError(f"You are not allowed to sell '{variant}' below its price ({variant.current_price}). Ask a manager.", "price_locked")
             overrides.append(f"{variant.sku}: {variant.current_price} -> {unit_price}")
         rows.append({"variant": variant, "quantity": quantity, "unit_price": unit_price, "discount": discount, "subtotal": line_subtotal})
 
@@ -102,6 +115,11 @@ def price_cart(store, items, order_discount=None, shipping=0):
             share = min(share, room)
             r["discount"] += share
             left -= share
+
+    if not can_override:
+        listed = sum((r["subtotal"] for r in rows), Decimal("0"))
+        if listed > 0 and sum((r["discount"] for r in rows), Decimal("0")) * HUNDRED / listed > MAX_FREE_DISCOUNT_PCT:
+            raise CartError(f"Discounts above {MAX_FREE_DISCOUNT_PCT}% of the bill need a manager.", "discount_locked")
 
     for r in rows:
         rate = r["variant"].product.tax.rate if r["variant"].product.tax else Decimal("0")

@@ -40,5 +40,7 @@ class Command(BaseCommand):
                 )
                 self.stdout.write(f"Created company: {company.name}")
             count = orphan_stores.update(company=company)
+            from accounting.management.commands.seed_chart_of_accounts import seed_chart
+            seed_chart(company)                      # without a chart of accounts nothing the POS or ERP sells or buys can be posted
 
         self.stdout.write(self.style.SUCCESS(f"Linked {count} branch(es) to company '{company.name}'."))

@@ -244,7 +244,7 @@ def resubmit(request, user=None):
     _record(request, ApprovalAction.SUBMITTED, user, "Resubmitted after correction", level=0)
     pending = _status_map.get(request.document_type)
     doc = request.content_object
-    if pending and doc is not None:
+    if pending and doc is not None and hasattr(doc, pending["field"]):               # same guard as submit_for_approval
         setattr(doc, pending["field"], pending["pending"])
         doc.save(update_fields=[pending["field"], "updated_at"] if hasattr(doc, "updated_at") else [pending["field"]])
     return request

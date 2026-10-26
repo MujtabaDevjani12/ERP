@@ -207,7 +207,7 @@ class ReceiptAndReturnTests(SalesBase):
         ret = ds.create_sales_return(inv, [{"invoice_line": line, "quantity": 4, "restock": True}], "wrong size", user=self.user)
         self.assertEqual((ret.net_amount, ret.tax_amount, ret.credit_amount), (D("2000.00"), D("360.00"), D("2360.00")))
         self.assertEqual(st.available_qty(self.shirt, self.wh), D(94))
-        self.assertEqual(self.bal("sales_returns"), D("2000.00"))
+        self.assertEqual(self.bal("sales_returns"), D("-2000.00"))      # a debit: returns reduce revenue
         self.assertEqual(self.bal("ar"), D("5900.00") - D("2360.00"))
         self.assertEqual(self.bal("cogs"), D("1800.00"))                  # 3000 - 4 x 300 restocked
         inv.refresh_from_db()

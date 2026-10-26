@@ -52,6 +52,9 @@ def terminate_employee(employee, leaving_date, user=None, reason=""):
 
 
 # ================================================================== attendance
+OVERTIME_MIN_HOURS = Decimal("0.25")
+
+
 def _minutes(t):
     return t.hour * 60 + t.minute
 
@@ -64,17 +67,21 @@ def record_attendance(employee, day, *, check_in=None, check_out=None, status=No
         raise ERPError(f"{employee} is not active.")
     if day < employee.joining_date:
         raise ERPError("Attendance cannot be before the joining date.")
-    if check_in and check_out and check_out <= check_in:
-        raise ERPError("Check-out must be after check-in (night shifts: record against the start date with a later check-out time).")
     shift = employee.shift
+    overnight = bool(shift and shift.end_time <= shift.start_time)               # e.g. 22:00 -> 06:00: check-out is the next morning
+    if check_in and check_out and check_out <= check_in and not overnight:
+        raise ERPError("Check-out must be after check-in (for a night shift, give the employee a shift that ends after midnight).")
     worked = ZERO
     late = 0
     overtime = ZERO
     if check_in and check_out:
-        worked = q2(Decimal(_minutes(check_out) - _minutes(check_in)) / 60)
+        minutes = _minutes(check_out) - _minutes(check_in)
+        if minutes <= 0:
+            minutes += 24 * 60
+        worked = q2(Decimal(minutes) / 60)
     if check_in and shift:
         late = max(_minutes(check_in) - _minutes(shift.start_time) - shift.grace_minutes, 0)
-    if shift and worked > shift.standard_hours:
+    if shift and worked - shift.standard_hours >= OVERTIME_MIN_HOURS:               # a few minutes past the end of the shift is not overtime
         overtime = q2(worked - shift.standard_hours)
     if status is None:
         if not (check_in and check_out):

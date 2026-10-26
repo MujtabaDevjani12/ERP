@@ -76,6 +76,12 @@ class BOMTests(ProdBase):
         with self.assertRaises(ERPError):                 # fabric made from shirt, shirt made from fabric
             pr.create_bom(self.company, self.fabric, [{"component": self.shirt, "quantity": 1}])
 
+    def test_work_order_checks_the_boms_current_status_not_a_stale_copy(self):
+        stale = BOM.objects.get(pk=self.bom.pk)
+        BOM.objects.filter(pk=self.bom.pk).update(status="archived")          # someone retired it after this copy was loaded
+        with self.assertRaises(ERPError):
+            pr.create_work_order(stale, 1, self.raw, self.fg, user=self.user)
+
     def test_work_order_needs_active_bom_and_cost_estimate(self):
         draft = pr.new_bom_version(self.bom, self.user)
         with self.assertRaises(ERPError):
@@ -162,7 +168,7 @@ class FullProductionTests(ProdBase):
 
     def test_shortage_report_and_insufficient_stock(self):
         wo = self.released_wo(20)                                       # needs 40 fabric, only 25 in store
-        rows = {r["material"].component.sku: r for r in pr.material_shortage(wo)}
+        rows = {r["material"].component.product.sku: r for r in pr.material_shortage(wo)}          # variant SKUs carry a suffix; the product SKU is "FAB"
         self.assertEqual(rows["FAB"]["shortage"], D(15))
         with self.assertRaises(InsufficientStock):
             pr.issue_materials(wo, user=self.user)

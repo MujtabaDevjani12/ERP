@@ -74,15 +74,15 @@ class ErpScreenTests(TestCase):
         self.assertEqual(self.client.post(self.url("delete", self.term.pk)).status_code, 403)
 
     def test_lookup_returns_matches_and_checks_permission(self):
-        url = reverse("erp_ui:lookup", args=["company", "company"]) + "?for=masters.paymentterm"
-        resp = self.client.get(url, {"q": "Ac"})
+        url = reverse("erp_ui:lookup", args=["company", "company"])
+        resp = self.client.get(url, {"for": "masters.paymentterm", "q": "Ac"})          # (a data dict replaces any query string in the URL)
         self.assertEqual(resp.status_code, 200)
         self.assertEqual([r["text"] for r in resp.json()["results"]], ["Acme"])
         # a model the form has no relation to cannot be browsed through this endpoint
-        bad = reverse("erp_ui:lookup", args=["tenants", "store"]) + "?for=masters.paymentterm"
-        self.assertEqual(self.client.get(bad).status_code, 403)
+        bad = reverse("erp_ui:lookup", args=["tenants", "store"])
+        self.assertEqual(self.client.get(bad, {"for": "masters.paymentterm"}).status_code, 403)
         self.client.force_login(self.plain)
-        self.assertEqual(self.client.get(url).status_code, 403)
+        self.assertEqual(self.client.get(url, {"for": "masters.paymentterm"}).status_code, 403)
 
     def test_bulk_action_without_selection_does_not_crash(self):
         resp = self.client.post(self.url("list"), {"action": "anything"})

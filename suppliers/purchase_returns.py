@@ -74,4 +74,6 @@ def create_return(order, quantities, reason, user):
             raise PurchaseReturnError(f"{line['variant']}: only {_n(have)} is in {order.warehouse.name} now, so {_n(qty)} cannot be sent back.")
         row.adjust(-qty, reference_type="PURCHASE_RETURN", reference_no=ret.reference, user=user, remarks=f"Returned to {order.supplier.name}")
         PurchaseReturnItem.objects.create(purchase_return=ret, variant=line["variant"], quantity=qty, cost_price=line["cost"])
+    from stock.gl import post_legacy_return
+    post_legacy_return(ret, user=user)
     return ret

@@ -147,9 +147,9 @@ class ReportTests(AccountingBase):
             {"party": "B", "party_id": 2, "document_number": "I3", "invoice_date": date(2025, 6, 1), "due_date": date(2025, 7, 1), "outstanding": 70},
             {"party": "B", "party_id": 2, "document_number": "I4", "invoice_date": date(2026, 1, 1), "due_date": date(2026, 1, 1), "outstanding": 0},
         ]
-        ag = reports.aging_buckets(items, as_of=date(2026, 4, 1))
-        self.assertEqual(ag["summary"]["61-90"], money("100.00"))   # due 31 Jan -> 61 days
-        self.assertEqual(ag["summary"]["31-60"], money("50.00"))    # due 1 Mar  -> 31 days
+        ag = reports.aging_buckets(items, as_of=date(2026, 4, 2))
+        self.assertEqual(ag["summary"]["61-90"], money("100.00"))   # due 31 Jan -> 61 days on 2 Apr
+        self.assertEqual(ag["summary"]["31-60"], money("50.00"))    # due 1 Mar  -> 32 days
         self.assertEqual(ag["summary"]["90+"], money("70.00"))
         self.assertEqual(ag["total"], money("220.00"))              # zero-outstanding invoice ignored
         self.assertEqual(ag["by_party"]["A"]["total"], money("150.00"))

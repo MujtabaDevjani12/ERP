@@ -27,7 +27,7 @@ from payments.models import PaymentMethod, Payment
 from register.views import get_active_session
 from .models import PosCart, Sale, SaleFeedback, SaleItem
 from .pos_cart import clean_cart, revalidate
-from .pricing import CartError, money, price_cart, to_decimal
+from .pricing import CartError, can_override_prices, money, price_cart, to_decimal
 from .pos_stock import OUT_OF_STOCK, STOCK_CHANGED, stock_effects
 
 
@@ -301,7 +301,7 @@ def pos_finalize_sale(request):
                 customer_id = payload["customer_id"]
 
             # ---- pass 1: validate and price every line (nothing is written yet)
-            priced = price_cart(store, items, payload.get("order_discount"), payload.get("shipping"))
+            priced = price_cart(store, items, payload.get("order_discount"), payload.get("shipping"), can_override=can_override_prices(request.user))
             rows, overrides = priced["rows"], priced["overrides"]
             subtotal, discount_total, tax_total, total = priced["subtotal"], priced["discount"], priced["tax"], priced["total"]
 

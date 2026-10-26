@@ -44,6 +44,13 @@ def _find_sequence(company, store, document_type, fiscal_year):
 
 def _create_default(company, document_type, fiscal_year):
     prefix, include_year, padding = DEFAULTS[document_type]
+    # Most documents keep one GLOBALLY unique reference column, so two companies must never hand out the same text: the first company keeps the
+    # plain prefix (PO-2026-00001); every later company gets its own tag (POC7-2026-00001).
+    mine = DocumentSequence.objects.filter(company=company, document_type=document_type, store__isnull=True).order_by("-fiscal_year").first()
+    if mine is not None:
+        prefix = mine.prefix                  # a new fiscal year keeps the company's own prefix
+    elif DocumentSequence.objects.filter(document_type=document_type).exclude(company=company).exists():
+        prefix = f"{prefix}C{company.pk}"[:15]
     year_key = fiscal_year if include_year else 0
     try:
         with transaction.atomic():

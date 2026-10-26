@@ -149,3 +149,54 @@ class AdjustmentAndCountTests(StockBase):
         self.assertEqual(count.status, "posted")
         with self.assertRaises(ERPError):
             st.record_count(count, {self.v.id: D("1")}, self.user)   # closed
+
+
+class StockGLTests(StockBase):
+    """Opening stock and the older Suppliers > Purchases screens now leave journal entries behind."""
+
+    def _balance(self, key):
+        from accounting.models import Account, JournalLine
+        from django.db.models import Sum
+        acc = Account.objects.get(company=self.company, system_key=key)
+        agg = JournalLine.objects.filter(account=acc, entry__status="posted").aggregate(d=Sum("debit"), c=Sum("credit"))
+        return (agg["d"] or 0) - (agg["c"] or 0)
+
+    def test_opening_stock_posts_inventory_against_opening_equity(self):
+        from . import gl
+        entry = gl.post_opening_stock(self.wh, self.v, D(10), D("12.50"), reference_no="SH1")
+        self.assertIsNotNone(entry)
+        self.assertEqual(self._balance("inventory"), D("125.00"))
+        self.assertEqual(self._balance("opening_balance_equity"), D("-125.00"))
+        self.assertEqual(gl.post_opening_stock(self.wh, self.v, D(10), D("12.50"), reference_no="SH1").pk, entry.pk)      # posting twice is harmless
+
+    def test_zero_cost_posts_nothing(self):
+        from . import gl
+        self.assertIsNone(gl.post_opening_stock(self.wh, self.v, D(10), D(0), reference_no="SH1"))
+
+    def test_legacy_purchase_receipt_payment_and_return(self):
+        import datetime
+        from suppliers.models import PurchaseOrder, PurchaseOrderItem, PurchasePayment, PurchaseReturn, PurchaseReturnItem, Supplier
+        from . import gl
+        sup = Supplier.objects.create(store=self.store, name="Mill")
+        po = PurchaseOrder.objects.create(reference="PO-X1", supplier=sup, warehouse=self.wh, status="received", order_date=datetime.date.today())
+        PurchaseOrderItem.objects.create(purchase_order=po, variant=self.v, quantity=D(10), cost_price=D(20))
+        gl.post_legacy_receipt(po)
+        self.assertEqual(self._balance("inventory"), D("200.00"))
+        self.assertEqual(self._balance("ap"), D("-200.00"))
+        pay = PurchasePayment.objects.create(reference="PP-1", purchase_order=po, amount=D(50), method="cash", paid_on=datetime.date.today())
+        gl.post_legacy_payment(pay)
+        self.assertEqual(self._balance("ap"), D("-150.00"))
+        ret = PurchaseReturn.objects.create(reference="PR-1", purchase_order=po, reason="bad")
+        PurchaseReturnItem.objects.create(purchase_return=ret, variant=self.v, quantity=D(2), cost_price=D(20))
+        gl.post_legacy_return(ret)
+        self.assertEqual(self._balance("ap"), D("-110.00"))
+        self.assertEqual(self._balance("inventory"), D("160.00"))
+
+    def test_backfill_command_is_dry_by_default_and_idempotent(self):
+        StockItem.objects.get_or_create(variant=self.v, warehouse=self.wh)[0].adjust(
+            D(4), reference_type="OPENING_STOCK", reference_no="SH1", unit_cost=D(5))
+        call_command("backfill_stock_gl", verbosity=0)
+        self.assertEqual(self._balance("inventory"), 0)
+        call_command("backfill_stock_gl", "--apply", verbosity=0)
+        call_command("backfill_stock_gl", "--apply", verbosity=0)
+        self.assertEqual(self._balance("inventory"), D("20.00"))

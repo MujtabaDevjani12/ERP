@@ -46,10 +46,27 @@ def returnable_map(sale):
     return out
 
 
-def refund_value(sale_item, qty):
+def line_parts(sale_item, qty, already=ZERO):
+    """(net, tax) given back for `qty` more units of this line, when `already` units came back earlier.
+
+    Each share is rounded from the running total, so several part-returns always add up to exactly the line's value: the last
+    unit returns whatever is left instead of a cent more or less."""
+    if not sale_item.quantity:
+        return ZERO, ZERO
+    gross = sale_item.quantity * sale_item.unit_price - sale_item.discount_amount
+
+    def upto(q):
+        share = Decimal(q) / sale_item.quantity
+        return _q2(gross * share), _q2(sale_item.tax_amount * share)
+    a_net, a_tax = upto(already)
+    b_net, b_tax = upto(Decimal(already) + Decimal(qty))
+    return b_net - a_net, b_tax - a_tax
+
+
+def refund_value(sale_item, qty, already=ZERO):
     """Money given back for `qty` of this line: its share of (price - discount) plus its share of the tax."""
-    share = Decimal(qty) / sale_item.quantity
-    return _q2((sale_item.quantity * sale_item.unit_price - sale_item.discount_amount) * share) + _q2(sale_item.tax_amount * share)
+    net, tax = line_parts(sale_item, qty, already)
+    return net + tax
 
 
 def refundable_balance(sale):
@@ -74,7 +91,7 @@ def _basic_return(sale, picked, reason, user, session, refund_method, restock):
             if qty > left[sale_item.pk]:
                 raise ReturnError(f"{sale_item.variant}: only {left[sale_item.pk]} can still be returned.")
             SaleReturnItem.objects.create(sale_return=sale_return, sale_item=sale_item, quantity=qty)
-            total += refund_value(sale_item, qty)
+            total += refund_value(sale_item, qty, sale_item.quantity - left[sale_item.pk])
             if restock:
                 for stock_variant, back in stock_effects(sale_item.variant, qty):
                     stock, _ = StockItem.objects.select_for_update().get_or_create(variant=stock_variant, warehouse=sale.warehouse)
@@ -124,7 +141,8 @@ def execute_return(request, sale, raw_qty, reason, method, restock, exchange=Fal
         raise ReturnError("A reason is required for a return.")
     if method not in {m.code for m in methods}:
         raise ReturnError("Choose how the customer is refunded.")
-    refund_total = sum((refund_value(i, q) for i, q in picked), ZERO)
+    already = {l["item"].pk: l["item"].quantity - l["left"] for l in lines}
+    refund_total = sum((refund_value(i, q, already[i.pk]) for i, q in picked), ZERO)
     if refund_total > balance:
         raise ReturnError(f"The customer has only paid {balance} that can be refunded; this return is worth {refund_total}. "
                           f"Return fewer items or settle the difference on the customer's account.")

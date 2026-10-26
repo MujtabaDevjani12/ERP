@@ -44,17 +44,19 @@ def dashboard(request):
     store = request.store
     date_from, date_to = _date_range(request)
 
+    from sales.stats import COUNTED, returns_total
     sales_qs = Sale.objects.filter(
-        store=store, status="completed",
+        store=store, status__in=COUNTED,
         created_at__date__gte=date_from, created_at__date__lte=date_to,
     )
 
     totals = sales_qs.aggregate(
         revenue=Sum("total_amount"), discount=Sum("discount_amount"), tax=Sum("tax_amount"),
     )
-    total_revenue = totals["revenue"] or Decimal("0")
+    returned = returns_total(store, date_from, date_to)
+    total_revenue = (totals["revenue"] or Decimal("0")) - returned["value"]          # goods that came back are taken off once
     total_discount = totals["discount"] or Decimal("0")
-    total_tax = totals["tax"] or Decimal("0")
+    total_tax = (totals["tax"] or Decimal("0")) - returned["tax"]
     sale_count = sales_qs.count()
     total_due = sum((s.due_amount for s in sales_qs), start=Decimal("0"))
 
@@ -62,8 +64,11 @@ def dashboard(request):
         sales_qs.annotate(day=TruncDate("created_at"))
         .values("day").annotate(revenue=Sum("total_amount")).order_by("day")
     )
-    chart_labels = [row["day"].strftime("%d %b") for row in by_day]
-    chart_values = [float(row["revenue"] or 0) for row in by_day]
+    day_net = {row["day"]: row["revenue"] or Decimal("0") for row in by_day}
+    for r in returned["rows"]:
+        day_net[r["day"]] = day_net.get(r["day"], Decimal("0")) - r["value"]
+    chart_labels = [d.strftime("%d %b") for d in sorted(day_net)]
+    chart_values = [float(day_net[d]) for d in sorted(day_net)]
 
     top_products = (
         SaleItem.objects.filter(sale__in=sales_qs)
@@ -88,7 +93,7 @@ def dashboard(request):
     )
 
     payment_methods = (
-        sales_qs.values("payments__method").annotate(total=Sum("payments__amount")).order_by("-total")
+        sales_qs.exclude(payments__status="voided").values("payments__method").annotate(total=Sum("payments__amount")).order_by("-total")
     )
 
     context = {

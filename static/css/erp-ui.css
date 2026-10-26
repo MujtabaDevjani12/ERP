@@ -640,3 +640,8 @@ html .ui-search > input { padding-left: 36px; }
 .rich-text p { margin: 0 0 8px; } .rich-text ul, .rich-text ol { margin: 4px 0 8px 22px; } .rich-text ul { list-style: disc; } .rich-text ol { list-style: decimal; }
 .rich-text h3 { font-weight: 700; margin: 8px 0 4px; } .rich-text a { color: var(--ui-primary); text-decoration: underline; }
 .rte [hidden], .rte textarea[hidden] { display: none !important; }
+
+/* Number fields: no browser up/down spinner arrows (quantity, price, discount ...). Typing and the +/- buttons still work. */
+input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; appearance: none; margin: 0; display: none; }

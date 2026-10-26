@@ -137,7 +137,7 @@ class MonthInTheLifeTests(TestCase):
         pos.on_sale_completed(sale, [payment])
         self.assertEqual(self.bal("sales_retail"), D("1600.00"))
         pos.process_pos_return(sale, [{"sale_item": sale.items.get(), "quantity": 1}], "wrong size", user=self.user, session=session)
-        self.assertEqual(self.bal("sales_returns"), D("800.00"))
+        self.assertEqual(self.bal("sales_returns"), D("-800.00"))      # a debit: returns reduce revenue
         self.assertEqual(st.available_qty(self.shirt, self.shop), D(2))          # 3 - 2 + 1 returned
 
     def payroll(self):
@@ -147,7 +147,7 @@ class MonthInTheLifeTests(TestCase):
         for day in range(1, 31):
             d = date(2026, 9, day)
             if d.weekday() != 6:
-                hr.record_attendance(emp, d, check_in=time(9), check_out=time(17, 30))
+                hr.record_attendance(emp, d, check_in=time(9), check_out=time(17, 0))
         run = pay.submit_payroll(pay.calculate_payroll(self.company, 2026, 9, user=self.user), self.user)
         self.assertEqual(run.status, "approved")
         pay.pay_payroll(run, self.user, method="cash")

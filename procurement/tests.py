@@ -117,6 +117,17 @@ class ProcurementFlowTests(ProcBase):
         with self.assertRaises(ERPError):
             pr.create_purchase_invoice(self.company, self.other_supplier, "B-1", date.today(), [{"grn_line": gl, "quantity": 1, "unit_price": 10}])
 
+    def test_invoice_cannot_be_tied_to_another_vendors_purchase_order(self):
+        from accounting.models import Account
+        po = self.make_po(qty=10, price=10)                                    # placed with self.supplier
+        acct = Account.objects.get(company=self.company, system_key="other_expense")
+        with self.assertRaises(ERPError):
+            pr.create_purchase_invoice(self.company, self.other_supplier, "Z-1", date.today(),
+                                       [{"description": "Freight", "account": acct, "quantity": 1, "unit_price": 5}], purchase_order=po)
+        inv = pr.create_purchase_invoice(self.company, self.supplier, "Z-2", date.today(),
+                                         [{"description": "Freight", "account": acct, "quantity": 1, "unit_price": 5}], purchase_order=po)
+        self.assertEqual(inv.purchase_order, po)
+
     def test_payment_validation_and_reversal(self):
         po = self.make_po(qty=10, price=10)
         grn = pr.receive_goods(po, [{"po_item": po.items.first(), "quantity": 10}], user=self.user)

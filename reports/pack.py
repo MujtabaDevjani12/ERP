@@ -12,6 +12,7 @@ from decimal import Decimal
 
 from django.db.models import Count, DecimalField, ExpressionWrapper, F, Max, Q, Sum
 from django.db.models.functions import TruncDate
+from django.utils import timezone
 
 ZERO = Decimal("0")
 MONEY = DecimalField(max_digits=16, decimal_places=2)
@@ -22,55 +23,103 @@ def _d(v):
 
 
 def _sales(store, date_from, date_to):
+    """Every sale that really happened in the period - completed AND partly / fully returned ones (the returns are taken off separately,
+    once, by _returns()). Held and cancelled sales never count."""
     from sales.models import Sale
-    return Sale.objects.filter(store=store, status="completed", created_at__date__gte=date_from, created_at__date__lte=date_to)
+    from sales.stats import COUNTED
+    return Sale.objects.filter(store=store, status__in=COUNTED, created_at__date__gte=date_from, created_at__date__lte=date_to)
+
+
+def _returns(store, date_from, date_to):
+    from sales.stats import returned_items
+    return returned_items(store, date_from, date_to)
+
+
+def _paid_by(qs, key):
+    """{group value: money received} for the sales in qs (voided payments are not money)."""
+    return {r[key]: _d(r["p"]) for r in qs.values(key).annotate(p=Sum("payments__amount", filter=~Q(payments__status="voided")))}
 
 
 # ----------------------------------------------------------------------------------------------------------- 1. sales
 def sales_report(request, store, date_from, date_to):
-    from sales.models import Sale
     qs = _sales(store, date_from, date_to)
     biller = request.GET.get("biller")
     if biller and biller.isdigit():
         qs = qs.filter(biller_id=int(biller))
     per_day = list(qs.annotate(day=TruncDate("created_at")).values("day").annotate(
         n=Count("id"), subtotal=Sum("subtotal"), discount=Sum("discount_amount"), tax=Sum("tax_amount"), total=Sum("total_amount")).order_by("-day"))
-    paid = {r["day"]: _d(r["paid"]) for r in qs.annotate(day=TruncDate("created_at")).values("day").annotate(paid=Sum("payments__amount"))}
-    rows = [{"day": r["day"], "n": r["n"], "subtotal": _d(r["subtotal"]), "discount": _d(r["discount"]), "tax": _d(r["tax"]), "total": _d(r["total"]),
-             "paid": paid.get(r["day"], ZERO), "due": _d(r["total"]) - paid.get(r["day"], ZERO)} for r in per_day]
-    total, count = sum((r["total"] for r in rows), ZERO), sum(r["n"] for r in rows)
+    paid = _paid_by(qs.annotate(day=TruncDate("created_at")), "day")
+    back = {}
+    for r in _returns(store, date_from, date_to):
+        if not (biller and biller.isdigit()) or _biller_of(r["sale_id"]) == int(biller):
+            back[r["day"]] = back.get(r["day"], ZERO) + r["value"]
+    days = sorted({r["day"] for r in per_day} | set(back), reverse=True)
+    by_day = {r["day"]: r for r in per_day}
+    from sales.stats import sale_return_adjustments
+    adjust = {}                                          # sales of that day that had goods returned / money refunded: what is no longer owed
+    returned_sales = qs.filter(status__in=("partially_returned", "returned"))
+    made = dict(returned_sales.values_list("pk", "created_at"))
+    for sid, (ret, ref) in sale_return_adjustments(returned_sales).items():
+        day = timezone.localtime(made[sid]).date()
+        adjust[day] = adjust.get(day, ZERO) + (ret - ref)
+    rows = []
+    for d in days:
+        r = by_day.get(d, {})
+        total, ret = _d(r.get("total")), back.get(d, ZERO)
+        rows.append({"day": d, "n": r.get("n", 0), "subtotal": _d(r.get("subtotal")), "discount": _d(r.get("discount")), "tax": _d(r.get("tax")), "total": total,
+                     "returns": ret, "net": total - ret, "paid": paid.get(d, ZERO)})
+        rows[-1]["due"] = max(ZERO, total - rows[-1]["paid"] - adjust.get(d, ZERO))
+    gross, returns = sum((r["total"] for r in rows), ZERO), sum((r["returns"] for r in rows), ZERO)
+    net, count = gross - returns, sum(r["n"] for r in rows)
+    unpaid = sum((r["due"] for r in rows), ZERO)
     chron = list(reversed(rows))
     return {
-        "kpis": [("Net sales", "money", total), ("Invoices", "int", count), ("Average invoice", "money", (total / count) if count else ZERO),
-                 ("Discounts given", "money", sum((r["discount"] for r in rows), ZERO)), ("Tax collected", "money", sum((r["tax"] for r in rows), ZERO)),
-                 ("Still unpaid", "money", sum((r["due"] for r in rows), ZERO))],
-        "chart": {"type": "bar", "labels": [r["day"].strftime("%d %b") for r in chron], "series": [{"label": "Sales", "data": [float(r["total"]) for r in chron]}]},
+        "kpis": [("Net sales (after returns, incl. tax)", "money", net), ("Invoices", "int", count), ("Average invoice", "money", (net / count) if count else ZERO),
+                 ("Returns", "money", returns), ("Discounts given", "money", sum((r["discount"] for r in rows), ZERO)),
+                 ("Tax collected", "money", sum((r["tax"] for r in rows), ZERO)), ("Still unpaid", "money", unpaid)],
+        "chart": {"type": "bar", "labels": [r["day"].strftime("%d %b") for r in chron], "series": [{"label": "Net sales", "data": [float(r["net"]) for r in chron]}]},
         "cols": [("day", "Date", "date"), ("n", "Invoices", "num"), ("subtotal", "Subtotal", "money"), ("discount", "Discount", "money"), ("tax", "Tax", "money"),
-                 ("total", "Total", "money"), ("paid", "Paid", "money"), ("due", "Due", "money")],
+                 ("total", "Total", "money"), ("returns", "Returns", "money"), ("net", "Net", "money"), ("paid", "Paid", "money"), ("due", "Due", "money")],
         "rows": rows,
         "extra_filters": [{"name": "biller", "label": "Biller", "options": [(u.pk, u.get_full_name() or u.username) for u in
                                                                               store.staff.filter(is_biller=True).order_by("username")]}],
+        "notes": "Net = total of the invoices made that day minus the goods customers returned that day (tax included). Held and cancelled sales are not counted.",
     }
+
+
+def _biller_of(sale_id):
+    from sales.models import Sale
+    return Sale.objects.filter(pk=sale_id).values_list("biller_id", flat=True).first()
 
 
 # -------------------------------------------------------------------------------------------------------- 2. products
 def products_report(request, store, date_from, date_to):
     from sales.models import SaleItem
     qs = SaleItem.objects.filter(sale__in=_sales(store, date_from, date_to))
+    back = {}
+    for r in _returns(store, date_from, date_to):
+        b = back.setdefault(r["variant_id"], {"qty": ZERO, "net": ZERO, "cost": ZERO})
+        b["qty"] += r["qty"]; b["net"] += r["net"]; b["cost"] += r["cost"]
     rows = []
+    seen = set()
     for r in qs.values("variant_id", "variant__product__name", "variant__name", "variant__sku", "variant__cost_price").annotate(
             qty=Sum("quantity"), revenue=Sum(ExpressionWrapper(F("quantity") * F("unit_price") - F("discount_amount"), output_field=MONEY))).order_by("-revenue"):
-        cost = _d(r["variant__cost_price"]) * _d(r["qty"])
+        seen.add(r["variant_id"])
+        b = back.get(r["variant_id"], {"qty": ZERO, "net": ZERO, "cost": ZERO})
+        qty = _d(r["qty"]) - b["qty"]
+        revenue = _d(r["revenue"]) - b["net"]
+        cost = _d(r["variant__cost_price"]) * qty
         label = r["variant__product__name"] + (f" - {r['variant__name']}" if r["variant__name"] and r["variant__name"] != "Default" else "")
-        rows.append({"product": label, "sku": r["variant__sku"], "qty": _d(r["qty"]), "revenue": _d(r["revenue"]), "cost": cost, "profit": _d(r["revenue"]) - cost})
+        rows.append({"product": label, "sku": r["variant__sku"], "qty": qty, "revenue": revenue, "cost": cost, "profit": revenue - cost})
+    rows.sort(key=lambda x: -x["revenue"])
     top = rows[:10]
     return {
-        "kpis": [("Products sold", "int", len(rows)), ("Units sold", "num", sum((r["qty"] for r in rows), ZERO)), ("Revenue", "money", sum((r["revenue"] for r in rows), ZERO)),
-                 ("Estimated profit", "money", sum((r["profit"] for r in rows), ZERO))],
+        "kpis": [("Products sold", "int", len(rows)), ("Units sold (after returns)", "num", sum((r["qty"] for r in rows), ZERO)),
+                 ("Revenue (after returns, no tax)", "money", sum((r["revenue"] for r in rows), ZERO)), ("Estimated profit", "money", sum((r["profit"] for r in rows), ZERO))],
         "chart": {"type": "bar", "labels": [r["product"][:22] for r in top], "series": [{"label": "Revenue", "data": [float(r["revenue"]) for r in top]}], "horizontal": True},
         "cols": [("product", "Product", "text"), ("sku", "SKU", "text"), ("qty", "Units sold", "num"), ("revenue", "Revenue", "money"), ("cost", "Est. cost", "money"), ("profit", "Est. profit", "money")],
         "rows": rows,
-        "notes": "Cost uses each product's current cost price, so profit is an estimate.",
+        "notes": "Units and revenue are after returns. Cost uses each product's current cost price, so profit is an estimate.",
     }
 
 
@@ -129,49 +178,60 @@ def stock_value_report(request, store, date_from, date_to):
 # ------------------------------------------------------------------------------------------------------- 5. profit & loss
 def profit_loss_report(request, store, date_from, date_to):
     from expenses.models import Expense
-    from sales.models import SaleItem, SaleReturnItem
+    from sales.models import SaleItem
     sales = _sales(store, date_from, date_to)
-    revenue = _d(sales.aggregate(t=Sum("total_amount"))["t"])
+    revenue = _d(sales.aggregate(t=Sum("total_amount"))["t"])            # includes tax, delivery charges and rounding
     tax = _d(sales.aggregate(t=Sum("tax_amount"))["t"])
     items = SaleItem.objects.filter(sale__in=sales)
-    cogs = sum((_d(r["cost"]) * _d(r["qty"]) for r in items.values("variant__cost_price").annotate(qty=Sum("quantity")).values("variant__cost_price", "qty")
-                .annotate(cost=F("variant__cost_price"))), ZERO)
-    returns = _d(SaleReturnItem.objects.filter(sale_return__sale__store=store, sale_return__created_at__date__gte=date_from, sale_return__created_at__date__lte=date_to)
-                 .aggregate(t=Sum(ExpressionWrapper(F("quantity") * F("sale_item__unit_price"), output_field=MONEY)))["t"])
+    sold_cost = sum((_d(r["cost"]) * _d(r["qty"]) for r in items.values("variant__cost_price").annotate(qty=Sum("quantity")).values("variant__cost_price", "qty")
+                     .annotate(cost=F("variant__cost_price"))), ZERO)
+    back = _returns(store, date_from, date_to)
+    returns_net = sum((r["net"] for r in back), ZERO)                    # goods that came back, tax not included
+    returned_cost = sum((r["cost"] for r in back), ZERO)                 # their cost goes back into stock, so it is not a cost of sale
+    cogs = sold_cost - returned_cost
     exp = Expense.objects.filter(store=store, expense_date__gte=date_from, expense_date__lte=date_to)
     expenses = _d(exp.aggregate(t=Sum("amount"))["t"])
-    gross = revenue - tax - returns - cogs
+    gross = revenue - tax - returns_net - cogs
     net = gross - expenses
     rows = [{"line": "Sales (incl. tax)", "amount": revenue, "kind": "in"}, {"line": "Less: tax collected", "amount": -tax, "kind": "out"},
-            {"line": "Less: returned goods", "amount": -returns, "kind": "out"}, {"line": "Less: cost of goods sold (estimate)", "amount": -cogs, "kind": "out"},
+            {"line": "Less: returned goods (without tax)", "amount": -returns_net, "kind": "out"},
+            {"line": "Less: cost of goods sold (estimate, after returns)", "amount": -cogs, "kind": "out"},
             {"line": "Gross profit", "amount": gross, "kind": "total"}]
     for r in exp.values("category__name").annotate(t=Sum("amount")).order_by("-t"):
         rows.append({"line": f"Expense - {r['category__name']}", "amount": -_d(r["t"]), "kind": "out"})
     rows.append({"line": "Net profit", "amount": net, "kind": "total"})
+    net_sales = revenue - tax - returns_net
     return {
-        "kpis": [("Sales", "money", revenue), ("Gross profit", "money", gross), ("Expenses", "money", expenses), ("Net profit", "money", net),
-                 ("Margin", "text", f"{(net / (revenue - tax) * 100):.1f}%" if revenue - tax else "-")],
+        "kpis": [("Sales", "money", net_sales), ("Gross profit", "money", gross), ("Expenses", "money", expenses), ("Net profit", "money", net),
+                 ("Margin", "text", f"{(net / net_sales * 100):.1f}%" if net_sales else "-")],
         "chart": {"type": "bar", "labels": ["Net sales", "Cost of goods", "Expenses", "Net profit"],
-                  "series": [{"label": "Amount", "data": [float(revenue - tax - returns), float(cogs), float(expenses), float(net)]}]},
+                  "series": [{"label": "Amount", "data": [float(net_sales), float(cogs), float(expenses), float(net)]}]},
         "cols": [("line", "Line", "text"), ("amount", "Amount", "money")],
         "rows": rows,
-        "notes": "Cost of goods uses each product's current cost price, so this is an estimate.",
+        "notes": "Cost of goods uses each product's current cost price, so this is an estimate. Returned goods are taken off once, on the day they were returned.",
     }
 
 
 # ------------------------------------------------------------------------------------------------------- 6. customers
 def customers_report(request, store, date_from, date_to):
     qs = _sales(store, date_from, date_to).filter(customer__isnull=False)
-    paid = {r["customer_id"]: _d(r["p"]) for r in qs.values("customer_id").annotate(p=Sum("payments__amount"))}
+    paid = _paid_by(qs, "customer_id")
+    back = {}
+    for r in _returns(store, date_from, date_to):
+        if r["customer_id"]:
+            back[r["customer_id"]] = back.get(r["customer_id"], ZERO) + r["value"]
     rows = []
     for r in qs.values("customer_id", "customer__name", "customer__phone").annotate(n=Count("id", distinct=True), total=Sum("total_amount"), last=Max("created_at")).order_by("-total"):
+        ret = back.get(r["customer_id"], ZERO)
+        bought = _d(r["total"]) - ret
         pd = paid.get(r["customer_id"], ZERO)
-        rows.append({"customer": r["customer__name"], "phone": r["customer__phone"], "n": r["n"], "total": _d(r["total"]), "paid": pd, "due": _d(r["total"]) - pd,
+        rows.append({"customer": r["customer__name"], "phone": r["customer__phone"], "n": r["n"], "total": bought, "paid": pd, "due": max(ZERO, bought - pd),
                      "last": r["last"].date() if r["last"] else None})
+    rows.sort(key=lambda x: -x["total"])
     walk = _d(_sales(store, date_from, date_to).filter(customer__isnull=True).aggregate(t=Sum("total_amount"))["t"])
     top = rows[:10]
     return {
-        "kpis": [("Customers who bought", "int", len(rows)), ("From customers", "money", sum((r["total"] for r in rows), ZERO)), ("Walk-in sales", "money", walk),
+        "kpis": [("Customers who bought", "int", len(rows)), ("From customers (after returns)", "money", sum((r["total"] for r in rows), ZERO)), ("Walk-in sales", "money", walk),
                  ("Customers owing", "int", sum(1 for r in rows if r["due"] > 0)), ("Total owed", "money", sum((r["due"] for r in rows if r["due"] > 0), ZERO))],
         "chart": {"type": "bar", "labels": [r["customer"][:20] for r in top], "series": [{"label": "Bought", "data": [float(r["total"]) for r in top]}], "horizontal": True},
         "cols": [("customer", "Customer", "text"), ("phone", "Phone", "text"), ("n", "Invoices", "num"), ("total", "Bought", "money"), ("paid", "Paid", "money"), ("due", "Owes", "money"),

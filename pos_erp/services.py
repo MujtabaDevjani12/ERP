@@ -215,9 +215,8 @@ def process_pos_return(sale, items, reason, *, user=None, session=None, refund_m
         consumed[sale_item.pk] = consumed.get(sale_item.pk, ZERO) + qty
         if qty <= 0 or consumed[sale_item.pk] > left[sale_item.pk]:
             raise ERPError(f"{sale_item.variant}: only {left[sale_item.pk]} can still be returned.")
-        share = qty / sale_item.quantity
-        line_net = q2((sale_item.quantity * sale_item.unit_price - sale_item.discount_amount) * share)
-        line_tax = q2(sale_item.tax_amount * share)
+        from sales.returns import line_parts
+        line_net, line_tax = line_parts(sale_item, qty, sale_item.quantity - left[sale_item.pk] + consumed[sale_item.pk] - qty)
         prepared.append((sale_item, qty))
         net += line_net
         tax += line_tax

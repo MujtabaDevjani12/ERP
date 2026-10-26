@@ -99,13 +99,15 @@ class FinalizeSaleTests(PosViewBase):
 
     def test_price_override_is_audited(self):
         from audit.models import AuditLog
-        self.finalize([{"variant_id": self.v.id, "quantity": 1, "unit_price": 80}])
+        resp = self.finalize([{"variant_id": self.v.id, "quantity": 1, "unit_price": 80}], [{"method": "cash", "amount": 80}])
+        self.assertEqual(resp.status_code, 200, resp.content)
         self.assertTrue(AuditLog.objects.filter(note__icontains="Price override").exists())
 
     def test_accounting_posts_only_when_switched_on(self):
+        PosSettings.objects.create(company=self.company, post_to_accounting=False)        # posting is ON by default, so switch it off first
         self.finalize([{"variant_id": self.v.id, "quantity": 1}], [{"method": "cash", "amount": 100}])
         self.assertEqual(balance_of(self.company, "sales_retail"), D(0))
-        PosSettings.objects.create(company=self.company, post_to_accounting=True)
+        PosSettings.objects.filter(company=self.company).update(post_to_accounting=True)
         self.finalize([{"variant_id": self.v.id, "quantity": 1}], [{"method": "cash", "amount": 100}])
         self.assertEqual(balance_of(self.company, "sales_retail"), D(100))
         self.assertEqual(balance_of(self.company, "cash"), D(100))
@@ -123,7 +125,9 @@ class FinalizeSaleTests(PosViewBase):
 
 class PaymentTests(PosViewBase):
     def make_sale(self):
-        self.finalize([{"variant_id": self.v.id, "quantity": 2}], [{"method": "cash", "amount": 50}])
+        buyer = Customer.objects.create(store=self.store, name="Credit buyer")          # paying less than the bill needs a customer (it is a credit sale)
+        resp = self.finalize([{"variant_id": self.v.id, "quantity": 2}], [{"method": "cash", "amount": 50}], customer_id=buyer.id)
+        self.assertEqual(resp.status_code, 200, resp.content)
         return Sale.objects.get()
 
     def test_bad_payments_refused_good_one_accepted(self):
@@ -133,7 +137,7 @@ class PaymentTests(PosViewBase):
             self.client.post(url, {"amount": amount, "method": "cash"})
         self.client.post(url, {"amount": "10", "method": "bitcoin"})
         self.assertEqual(Payment.objects.filter(sale=sale).count(), 1)
-        self.client.post(url, {"amount": "150", "method": "card"})
+        self.client.post(url, {"amount": "150", "method": "card", "reference_no": "TXN-1"})        # a card payment needs the slip number
         self.assertEqual(Payment.objects.filter(sale=sale).count(), 2)
         self.assertEqual(Sale.objects.get(pk=sale.pk).due_amount, D(0))
 

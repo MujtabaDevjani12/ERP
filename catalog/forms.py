@@ -57,7 +57,6 @@ class ProductForm(forms.ModelForm):
         widgets = {
             "name": forms.TextInput(attrs={"placeholder": "e.g. Basmati Rice 5kg", "autocomplete": "off"}),
             "sku": forms.TextInput(attrs={"placeholder": "e.g. RICE-5KG", "autocomplete": "off"}),
-            "description": forms.Textarea(attrs={"rows": 3}),
             "product_type": forms.Select(),
             "promo_price": forms.NumberInput(attrs={"step": "0.01", "min": "0", "placeholder": "e.g. 450"}),
             "promo_start": forms.DateInput(attrs={"type": "date"}), "promo_end": forms.DateInput(attrs={"type": "date"}),

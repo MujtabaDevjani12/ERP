@@ -237,6 +237,8 @@ def _receive_stock(purchase_order: PurchaseOrder, user=None):
         if update_cost:
             item.variant.cost_price = item.cost_price
             item.variant.save(update_fields=["cost_price", "updated_at"])
+    from stock.gl import post_legacy_receipt
+    post_legacy_receipt(purchase_order, user=user)
 
 
 @login_required
@@ -254,6 +256,8 @@ def purchase_order_detail(request, pk):
             payment.reference = NumberingPrefix.next_reference(NumberingPrefix.PURCHASE_PAYMENT)
             payment.created_by = request.user
             payment.save()
+            from stock.gl import post_legacy_payment
+            post_legacy_payment(payment, user=request.user)
             messages.success(request, f"Payment {payment.reference} recorded.")
             return redirect("suppliers:purchase_detail", pk=order.pk)
     else:

@@ -196,7 +196,7 @@ def stock_check(request):
 def quote(request):
     """Prices the cart exactly like the checkout will: {items, order_discount} -> subtotal / discount / tax / total.
     The POS screen shows these numbers, so what the cashier sees is what the sale is saved with."""
-    from .pricing import CartError, price_cart
+    from .pricing import CartError, can_override_prices, price_cart
     try:
         payload = json.loads(request.body or b"{}")
     except (json.JSONDecodeError, UnicodeDecodeError):
@@ -204,7 +204,8 @@ def quote(request):
     if not isinstance(payload, dict) or not isinstance(payload.get("items") or [], list):
         return JsonResponse({"ok": False, "error": "Bad request body."}, status=400)
     try:
-        priced = price_cart(request.store, payload.get("items") or [], payload.get("order_discount"), payload.get("shipping"))
+        priced = price_cart(request.store, payload.get("items") or [], payload.get("order_discount"), payload.get("shipping"),
+                           can_override=can_override_prices(request.user))
     except CartError as exc:
         return JsonResponse({"ok": False, "error": str(exc), "code": exc.code}, status=400)
     return JsonResponse({

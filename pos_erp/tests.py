@@ -83,6 +83,8 @@ class PostingTests(PosBase):
 
     def test_sale_and_cash_payment_post_correctly(self):
         self.enable()
+        from stock.gl import post_opening_stock
+        post_opening_stock(self.wh, self.v, 50, 60, reference_no="SH1")        # the shelf stock (50 x 60) is booked: Dr Inventory / Cr Opening equity
         sale, pays = self.make_sale(qty=2, price=100)
         ps.on_sale_completed(sale, pays)
         self.assertEqual(balance_of(self.company, "sales_retail"), D(200))
@@ -146,7 +148,7 @@ class ReturnTests(PosBase):
         self.assertEqual(sale.status, "partially_returned")
         self.assertEqual(r1.refund_amount, D(100))
         self.assertEqual(st.available_qty(self.v, self.wh), D(47))            # 50 - 4 + 1
-        self.assertEqual(balance_of(self.company, "sales_returns"), D(100))
+        self.assertEqual(balance_of(self.company, "sales_returns"), D(-100))      # a debit: sales returns reduce revenue
         self.assertEqual(balance_of(self.company, "cash"), D(300))
         with self.assertRaises(ERPError):
             ps.process_pos_return(sale, [{"sale_item": item, "quantity": 4}], "too many", user=self.user)

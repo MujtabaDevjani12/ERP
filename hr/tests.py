@@ -46,6 +46,17 @@ class AttendanceTests(HrBase):
         ot = hr.record_attendance(self.emp, date(2026, 9, 11), check_in=time(9, 0), check_out=time(20, 0))
         self.assertEqual(ot.overtime_hours, D("3.00"))
 
+    def test_night_shift_crosses_midnight_and_tiny_overtime_is_ignored(self):
+        night = Shift.objects.create(company=self.company, name="Night", start_time=time(22), end_time=time(6), grace_minutes=10,
+                                     standard_hours=8, half_day_hours=4)
+        guard = hr.create_employee(self.company, "Night Guard", date(2026, 1, 1), shift=night, store=self.store)
+        row = hr.record_attendance(guard, date(2026, 9, 7), check_in=time(22, 0), check_out=time(6, 0))
+        self.assertEqual((row.worked_hours, row.status, row.overtime_hours), (D("8.00"), "present", D("0")))
+        row = hr.record_attendance(guard, date(2026, 9, 8), check_in=time(22, 0), check_out=time(8, 0))
+        self.assertEqual((row.worked_hours, row.overtime_hours), (D("10.00"), D("2.00")))
+        day = hr.record_attendance(self.emp, date(2026, 9, 10), check_in=time(9, 0), check_out=time(17, 10))      # 8h10m worked
+        self.assertEqual(day.overtime_hours, D("0"))                                  # ten minutes late out is not overtime
+
     def test_validation_and_upsert(self):
         with self.assertRaises(ERPError):
             hr.record_attendance(self.emp, date(2025, 12, 31), status="present")      # before joining

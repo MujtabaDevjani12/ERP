@@ -481,7 +481,7 @@ class CompanyBillingPageTests(BillingBase):
 
     def test_sidebar_plan_card_shows_plan_state_usage_and_upgrade(self):
         r = self.client.get(reverse("dashboard:home"))
-        self.assertContains(r, "sbp-head")
+        self.assertContains(r, "sbp-bar")
         self.assertContains(r, "Starter plan")
         self.assertContains(r, "Active")
         self.assertContains(r, "Upgrade plan")
