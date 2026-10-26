@@ -18,6 +18,7 @@ import io
 import json
 import os
 import re
+import time
 import zipfile
 from collections import defaultdict
 from datetime import datetime
@@ -32,6 +33,7 @@ from django.core.management.color import no_style
 from django.db import IntegrityError, connections, transaction
 from django.db.models import FileField, Q
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 FORMAT = 1
 CHUNK = 400
@@ -128,6 +130,7 @@ def _file_names(model, rows):
 
 def build_backup(scope, *, using, kind, label, extra=None):
     """-> (bytes, manifest). `scope` is {model: set(pk)}."""
+    started = time.perf_counter()
     manifest = {"format": FORMAT, "kind": kind, "label": label, "created": timezone.now().isoformat(), "models": [], "counts": {},
                 "app": "multiple-pos"}
     manifest.update(extra or {})
@@ -156,6 +159,7 @@ def build_backup(scope, *, using, kind, label, extra=None):
             except Exception:                                # noqa: BLE001 - a missing / unreadable picture must not stop the backup
                 continue
         manifest["media"] = kept
+        manifest["seconds"] = round(time.perf_counter() - started, 2)
         zf.writestr("manifest.json", json.dumps(manifest, indent=1))
     return buf.getvalue(), manifest
 
@@ -171,37 +175,79 @@ def owner_backup(using):
 
 
 def filename_for(manifest):
-    stamp = datetime.now().strftime("%Y%m%d-%H%M")
+    stamp = timezone.localtime().strftime("%Y%m%d-%H%M%S")
     base = SAFE_NAME.sub("-", manifest.get("label") or manifest["kind"]).strip("-").lower() or manifest["kind"]
-    return f"backup-{manifest['kind']}-{base}-{stamp}.zip"
+    ident = f"c{manifest['company_id']}-" if manifest.get("company_id") else ""
+    return f"backup-{manifest['kind']}-{ident}{base}-{stamp}.zip"
 
 
-# ------------------------------------------------------------------ safety copies kept on the server
+# ------------------------------------------------------------------ copies kept on the server (the history shown on the Backup pages)
+KEEP = 30                     # newest copies kept per company / per owner console; older ones are removed automatically
+
+
 def backup_dir():
     path = Path(getattr(settings, "BACKUP_DIR", settings.BASE_DIR / "backups"))
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
-def save_safety_copy(data, manifest, why="before-import"):
+def _scope_marker(kind, company_id=None):
+    return f"-company-c{company_id}-" if kind == "company" and company_id else f"-{kind}-"
+
+
+def save_copy(data, manifest, why=""):
+    """Write a backup into the server's backups folder (why="" = a normal backup, "before-import" = the safety copy before a restore)."""
     try:
-        path = backup_dir() / f"{why}-{filename_for(manifest)}"
+        path = backup_dir() / f"{why + '-' if why else ''}{filename_for(manifest)}"
         path.write_bytes(data)
     except OSError as exc:
-        raise BackupError(f"A safety copy could not be saved on the server ({exc.strerror or exc}), so nothing was changed. "
+        raise BackupError(f"A copy could not be saved on the server ({exc.strerror or exc}). "
                           "Check that the 'backups' folder next to manage.py is writable.")
+    _prune(manifest["kind"], manifest.get("company_id"))
     return path
 
 
-def saved_copies(kind, key="", limit=6):
-    """Newest server-side copies for this scope: [{name, size, when}]."""
+def save_safety_copy(data, manifest, why="before-import"):
+    try:
+        return save_copy(data, manifest, why=why)
+    except BackupError as exc:
+        raise BackupError(f"{exc} Nothing was changed.")
+
+
+def _prune(kind, company_id=None):
+    try:
+        marker = _scope_marker(kind, company_id)
+        files = sorted((p for p in backup_dir().glob("*.zip") if marker in p.name), key=lambda p: p.stat().st_mtime, reverse=True)
+        for old in files[KEEP:]:
+            old.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def manifest_of(path):
+    try:
+        with zipfile.ZipFile(path) as zf:
+            return json.loads(zf.read("manifest.json"))
+    except (OSError, KeyError, ValueError, zipfile.BadZipFile):
+        return None
+
+
+def saved_copies(kind, key="", limit=20, company_id=None):
+    """Newest copies on the server for this scope: [{name, size, when, records, seconds, safety}]. `when` is the moment the backup was made."""
     out = []
-    marker = f"-{kind}-"
+    marker = _scope_marker(kind, company_id)
     try:
         for p in sorted(backup_dir().glob("*.zip"), key=lambda p: p.stat().st_mtime, reverse=True):
-            if marker in p.name and (not key or key in p.name):
-                st = p.stat()
-                out.append({"name": p.name, "size": st.st_size, "when": datetime.fromtimestamp(st.st_mtime)})
+            if marker not in p.name or (key and key not in p.name):
+                continue
+            manifest = manifest_of(p) or {}
+            if manifest.get("kind") != kind or (company_id and manifest.get("company_id") != company_id):
+                continue
+            st = p.stat()
+            when = parse_datetime(manifest.get("created", "")) or datetime.fromtimestamp(st.st_mtime, tz=timezone.get_current_timezone())
+            out.append({"name": p.name, "size": st.st_size, "when": timezone.localtime(when) if timezone.is_aware(when) else when,
+                        "records": sum((manifest.get("counts") or {}).values()), "seconds": manifest.get("seconds"),
+                        "safety": p.name.startswith("before-import")})
             if len(out) >= limit:
                 break
     except OSError:                                          # an unreadable / read-only folder must never break the Settings page
@@ -209,12 +255,17 @@ def saved_copies(kind, key="", limit=6):
     return out
 
 
-def saved_copy_path(name):
+def saved_copy_path(name, kind=None, company_id=None):
+    """The file of a saved copy, only if it really belongs to this scope (the file's own manifest decides, not its name)."""
     if not re.fullmatch(r"[A-Za-z0-9._-]+\.zip", name or ""):
         raise BackupError("That file name is not valid.")
     path = backup_dir() / name
     if not path.is_file():
         raise BackupError("That saved backup no longer exists.")
+    if kind:
+        manifest = manifest_of(path) or {}
+        if manifest.get("kind") != kind or (kind == "company" and manifest.get("company_id") != company_id):
+            raise BackupError("That backup does not belong here.")
     return path
 
 

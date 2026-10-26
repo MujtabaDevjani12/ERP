@@ -21,6 +21,15 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-insecure-key-change-me")
 DEBUG = os.environ.get("DEBUG", "True") == "True"
 ALLOWED_HOSTS = [h.strip() for h in os.environ.get("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") if h.strip()]
 
+# Behind nginx with HTTPS (needed for "Sign in with Google": Google only accepts https:// addresses on a real domain, not http://IP).
+# .env:  CSRF_TRUSTED_ORIGINS=https://erp.example.com,https://owner.example.com   and   BEHIND_HTTPS_PROXY=True
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()]
+if os.environ.get("BEHIND_HTTPS_PROXY", "False") == "True":
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    USE_X_FORWARDED_HOST = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
 DJANGO_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
